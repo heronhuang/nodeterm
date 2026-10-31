@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { rankQuickOpenFiles, type QuickOpenIndexedFile } from '../lib/quickOpenSearch'
 import { contentHit as contentHitQ, labelHit as labelHitQ, rankPaletteCommands } from '../lib/paletteSearch'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { IconEditor } from './icons'
 
 export interface Command {
@@ -51,6 +52,7 @@ export function CommandPalette({
   onQueryChange,
   extraCommands
 }: CommandPaletteProps) {
+  const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
 
@@ -69,14 +71,14 @@ export function CommandPalette({
         id: `file:${r.path}`,
         label: base,
         hint: dir,
-        section: 'Files',
+        section: t('palette.filesSection'),
         icon: <IconEditor />,
         run: () => onOpenFile(r.path),
         onSecondary: onRevealFile ? () => onRevealFile(r.path) : undefined,
-        secondaryLabel: 'Reveal in Explorer'
+        secondaryLabel: t('palette.revealInExplorer')
       }
     })
-  }, [fileIndex, onOpenFile, onRevealFile, query])
+  }, [fileIndex, onOpenFile, onRevealFile, query, t])
 
   const items = useMemo(
     () => [...filtered, ...fileCommands, ...(extraCommands ?? [])],
@@ -96,7 +98,7 @@ export function CommandPalette({
           className="palette__input"
           autoFocus
           spellCheck={false}
-          placeholder="Type a command or name…"
+          placeholder={t('palette.placeholder')}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -126,7 +128,7 @@ export function CommandPalette({
           }}
         />
         <div className="palette__list">
-          {items.length === 0 && <div className="palette__empty">No matches</div>}
+          {items.length === 0 && <div className="palette__empty">{t('palette.empty')}</div>}
           {items.map((c, i) => (
             <div key={c.id} className="palette__row">
               {c.section && c.section !== items[i - 1]?.section && (
@@ -140,7 +142,7 @@ export function CommandPalette({
                 <span className="palette__icon">{c.icon}</span>
                 <span className="palette__label">{c.label}</span>
                 {!labelHit(c) && contentHit(c) ? (
-                  <span className="palette__hint">found in output</span>
+                  <span className="palette__hint">{t('palette.foundInOutput')}</span>
                 ) : (
                   (c.hint ?? c.note) && (
                     <span className="palette__hint">{c.hint ?? c.note}</span>

@@ -6,6 +6,7 @@ import type { NodeIcon } from '@shared/node-icon'
 import { hasUsage } from '@shared/agents/config'
 import type { SshConnection } from '@shared/ssh'
 import type { ProjectIcon } from '@shared/project-icon'
+import { t } from '@renderer/i18n/runtime'
 import { relativeTime } from './relativeTime'
 
 export interface SessionNodeInput {
@@ -42,6 +43,11 @@ export type StatusKind = 'working' | 'attention' | 'done' | 'unknown'
 /** Sessions sidebar top-level grouping mode. */
 export type SidebarGrouping = 'project' | 'status'
 
+export function stateLabel(kind: StatusKind): string {
+  return t(`session.state.${kind}`)
+}
+
+/** @deprecated Prefer `stateLabel()` for locale-aware labels. */
 export const STATE_LABEL: Record<StatusKind, string> = {
   working: 'Running',
   attention: 'Waiting for your response',
@@ -63,12 +69,8 @@ export type StatusGroup = 'attention' | 'unread' | 'working' | 'idle' | 'unknown
  */
 const STATUS_GROUP_ORDER: StatusGroup[] = ['attention', 'unread', 'working', 'idle', 'unknown']
 
-const STATUS_GROUP_LABEL: Record<StatusGroup, string> = {
-  attention: 'Need attention',
-  unread: 'Unread',
-  working: 'Running',
-  idle: 'Idle',
-  unknown: 'Unknown'
+function statusGroupLabel(kind: StatusGroup): string {
+  return t(`session.group.${kind}`)
 }
 
 /**
@@ -266,7 +268,7 @@ export function sessionStateAgeTitle(
   if (clock === 'transition') return `Entered this state ${label}`
   const when = label.replace(/^seen /, '')
   if (clock === 'seen') return `Last hook event ${when}. The current state is unknown until the agent reports one.`
-  const what = lastSeenState ? ` (${STATE_LABEL[sessionStatusKind(lastSeenState)]})` : ''
+  const what = lastSeenState ? ` (${stateLabel(sessionStatusKind(lastSeenState))})` : ''
   return `Last hook event ${when}${what}, before nodeterm restarted. The current state is unknown until the agent reports again.`
 }
 
@@ -381,7 +383,7 @@ function toRow(
     icon: n.icon,
     isAgent: !!n.agentId,
     statusKind,
-    stateLabel: STATE_LABEL[statusKind],
+    stateLabel: stateLabel(statusKind),
     // Transition clock first; the "last seen" one only while this run has seen no transition.
     statusUpdatedAt: status?.lastEventAt ?? status?.lastSeen?.at,
     ...statusClockOf(status),
@@ -648,7 +650,7 @@ export function buildStatusList(
   // is temporarily empty and prevent the sidebar from jumping as sessions move between states.
   return STATUS_GROUP_ORDER.map((kind) => ({
     kind,
-    label: STATUS_GROUP_LABEL[kind],
+    label: statusGroupLabel(kind),
     rows: (byStatus.get(kind) ?? []).map((t) => t.row)
   }))
 }

@@ -7,7 +7,7 @@ import { ensureCodexCliCaps } from './state/codexCli'
 import { initAgentResolver } from './state/agent-resolver'
 import { refreshAgentEnv } from './lib/agentEnv'
 import { applyWindowChrome } from './lib/windowChrome'
-import { installMarkdownLinkGuard, LOCAL_LINK_MESSAGE, openExternalQuietly } from './lib/markdownLinks'
+import { installMarkdownLinkGuard, localLinkMessage, openExternalQuietly } from './lib/markdownLinks'
 import './styles.css'
 import './tailwind.css'
 
@@ -28,7 +28,7 @@ installMarkdownLinkGuard(document, {
   openExternal: (url) => openExternalQuietly((u) => window.nodeTerminal.shell.openExternal(u), url),
   notifyLocal: () =>
     window.dispatchEvent(
-      new CustomEvent('nodeterm:toast', { detail: { kind: 'error', message: LOCAL_LINK_MESSAGE } })
+      new CustomEvent('nodeterm:toast', { detail: { kind: 'error', message: localLinkMessage() } })
     )
 })
 

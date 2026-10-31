@@ -21,6 +21,8 @@
 // per-node state a document-level handler cannot see. A wrong guess would open the wrong file on
 // the wrong machine, so this degrades to "say so" instead.
 
+import { t } from '@renderer/i18n/runtime'
+
 /**
  * CONTRACT: the container classes rendered markdown HTML is injected into. Every component that
  * pipes `renderMarkdown` output into `dangerouslySetInnerHTML` must render it inside one of these —
@@ -106,7 +108,9 @@ export function installMarkdownLinkGuard(doc: Document, deps: MarkdownLinkDeps):
 }
 
 /** The message shown for a local link. */
-export const LOCAL_LINK_MESSAGE = "Local file links can't be opened from rendered markdown."
+export function localLinkMessage(): string {
+  return t('markdown.localLink')
+}
 
 /**
  * Hand a web link to the bridge's `openExternal` without letting a failure escape as an unhandled

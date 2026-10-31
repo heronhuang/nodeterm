@@ -2,7 +2,7 @@ import type { NavStop, NodeKind } from '@shared/types'
 import type { AgentId } from '@shared/agents/config'
 import { agentConfig } from '@shared/agents/config'
 import type { AgentNodeStatus } from '../state/agentStatus'
-import { sessionStatusKind, STATE_LABEL } from './sessionList'
+import { sessionStatusKind, stateLabel } from './sessionList'
 
 /** Camera navigation history is capped so it never grows unbounded on a long-lived project. */
 export const BREADCRUMB_CAP = 20
@@ -58,8 +58,8 @@ export function buildNote(target: BreadcrumbTarget, status: AgentNodeStatus | un
     // hook state (the norm right after an app restart — `agentStatus.state` is transient) still
     // names the node instead of degrading to a generic "Claude Code · Unknown".
     const name = status?.session || target.title || agentLabel
-    const stateLabel = STATE_LABEL[sessionStatusKind(status?.state)]
-    return `${name} · ${stateLabel}`
+    const statusText = stateLabel(sessionStatusKind(status?.state))
+    return `${name} · ${statusText}`
   }
   // A missing kind defaults to 'terminal'; there is deliberately NO generic fallback beyond it —
   // goToNode refuses the only kinds KIND_LABEL omits (subagent/loop), so a dead `?? 'node'` arm

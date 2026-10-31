@@ -12,3 +12,7 @@ export function normalizeUiLanguage(raw: unknown): UiLanguage {
 export type TranslateParams = Record<string, string | number | undefined>
 
 export type TranslateFn = (key: string, params?: TranslateParams) => string
+
+export function htmlLangFor(locale: UiLanguage): string {
+  return locale === 'zh' ? 'zh-CN' : 'en'
+}

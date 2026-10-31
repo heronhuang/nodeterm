@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useSettings } from '../../../state/settings'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -13,72 +14,81 @@ import {
   sanitizeNotchOffsetY,
   type NotchAlign
 } from '@shared/notch-hud'
+import { useI18n } from '@renderer/i18n/useI18n'
 
-const ROWS = {
+const ROW_DEFS = {
   enabled: {
-    title: 'Notch HUD',
-    keywords: ['notch', 'hud', 'mascot', 'menu bar', 'overlay', 'agent', 'status', 'macos', 'capsule', 'dynamic island']
+    key: 'settings.notch.rows.enabled.title',
+    keywords: [
+      'notch',
+      'hud',
+      'mascot',
+      'menu bar',
+      'overlay',
+      'agent',
+      'status',
+      'macos',
+      'capsule',
+      'dynamic island'
+    ]
   },
   width: {
-    title: 'Notch width',
+    key: 'settings.notch.rows.width.title',
     keywords: ['notch', 'width', 'flush', 'align', 'capsule', 'position', 'offset', 'tune']
   },
   side: {
-    title: 'Capsule side',
+    key: 'settings.notch.rows.side.title',
     keywords: ['notch', 'side', 'left', 'right', 'center', 'centre', 'align', 'position', 'place', 'corner', 'capsule']
   },
   offset: {
-    title: 'Vertical position',
+    key: 'settings.notch.rows.offset.title',
     keywords: ['notch', 'vertical', 'offset', 'raise', 'lower', 'up', 'down', 'height', 'position', 'move', 'capsule']
   },
   hover: {
-    title: 'Expand on hover',
+    key: 'settings.notch.rows.hover.title',
     keywords: ['notch', 'hover', 'expand', 'panel', 'click', 'open', 'sessions']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
-/** "+12 px" / "−8 px" / "0 px" — a signed readout so the direction is legible at a glance. */
 function offsetLabel(px: number): string {
   if (px > 0) return `+${px} px`
   if (px < 0) return `−${-px} px`
   return '0 px'
 }
 
-/**
- * Settings → Interface → Notch (macOS only; the page only renders it on darwin).
- *
- * Everything the notch capsule exposes lives here rather than in Appearance: the enable toggle, the
- * notch-width knob (macOS exposes no API for the real notch width, so the capsule has to assume one
- * — this is how you make it sit flush on YOUR Mac), the two PLACEMENT controls (which side of the
- * display, and how far up/down), and hover-vs-click expansion. Everything applies live: dragging a
- * slider moves the capsule as you drag.
- *
- * The slider bounds and the sanitizers are the SAME constants main clamps against
- * (`@shared/notch-hud`), so the range on screen cannot drift from the clamp.
- */
 export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const notchHud = useSettings((s) => s.settings.notchHud)
   const notchWidth = useSettings((s) => s.settings.notchWidth)
-  // Read through the sanitizers: settings.json is hand-editable, and a control bound to a value it
-  // cannot represent (an unknown side, NaN) would render blank and overwrite the file on the next
-  // interaction. Reading it as main will read it keeps the control honest about what is drawn.
   const notchAlign = useSettings((s) => sanitizeNotchAlign(s.settings.notchAlign))
   const notchOffsetY = useSettings((s) => sanitizeNotchOffsetY(s.settings.notchOffsetY))
   const hoverExpand = useSettings((s) => s.settings.notchHoverExpand)
   const update = useSettings((s) => s.update)
+
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   return (
     <SettingsSection
       id="notch"
-      title="Notch"
-      description="Walking agent mascots inside the MacBook notch, and a mini session panel when you need it."
+      title={t('settings.notch.title')}
+      description={t('settings.notch.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.enabled}>
+      <SearchableRow entry={rows.enabled}>
         <FieldRow
-          label="Show the notch HUD"
-          description="Extends the notch into a black capsule while agents work: a walking mascot per busy agent, a red dot when one needs you, a green blob when one has finished and you haven't looked yet."
+          label={t('settings.notch.showHud')}
+          description={t('settings.notch.showHudDescription')}
           control={
             <Switch
               checked={notchHud}
@@ -96,17 +106,17 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
         }
         aria-disabled={!notchHud}
       >
-        <SearchableRow {...ROWS.side}>
+        <SearchableRow entry={rows.side}>
           <FieldRow
-            label="Capsule side"
-            description="Center hugs the notch (on a screen without one, a floating pill in the middle). Left and Right draw a floating pill at that edge of the screen, just below the menu bar."
+            label={t('settings.notch.capsuleSide')}
+            description={t('settings.notch.capsuleSideDescription')}
             control={
               <SegmentedPill<NotchAlign>
                 value={notchAlign}
                 options={[
-                  { value: 'left', label: 'Left' },
-                  { value: 'center', label: 'Center' },
-                  { value: 'right', label: 'Right' }
+                  { value: 'left', label: t('settings.notch.alignLeft') },
+                  { value: 'center', label: t('settings.notch.alignCenter') },
+                  { value: 'right', label: t('settings.notch.alignRight') }
                 ]}
                 onChange={(v) => update({ notchAlign: v })}
                 ariaLabel="Notch capsule side"
@@ -115,10 +125,10 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           />
         </SearchableRow>
 
-        <SearchableRow {...ROWS.offset}>
+        <SearchableRow entry={rows.offset}>
           <FieldRow
-            label="Vertical position"
-            description="Nudges the capsule down (positive) or up (negative) from where it normally sits. Up stops at the top edge of the screen — and the capsule fused to the notch is already there, so it can only move down, which turns it into a floating pill under the notch."
+            label={t('settings.notch.verticalPosition')}
+            description={t('settings.notch.verticalPositionDescription')}
             control={
               <div className="flex items-center gap-3">
                 <input
@@ -139,10 +149,10 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           />
         </SearchableRow>
 
-        <SearchableRow {...ROWS.width}>
+        <SearchableRow entry={rows.width}>
           <FieldRow
-            label="Notch width"
-            description="macOS doesn't tell apps how wide the notch is, so the capsule assumes it. Nudge this until the capsule sits flush against the notch — larger moves it left, smaller moves it right. Only the centered, notch-hugging capsule uses it."
+            label={t('settings.notch.notchWidth')}
+            description={t('settings.notch.notchWidthDescription')}
             control={
               <div className="flex items-center gap-3">
                 <input
@@ -163,10 +173,10 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           />
         </SearchableRow>
 
-        <SearchableRow {...ROWS.hover}>
+        <SearchableRow entry={rows.hover}>
           <FieldRow
-            label="Expand on hover"
-            description="Point at the capsule to open the session panel. Off = it only opens when you click it. Either way it closes when you move away — and that's when a finished session stops glowing green."
+            label={t('settings.notch.expandOnHover')}
+            description={t('settings.notch.expandOnHoverDescription')}
             control={
               <Switch
                 checked={hoverExpand}

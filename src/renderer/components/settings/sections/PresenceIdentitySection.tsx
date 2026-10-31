@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { NAME_MAX_LEN, PRESENCE_COLORS } from '@shared/presence'
 import { loadIdentity } from '../../../state/presence'
 import { setMeAll } from '../../../session/session'
@@ -8,35 +8,37 @@ import { FieldRow } from '../FieldRow'
 import { Button } from '@renderer/ui/Button'
 import { Input } from '@renderer/ui/Input'
 import { thisMachine } from '../../../lib/machineName'
+import { useI18n } from '@renderer/i18n/useI18n'
 
-const ROWS = {
-  identity: {
-    title: 'Your name',
-    keywords: ['name', 'presence', 'identity', 'display', 'collaborate', 'color', 'facepile', 'nickname']
-  }
-}
-const ENTRIES = Object.values(ROWS)
+const IDENTITY_KEYWORDS = [
+  'name',
+  'presence',
+  'identity',
+  'display',
+  'collaborate',
+  'color',
+  'facepile',
+  'nickname'
+]
 
-/**
- * Edit the live-collaboration identity ({name, color}) others see in the facepile / cursor labels /
- * board-log — the same value the first-connect PresenceNamePrompt sets. Seeds from the saved
- * identity (`loadIdentity`) and writes through `setMeAll`, which re-helloes EVERY live session, so a
- * rename reaches connected peers immediately (no reload). Renderer-only: the identity lives in
- * localStorage (`nodeterm.presence.me`), never in settings.json, and is shared across sessions.
- */
 export function PresenceIdentitySection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const saved = loadIdentity()
   const [name, setName] = useState(saved?.name ?? '')
   const [color, setColor] = useState(saved?.color ?? PRESENCE_COLORS[0])
   const [justSaved, setJustSaved] = useState(false)
+
+  const row = useMemo(
+    () => ({ title: t('settings.presence.rows.identity.title'), keywords: IDENTITY_KEYWORDS }),
+    [t]
+  )
+  const entries = useMemo(() => [row], [row])
 
   const trimmed = name.trim()
   const dirty = trimmed !== (saved?.name ?? '') || color !== (saved?.color ?? PRESENCE_COLORS[0])
 
   const save = (): void => {
     if (!trimmed) return
-    // Re-hello every live session (obligation 2): renaming must update every connected core, or a
-    // remote peer keeps drawing the old name until reload.
     setMeAll({ name: trimmed, color })
     setJustSaved(true)
   }
@@ -44,21 +46,21 @@ export function PresenceIdentitySection({ isActive }: { isActive: boolean }): Re
   return (
     <SettingsSection
       id="presence"
-      title="Your name"
-      description={`The name and color other people see when they connect to ${thisMachine()} — in the facepile, cursor labels, and board comments.`}
+      title={t('settings.presence.title')}
+      description={t('settings.presence.description', { machine: thisMachine() })}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.identity}>
+      <SearchableRow entry={row}>
         <div className="space-y-4">
           <FieldRow
-            label="Display name"
+            label={t('settings.presence.displayName')}
             control={
               <Input
                 className="w-72"
                 value={name}
                 maxLength={NAME_MAX_LEN}
-                placeholder="Your name"
+                placeholder={t('settings.presence.placeholder')}
                 onChange={(e) => {
                   setName(e.target.value)
                   setJustSaved(false)
@@ -70,7 +72,7 @@ export function PresenceIdentitySection({ isActive }: { isActive: boolean }): Re
             }
           />
           <FieldRow
-            label="Color"
+            label={t('settings.presence.color')}
             control={
               <div className="flex flex-wrap gap-2">
                 {PRESENCE_COLORS.map((c) => (
@@ -78,7 +80,7 @@ export function PresenceIdentitySection({ isActive }: { isActive: boolean }): Re
                     key={c}
                     type="button"
                     title={c}
-                    aria-label={`Color ${c}`}
+                    aria-label={t('settings.presence.colorAria', { color: c })}
                     onClick={() => {
                       setColor(c)
                       setJustSaved(false)
@@ -100,14 +102,13 @@ export function PresenceIdentitySection({ isActive }: { isActive: boolean }): Re
           />
           <div className="flex items-center gap-3">
             <Button variant="primary" disabled={!trimmed || !dirty} onClick={save}>
-              Save
+              {t('settings.presence.save')}
             </Button>
-            {justSaved && !dirty ? <span className="text-sm text-muted">Saved</span> : null}
+            {justSaved && !dirty ? (
+              <span className="text-sm text-muted">{t('settings.presence.saved')}</span>
+            ) : null}
           </div>
-          <p className="text-sm text-muted">
-            If you never pick a name you appear to others as “Someone”. This is separate from your
-            login or license — it only labels you during live collaboration.
-          </p>
+          <p className="text-sm text-muted">{t('settings.presence.footnote')}</p>
         </div>
       </SearchableRow>
     </SettingsSection>

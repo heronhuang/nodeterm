@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { normalizeUiLanguage, type UiLanguage } from '@shared/i18n/types'
+import { htmlLangFor } from '@shared/i18n/types'
 import { setUiLanguage } from './runtime'
 
 /**
@@ -14,7 +15,9 @@ export function I18nProvider({
   children: ReactNode
 }): React.JSX.Element {
   useEffect(() => {
-    setUiLanguage(normalizeUiLanguage(uiLanguage))
+    const locale = normalizeUiLanguage(uiLanguage)
+    setUiLanguage(locale)
+    document.documentElement.lang = htmlLangFor(locale)
   }, [uiLanguage])
   return <>{children}</>
 }

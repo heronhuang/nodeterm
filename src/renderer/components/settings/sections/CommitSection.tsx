@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useSettings } from '../../../state/settings'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -5,48 +6,66 @@ import { FieldRow } from '../FieldRow'
 import { Select } from '@renderer/ui/Select'
 import { Input } from '@renderer/ui/Input'
 import { Switch } from '@renderer/ui/Switch'
+import { useI18n } from '@renderer/i18n/useI18n'
 
-const ROWS = {
+const ROW_DEFS = {
   autoFetch: {
-    title: 'Auto-fetch git status',
+    key: 'settings.commit.rows.autoFetch.title',
     keywords: ['git', 'fetch', 'source control', 'ahead', 'behind', 'sync', 'remote']
   },
   agent: {
-    title: 'Commit agent',
+    key: 'settings.commit.rows.agent.title',
     keywords: ['commit', 'message', 'ai', 'claude', 'codex', 'generate']
   },
-  command: { title: 'Custom command', keywords: ['commit', 'custom', 'command', 'prompt', 'promptFile'] },
-  extra: { title: 'Extra prompt', keywords: ['commit', 'prompt', 'conventional', 'gitmoji'] }
-}
-const ENTRIES = Object.values(ROWS)
+  command: {
+    key: 'settings.commit.rows.command.title',
+    keywords: ['commit', 'custom', 'command', 'prompt', 'promptFile']
+  },
+  extra: {
+    key: 'settings.commit.rows.extra.title',
+    keywords: ['commit', 'prompt', 'conventional', 'gitmoji']
+  }
+} as const
 
 export function CommitSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
   return (
     <SettingsSection
       id="commit"
-      title="Commit messages (AI)"
-      description="Runs a local coding-agent CLI read-only on your staged diff (no built-in model)."
+      title={t('settings.commit.title')}
+      description={t('settings.commit.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.autoFetch}>
+      <SearchableRow entry={rows.autoFetch}>
         <FieldRow
-          label="Auto-fetch git status"
-          description="Periodically refresh ahead/behind from the remote while Source Control is open."
+          label={t('settings.commit.autoFetchLabel')}
+          description={t('settings.commit.autoFetchDescription')}
           control={
             <Switch
               checked={settings.gitAutoFetch}
-              ariaLabel="Auto-fetch git status"
+              ariaLabel={t('settings.commit.autoFetchLabel')}
               onChange={(on) => update({ gitAutoFetch: on })}
             />
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.agent}>
+      <SearchableRow entry={rows.agent}>
         <FieldRow
-          label="Agent"
+          label={t('settings.commit.agentLabel')}
           control={
             <Select
               value={settings.commitAgent}
@@ -54,22 +73,22 @@ export function CommitSection({ isActive }: { isActive: boolean }): React.JSX.El
                 update({ commitAgent: e.target.value as 'claude' | 'codex' | 'custom' })
               }
             >
-              <option value="claude">Claude Code</option>
-              <option value="codex">Codex</option>
-              <option value="custom">Custom command…</option>
+              <option value="claude">{t('settings.commit.agentClaude')}</option>
+              <option value="codex">{t('settings.commit.agentCodex')}</option>
+              <option value="custom">{t('settings.commit.agentCustom')}</option>
             </Select>
           }
         />
       </SearchableRow>
       {settings.commitAgent === 'custom' && (
-        <SearchableRow {...ROWS.command}>
+        <SearchableRow entry={rows.command}>
           <FieldRow
-            label="Command"
-            description="The prompt goes to the command's stdin by default. {prompt} passes it inline as one argument instead (not for npm .cmd shims on Windows, nor for diffs past the Windows command-line limit); {promptFile} passes the path of a private temp file holding it."
+            label={t('settings.commit.commandLabel')}
+            description={t('settings.commit.commandDescription')}
             control={
               <Input
                 className="w-72"
-                placeholder="mycli --flag {prompt}"
+                placeholder={t('settings.commit.commandPlaceholder')}
                 value={settings.commitAgentCommand}
                 onChange={(e) => update({ commitAgentCommand: e.target.value })}
               />
@@ -77,12 +96,12 @@ export function CommitSection({ isActive }: { isActive: boolean }): React.JSX.El
           />
         </SearchableRow>
       )}
-      <SearchableRow {...ROWS.extra}>
+      <SearchableRow entry={rows.extra}>
         <div className="py-2.5">
-          <label className="block text-[13px] text-text">Extra prompt (optional)</label>
+          <label className="block text-[13px] text-text">{t('settings.commit.extraLabel')}</label>
           <textarea
             value={settings.commitExtraPrompt}
-            placeholder="e.g. Use Conventional Commits with gitmoji"
+            placeholder={t('settings.commit.extraPlaceholder')}
             onChange={(e) => update({ commitExtraPrompt: e.target.value })}
             className="mt-2 min-h-20 w-full rounded-md border border-border bg-bg px-2.5 py-2 text-[13px] text-text outline-none focus:border-accent"
           />

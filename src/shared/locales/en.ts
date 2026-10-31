@@ -1,3 +1,7 @@
+import { settingsSectionEn } from './settings-en'
+
+const { language: languageSectionEn, ...settingsRestEn } = settingsSectionEn
+
 /** English UI message catalog (nested keys resolved by createTranslator). */
 export const enMessages = {
   common: {
@@ -94,8 +98,87 @@ export const enMessages = {
       description: 'Choose the language used for menus, settings, and dialogs in this app.',
       label: 'Display language',
       zh: '简体中文',
-      en: 'English'
+      en: 'English',
+      ...languageSectionEn
+    },
+    ...settingsRestEn
+  },
+  palette: {
+    placeholder: 'Type a command or name…',
+    empty: 'No matches',
+    foundInOutput: 'found in output',
+    filesSection: 'Files',
+    revealInExplorer: 'Reveal in Explorer'
+  },
+  tabBar: {
+    canvasView: 'Canvas view',
+    kanbanView: 'Kanban view',
+    storeInFolder: 'Store canvas in folder',
+    storeInAppData: 'Store canvas in app data',
+    openToResume: 'Open the project to resume',
+    updateDownloaded: 'nodeterm v{version} is ready, restart to update',
+    updateAvailable: 'nodeterm v{version} is available, click to download it',
+    updateManual: 'nodeterm v{version} is available, download it to update',
+    updateUnsupported: 'This version is no longer supported, update to continue',
+    updateButton: 'Update',
+    projectOptions: 'Project options',
+    newProject: 'New project'
+  },
+  session: {
+    state: {
+      working: 'Running',
+      attention: 'Waiting for your response',
+      done: 'Done',
+      unknown: 'Unknown'
+    },
+    group: {
+      attention: 'Need attention',
+      unread: 'Unread',
+      working: 'Running',
+      idle: 'Idle',
+      unknown: 'Unknown'
     }
+  },
+  nodeActions: {
+    nodesCount: '{count} nodes',
+    oneNode: '1 node',
+    stopAgentControl: 'Stop agent control',
+    addToGroup: 'Add selection to {title}',
+    addToGroupFallback: 'group',
+    addSelectionToGroup: 'Add selection to group',
+    groupFallback: 'Group',
+    groupSelection: 'Group selection',
+    groupNode: 'Group node',
+    removeFromGroup: 'Remove from group',
+    changeIcon: 'Change icon…',
+    setIcon: 'Set icon…',
+    duplicate: 'Duplicate',
+    snapToZone: 'Snap to zone',
+    collapseExpand: 'Collapse / Expand',
+    markdownView: 'Markdown view',
+    refreshTerminal: 'Refresh terminal',
+    branchConversation: 'Branch conversation',
+    delete: 'Delete',
+    pauseSessions: 'Pause {count} sessions',
+    restartAgent: 'Restart agent',
+    restartAgentAndShell: 'Restart agent and shell',
+    reopenAs: 'Reopen session as',
+    switchModel: 'Switch model',
+    switchModelCurrent: 'Switch model ({model})',
+    restart: 'Restart',
+    resumeSession: 'Resume session',
+    pauseSession: 'Pause session',
+    pause: 'Pause',
+    pauseEndSession: 'Pause & end session',
+    switchClaudeAccount: 'Switch Claude account',
+    switchCodexAccount: 'Switch Codex account'
+  },
+  markdown: {
+    localLink: "Local file links can't be opened from rendered markdown."
+  },
+  dialog: {
+    ok: 'OK',
+    cancel: 'Cancel'
   },
   addMenu: {
     hints: {

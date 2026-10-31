@@ -16,6 +16,7 @@ import { homedir, hostname } from 'os'
 import { randomUUID } from 'crypto'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, Notification, powerMonitor, safeStorage, screen, shell, systemPreferences, webContents } from 'electron'
 import { IPC } from '../shared/ipc'
+import { mainT } from './i18n'
 
 // Debug log ring (issue #78): capture the process console from the first line — a packaged app
 // swallows it entirely, and the boot path is where the interesting warnings are. The ring is
@@ -1051,6 +1052,7 @@ if (process.platform !== 'win32' && typeof process.setFdLimit === 'function') {
 function buildAppMenu(win: BrowserWindow): void {
   const isMac = process.platform === 'darwin'
   const s = settingsStore.get()
+  const t = mainT(s)
   const send = (channel: string): void => {
     if (!win.isDestroyed()) win.webContents.send(channel)
   }
@@ -1061,7 +1063,7 @@ function buildAppMenu(win: BrowserWindow): void {
   // stand-down is the only way it can reach a focused terminal.
   const settingsItem: Electron.MenuItemConstructorOptions = {
     id: MENU_ITEM_ID_SETTINGS,
-    label: isMac ? 'Settings…' : 'Settings',
+    label: isMac ? t('menu.settingsMac') : t('menu.settings'),
     accelerator: 'CmdOrCtrl+,',
     click: () => send(IPC.appOpenSettings)
   }
@@ -1085,7 +1087,7 @@ function buildAppMenu(win: BrowserWindow): void {
     { role: 'toggleDevTools' },
     { type: 'separator' },
     {
-      label: 'Snap to Grid',
+      label: t('menu.snapToGrid'),
       type: 'checkbox',
       checked: s.autoAlignGrid === true,
       click: () => send(IPC.appToggleAutoAlign)
@@ -1095,7 +1097,7 @@ function buildAppMenu(win: BrowserWindow): void {
       // renderer sees it, so labelling this item "⌘0" would show a shortcut that does something
       // else. The item stays click-only; the renderer's own Shift+1 chord is the keyboard route to
       // Fit View.
-      label: 'Fit View',
+      label: t('menu.fitView'),
       click: () => send(IPC.appFitView)
     },
     {
@@ -1104,7 +1106,7 @@ function buildAppMenu(win: BrowserWindow): void {
       // (`view.kanbanToggle`) the menu happens to own above the page; suspending the item is what
       // lets a terminal-first user's ⌘⇧B reach the shell like every other chord.
       id: MENU_ITEM_ID_KANBAN,
-      label: 'Toggle Kanban Board',
+      label: t('menu.toggleKanban'),
       accelerator: 'CmdOrCtrl+Shift+B',
       click: () => send(IPC.appToggleKanban)
     },
@@ -1131,7 +1133,7 @@ function buildAppMenu(win: BrowserWindow): void {
           ]
         },
         {
-          label: 'Edit',
+          label: t('menu.edit'),
           submenu: [
             { role: 'undo' },
             { role: 'redo' },
@@ -1144,9 +1146,9 @@ function buildAppMenu(win: BrowserWindow): void {
             { role: 'selectAll' }
           ]
         },
-        { label: 'View', submenu: viewSubmenu },
+        { label: t('menu.view'), submenu: viewSubmenu },
         {
-          label: 'Window',
+          label: t('menu.window'),
           // `id` on minimize: `syncMenuForStandDown` disables it while EITHER stand-down is in
           // effect — a terminal focused under terminal-first, or an armed shortcut recorder — so
           // ⌘M falls through to the terminal, or to the recorder, instead of minimizing the
@@ -1161,9 +1163,9 @@ function buildAppMenu(win: BrowserWindow): void {
         }
       ]
     : [
-        { label: 'File', submenu: [{ role: 'quit' }] },
+        { label: t('menu.file'), submenu: [{ role: 'quit' }] },
         {
-          label: 'Edit',
+          label: t('menu.edit'),
           submenu: [
             { role: 'undo' },
             { role: 'redo' },
@@ -1175,13 +1177,13 @@ function buildAppMenu(win: BrowserWindow): void {
             { role: 'selectAll' }
           ]
         },
-        { label: 'View', submenu: viewSubmenu },
-        { label: 'Settings', submenu: [settingsItem] },
+        { label: t('menu.view'), submenu: viewSubmenu },
+        { label: t('menu.settings'), submenu: [settingsItem] },
         // Both ids matter off-mac: `{role:'close'}` owns Ctrl+W here, which is readline's kill-word
         // in a terminal — a stand-down that left it enabled would CLOSE the window on a keystroke
         // a terminal-first user meant for their shell.
         {
-          label: 'Window',
+          label: t('menu.window'),
           submenu: [
             { role: 'minimize', id: MENU_ITEM_ID_MINIMIZE },
             { role: 'close', id: MENU_ITEM_ID_CLOSE }

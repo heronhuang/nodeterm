@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useDialogStack } from './dialog-stack'
 
 interface InputDialogProps {
@@ -23,12 +24,15 @@ export function InputDialog({
   message,
   initialValue = '',
   placeholder,
-  confirmLabel = 'OK',
-  cancelLabel = 'Cancel',
+  confirmLabel: confirmLabelProp,
+  cancelLabel: cancelLabelProp,
   maxLength,
   onSubmit,
   onCancel
 }: InputDialogProps) {
+  const { t } = useI18n()
+  const confirmLabel = confirmLabelProp ?? t('common.ok')
+  const cancelLabel = cancelLabelProp ?? t('confirm.cancel')
   const [value, setValue] = useState(initialValue)
   const inputRef = useRef<HTMLInputElement>(null)
   // Registered in the modal stack so a ConfirmDialog underneath does not ALSO answer the Enter /

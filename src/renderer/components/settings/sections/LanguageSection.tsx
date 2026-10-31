@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useSettings } from '../../../state/settings'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -7,17 +8,16 @@ import type { UiLanguage } from '@shared/i18n/types'
 import { UI_LANGUAGES } from '@shared/i18n/types'
 import { useI18n } from '@renderer/i18n/useI18n'
 
-const ROWS = {
-  language: {
-    title: 'Language',
-    keywords: ['language', 'locale', '中文', 'english', 'i18n', 'translation', 'display']
-  }
-}
+const LANGUAGE_KEYWORDS = ['language', 'locale', '中文', 'english', 'i18n', 'translation', 'display']
 
 export function LanguageSection({ isActive }: { isActive: boolean }): React.JSX.Element {
   const { t } = useI18n()
   const uiLanguage = useSettings((s) => s.settings.uiLanguage)
   const update = useSettings((s) => s.update)
+  const row = useMemo(
+    () => ({ title: t('settings.language.rows.language.title'), keywords: LANGUAGE_KEYWORDS }),
+    [t]
+  )
 
   const choices: { value: UiLanguage; label: string }[] = UI_LANGUAGES.map((code) => ({
     value: code,
@@ -30,9 +30,9 @@ export function LanguageSection({ isActive }: { isActive: boolean }): React.JSX.
       title={t('settings.language.title')}
       description={t('settings.language.description')}
       isActive={isActive}
-      searchEntries={[ROWS.language]}
+      searchEntries={[row]}
     >
-      <SearchableRow entry={ROWS.language}>
+      <SearchableRow entry={row}>
         <FieldRow label={t('settings.language.label')}>
           <SegmentedPill
             value={uiLanguage}

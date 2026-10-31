@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { confirmKeyAction } from './confirm-key'
 import { isTopDialog, nextDialogId, popDialog, pushDialog } from './dialog-stack'
 
@@ -70,7 +71,7 @@ export function ConfirmDialog({
   message,
   body,
   confirmLabel,
-  cancelLabel = 'Cancel',
+  cancelLabel: cancelLabelProp,
   danger: dangerProp,
   alert = false,
   option,
@@ -81,12 +82,15 @@ export function ConfirmDialog({
   onCancel,
   onDismiss
 }: ConfirmDialogProps) {
+  const { t } = useI18n()
+  const cancelLabel = cancelLabelProp ?? t('confirm.cancel')
   // Escape / overlay-click land here: the caller's dismiss channel when it has one, else cancel.
   const dismiss = onDismiss ?? onCancel
   // An alert has nothing destructive to warn about and nothing to cancel; anything else keeps the
   // historical destructive defaults ("Delete", danger styling, focus parked on the safe button).
   const danger = dangerProp ?? !alert
-  const confirmText = confirmLabel ?? (alert ? 'OK' : 'Delete')
+  const confirmText =
+    confirmLabel ?? (alert ? t('confirm.ok') : t('confirm.delete'))
   // One id per instance, for the lifetime of the component (mount order == paint order == stack).
   const idRef = useRef<string>()
   if (!idRef.current) idRef.current = nextDialogId()

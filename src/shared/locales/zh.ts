@@ -1,3 +1,7 @@
+import { settingsSectionZh } from './settings-zh'
+
+const { language: languageSectionZh, ...settingsRestZh } = settingsSectionZh
+
 /** 简体中文 UI 消息目录（由 createTranslator 解析嵌套键）。 */
 export const zhMessages = {
   common: {
@@ -94,8 +98,87 @@ export const zhMessages = {
       description: '选择本应用中菜单、设置与对话框使用的语言。',
       label: '显示语言',
       zh: '简体中文',
-      en: 'English'
+      en: 'English',
+      ...languageSectionZh
+    },
+    ...settingsRestZh
+  },
+  palette: {
+    placeholder: '输入命令或名称…',
+    empty: '无匹配项',
+    foundInOutput: '在输出中找到',
+    filesSection: '文件',
+    revealInExplorer: '在资源管理器中显示'
+  },
+  tabBar: {
+    canvasView: '画布视图',
+    kanbanView: '看板视图',
+    storeInFolder: '将画布存入文件夹',
+    storeInAppData: '将画布存入应用数据',
+    openToResume: '打开项目以恢复',
+    updateDownloaded: 'nodeterm v{version} 已就绪，重启以更新',
+    updateAvailable: 'nodeterm v{version} 可用，点击下载',
+    updateManual: 'nodeterm v{version} 可用，下载以更新',
+    updateUnsupported: '此版本已不再受支持，请更新后继续使用',
+    updateButton: '更新',
+    projectOptions: '项目选项',
+    newProject: '新建项目'
+  },
+  session: {
+    state: {
+      working: '运行中',
+      attention: '等待你的回复',
+      done: '已完成',
+      unknown: '未知'
+    },
+    group: {
+      attention: '需要处理',
+      unread: '未读',
+      working: '运行中',
+      idle: '空闲',
+      unknown: '未知'
     }
+  },
+  nodeActions: {
+    nodesCount: '{count} 个节点',
+    oneNode: '1 个节点',
+    stopAgentControl: '停止 Agent 控制',
+    addToGroup: '将选中项添加到 {title}',
+    addToGroupFallback: '分组',
+    addSelectionToGroup: '将选中项添加到分组',
+    groupFallback: '分组',
+    groupSelection: '分组选中项',
+    groupNode: '分组节点',
+    removeFromGroup: '从分组移除',
+    changeIcon: '更改图标…',
+    setIcon: '设置图标…',
+    duplicate: '复制',
+    snapToZone: '对齐到区域',
+    collapseExpand: '折叠 / 展开',
+    markdownView: 'Markdown 视图',
+    refreshTerminal: '刷新终端',
+    branchConversation: '分支对话',
+    delete: '删除',
+    pauseSessions: '暂停 {count} 个会话',
+    restartAgent: '重启 Agent',
+    restartAgentAndShell: '重启 Agent 与 Shell',
+    reopenAs: '以此重新打开会话',
+    switchModel: '切换模型',
+    switchModelCurrent: '切换模型 ({model})',
+    restart: '重启',
+    resumeSession: '恢复会话',
+    pauseSession: '暂停会话',
+    pause: '暂停',
+    pauseEndSession: '暂停并结束会话',
+    switchClaudeAccount: '切换 Claude 账户',
+    switchCodexAccount: '切换 Codex 账户'
+  },
+  markdown: {
+    localLink: '无法从渲染的 Markdown 中打开本地文件链接。'
+  },
+  dialog: {
+    ok: '确定',
+    cancel: '取消'
   },
   addMenu: {
     hints: {

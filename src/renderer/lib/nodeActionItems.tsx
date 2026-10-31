@@ -62,6 +62,7 @@ import { tidySeparators } from './tidySeparators'
 import { transferConversationItems, type TransferConversationHandler } from './transferItems'
 import { isHidden } from './ui-visibility'
 import type { NodeWrites } from './nodeWriteRouter'
+import { t } from '@renderer/i18n/runtime'
 
 /** The agent a terminal node was CREATED as. Deliberately NOT `agentIdOf`, whose extra hook-status
  *  fallback also reports a plain terminal someone typed `claude` into by hand: TerminalNode's
@@ -270,13 +271,22 @@ export function buildNodeActionSections(
   const anyTerminal = ids.some((nid) => ctx.nodes.find((n) => n.id === nid)?.type === 'terminal')
   const session = ids.length === 1 ? sessionRows(ids[0], ctx, hidden) : NO_SESSION_ROWS
   return [
-    { id: 'label', items: [{ type: 'label', label: ids.length > 1 ? `${ids.length} nodes` : '1 node' }] },
+    {
+      id: 'label',
+      items: [
+        {
+          type: 'label',
+          label:
+            ids.length > 1 ? t('nodeActions.nodesCount', { count: ids.length }) : t('nodeActions.oneNode')
+        }
+      ]
+    },
     {
       id: 'stop-agent-control',
       items: drivenHere
         ? ([
             {
-              label: 'Stop agent control',
+              label: t('nodeActions.stopAgentControl'),
               onClick: () => window.nodeTerminal.browser.stop(ids[0])
             },
             { type: 'separator' }
@@ -377,7 +387,11 @@ export function buildNodeActionSections(
       items: isHidden('duplicate', hidden)
         ? []
         : ([
-            { label: 'Duplicate', icon: <IconDuplicate />, onClick: () => ctx.duplicateNodes(ids, at) }
+            {
+              label: t('nodeActions.duplicate'),
+              icon: <IconDuplicate />,
+              onClick: () => ctx.duplicateNodes(ids, at)
+            }
           ] as MenuItem[])
     },
     // Zone snap (issue #394 v1): place THIS node into a region of the visible canvas at that
@@ -510,7 +524,14 @@ export function buildNodeActionSections(
     SEPARATOR,
     {
       id: 'delete',
-      items: [{ label: 'Delete', icon: <IconTrash />, danger: true, onClick: () => ctx.deleteNodes(ids) }]
+      items: [
+        {
+          label: t('nodeActions.delete'),
+          icon: <IconTrash />,
+          danger: true,
+          onClick: () => ctx.deleteNodes(ids)
+        }
+      ]
     }
   ]
 }
