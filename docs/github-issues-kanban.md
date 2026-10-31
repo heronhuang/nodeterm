@@ -1,77 +1,30 @@
-# GitHub Issues on the Kanban board
+> English: [docs/en/github-issues-kanban.md](./en/github-issues-kanban.md)
 
-nodeterm can show GitHub issues beside live session cards and keep issue state in sync with board movement. GitHub remains the source of truth. GitHub issues are never copied into the shared Kanban assignments.
+# 看板上的 GitHub Issues
 
-## Set up
+nodeterm 可在 live 会话卡片旁显示 GitHub issues，并在移动看板卡片时与 issue 状态同步。GitHub 仍是唯一真相源。
 
-1. Open the project and create its Kanban board if it does not have one.
-2. Open Settings, then GitHub Issues in the Workspace group.
-3. Turn on Include GitHub issues.
-4. Confirm the repository detected from the Git origin, or enter an `owner/repository` override.
-5. Choose an authentication method.
-6. Map each Kanban column to one exact GitHub issue label.
-7. Choose the completion column.
-8. Approve access for this project on this computer.
-9. Create missing labels if needed, then refresh.
+## 设置
 
-Repository overrides and label mappings are shared in `.nodeterm/project.json`. Credentials and the computer approval are local and are never written to the project file.
+1. 打开项目并创建看板（若尚无）。
+2. 设置 → 工作区 → GitHub Issues → 开启 Include GitHub issues。
+3. 确认 Git origin 仓库或输入 `owner/repository`。
+4. 选择认证方式，映射列到 GitHub 标签，选择完成列，批准本机访问，按需创建标签并刷新。
 
-## Authentication
+仓库覆盖与标签映射在 `.nodeterm/project.json`；凭证与本机批准为本地项。
 
-A resolved credential is reused for up to 30 seconds so that reading issues does not re-run the GitHub CLI and re-validate the token on every request. Saving a token, clearing it, switching provider, or revoking the machine drops that immediately.
+## 认证
 
-Auto uses an authenticated GitHub CLI first and falls back to a saved token. GitHub CLI only and Personal access token only enforce the selected method exactly.
+Auto 优先 `gh`，否则保存的 token。Fine-grained token 需 Metadata read、Issues read/write。Server Edition 用本地 `0600` 文件存 token。
 
-For GitHub CLI, sign in to `github.com` with `gh auth login`.
+## 映射与移动
 
-For a fine-grained personal access token, grant access only to the selected repository with these repository permissions.
+每列一个确切标签；完成列关闭 issue；移出完成列会重新打开。移动仅改标签立即生效；关闭/重新打开需确认。Pull request 排除。
 
-- Metadata – read
-- Issues – read and write
+## 刷新与缓存
 
-The token field is write only. The renderer cannot read the saved value. Electron uses encrypted system storage when a secure backend is available. If it is unavailable, nodeterm shows a warning and stores the token in a local mode `0600` file. Server Edition always uses the restricted local file and shows the same warning.
+可见时每 60 s 轮询；请求刷新至少间隔 30 s。缓存目录 `github-issues-cache`。Relay 标签的 GitHub 操作在主机本地执行。
 
-## Mapping and movement
+## 当前范围
 
-Each configured column has one exact issue label. Matching is case insensitive, but writes use the spelling shown in Settings.
-
-- Open issues with one mapped label appear in that column.
-- Open issues with no mapped label appear in Ungrouped.
-- Issues with several mapped labels appear in Ungrouped with a conflict warning.
-- Closed issues appear in the completion column.
-- Moving an issue to the completion column closes it.
-- Moving a closed issue outside the completion column reopens it, including a drop on Ungrouped.
-- Closing and reopening ask for confirmation first. Both notify everyone watching the issue and neither can be undone from the board. Moves that only rewrite labels apply immediately, and a card dropped back where it already sits writes nothing.
-- A move never rewrites the GitHub close reason. Re-closing an issue that is already closed leaves a `not planned` close as it is.
-- Unrelated labels are preserved.
-- Pull requests are excluded.
-
-Every card has a Move issue selector, so movement does not depend on drag and drop. Stale writes are not repeated. nodeterm refreshes the current issue and asks for a new action.
-
-## Source filter and paging
-
-Use All, GitHub, or Sessions in the board header to choose which card sources are visible. The selection is temporary and does not change the project configuration.
-
-The label filter groups session labels and GitHub labels separately. GitHub selections are sent to the host with a `github:` namespace, while session selections remain local to the board.
-
-Issues are loaded in pages of up to 50 per column. Use Show more issues at the end of a column for the next page.
-
-## Refresh and cache
-
-One repository poll runs every 60 seconds while at least one board view is visible. Requested refreshes are floored at one every 30 seconds per project, and a full reconciliation at one every 2 minutes, so a repeated request cannot spend the account's hourly API quota. A refresh that fails does not hold the floor, so Retry stays responsive. A complete reconciliation runs at least every 24 hours. Incremental refreshes overlap by two seconds to avoid missing boundary updates.
-
-The private host cache is stored under the nodeterm data directory in `github-issues-cache`. Clear cached data in Settings to remove every identity cache linked to that local project and repository. This remains available while signed out and after revocation. The next authenticated refresh rebuilds it.
-
-nodeterm supports up to 10,000 issues and a 64 MiB cache document per repository. An incomplete refresh never replaces the last complete cache. If the first refresh exceeds a limit, the partial data is read only.
-
-## Local trust and remote sessions
-
-Approval is tied to the local workspace identity, project, and repository. Changing the repository requires a new approval. Revoke this machine in Settings to stop credential use, cache access, and GitHub network access for that project.
-
-GitHub HTTP requests and avatar downloads run only on the trusted project host. Relay tabs send issue queries and movements to that host, but GitHub control remains local and cannot be invoked by a relay peer. Configure a relayed project on the computer that hosts it.
-
-## Current scope
-
-This release supports reading issues, source filtering, paging, mapped label creation, movement, conflict resolution, close, reopen, refresh, and cache controls.
-
-Editing issue titles and bodies, comments, ordinary labels, assignees, milestones, locking, and media rendering are planned for the follow-up issue editor. Until then, Open on GitHub opens the canonical issue page.
+读 issue、过滤、分页、标签创建、移动、关闭/重新打开、刷新与缓存。标题/正文编辑等在后续 issue 编辑器中。

@@ -1,107 +1,104 @@
-# S6 acceptance gate — machine-scoped managed Codex accounts
+> English: [docs/en/codex-accounts-acceptance.md](./en/codex-accounts-acceptance.md)
 
-**S6 is not "done" until this gate is green.** The feature closes external PR #112 (@Corvin). Every
-mechanism (PRs 1–8.5) is merged and unit-tested against real primitives, and the composition is walked
-once end-to-end in `src/main/codex-accounts-e2e.test.ts`. But several legs **cannot run in headless
-CI** — a live `codex app-server`, a second logged-in ChatGPT account, a real SSH host with a
-curl-managed standalone Codex install, and the renderer's imperative pane-recycle sequencing. Those
-are the checklist below. **The code fails CLOSED on each**, so a false assumption is a *refused* op and
-a *rolled-back* copy, never a silent corruption — but "fails closed" is not "verified", and nobody may
-call S6 verified until a human runs these on a real Mac + real host.
+# S6验收门——机器扫描管理Codex账户
 
-## What CI already proves (no device needed)
+**S6在这扇门是绿色之前不是"干"的。 ** 该功能关闭了外部PR #112 (@Corvin). 每个
+机制(PRs 1–8.5)被合并,并针对真正的原始人进行单位测试,组成被走
+一次结束到结束`src/main/codex-accounts-e2e.test.ts`但数条腿不能无头运行
+CI**——现场直播.`codex app-server`,第二个登录的 ChatGPT 账户, 一个真正的 SSH 主机
+卷式管理的独立 Codex 安装, 和渲染器的必需的 阴道循环排序。 这些
+清单如下。 ** 代码在每一个上都失败了**,所以一个错误的假设是*被背弃* op和
+a* rolled-back* 副本,从来不是沉默的腐败——但"失败关闭"没有"核实",没有人可以
+呼叫S6,直到有人在真正的Mac + 真正的主机上运行。
 
-`npx vitest run src/main/codex-accounts-e2e.test.ts` — the one long composition test. Against REAL
-primitives (real fs, real `/bin/sh`, real HMAC, the real main-side switch handler; only the live
-app-server JSON-RPC is faked, and the rollout path it returns is a real on-disk file):
+□ CI 已经证明( 不需要设备)
 
-- a managed account home resolves its spawn scope; an explicitly selected **missing** account
-  **refuses** to spawn (no system fallback);
-- a signed ownership record is recovered under real `/bin/sh` by the resolver prelude;
-- the three-phase main-side switch **hardlinks the rollout inode** into the target (same conversation
-  id, never a fork) and the local copy remains;
-- the local→SSH transfer source leg hands off the containment-validated path and keeps the local copy;
-  an absent importer **fails closed**;
-- the same thread id in two scopes resolves to **no owner** in the proxy, the sh resolver, and the
-  relay catalog;
-- a different existing rollout at the target is **never overwritten** (the local twin of remote
-  `exit 17`);
-- usage stays **per-account** (each row stamped with its own id, `unavailable` included), never mixed;
-- the Server Edition arms the record secret **raw** (`node-auth-key.bin`, `0600`), no keychain
-  plaintext; with no secret armed a record write throws rather than writing unsigned;
-- **no credential rides any argv** (tmux env, the generated launcher, the auth-env strip).
+`npx vitest run src/main/codex-accounts-e2e.test.ts`- 一个漫长的成分测试诫 反对真实
+原始语( 真实 fs, 真实)`/bin/sh`,真正的HMAC,真正的主侧开关处理器;只有直播
+app-server JSON-RPC是伪造的,它返回的推出路径是一个真正的磁盘文件:
 
-Mutation report (GC 9): 5 source mutations introduced, 5 caught (5/5) — M1 spawn-scope fallback, M2
-ambiguity gate, M3 rollout never-overwrite, M4 usage attribution, M5 sh `matches -eq 1` gate.
+- 管理账户之家解决其产卵范围;明确选定的**缺失**账户
+以该单位为单位的顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式ش 顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶翡的顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶嘞顶式顶式顶式顶的顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶制顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶式顶顶
+- 背从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从酥从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从 毫无疑问从从 该死的从从从从从从从从从从从从从从从从从从`/bin/sh`以判决者的序幕盟誓,
+- 三相主侧开关** 硬链接推出的inode** 进入目标(同样的谈话)
+编号,从不设叉)和本地副本遗存;
+- 本地-SSH转移源腿从封闭验证路径上移出并保存本地副本;
+(a) 不存在的进口商**未关闭**;
+- 两只瞄准镜中的相同线条ID 解决了代理中**无所有者**, sh解析器,和
+中继目录;
+- 在目标上推出的不同版本是**从未覆盖**(本地双胞胎远程)`exit 17`;
+- 使用量保持**每个账户**(每行都印有自己的身份证,`unavailable`)和(或)
+- 服务器版带有记录的秘密**raw**(`node-auth-key.bin`, (中文).`0600`,无键链
+简写;没有秘密武器,没有记录书写,没有签名;
+- **不使用证书搭载任何argv**(tmux env,生成的发射装置,auth-env条)。
 
-## Owed device verifications — a human MUST run these before S6 is called done
+突变报告(GC 9):引入5个源突变,5个捕获(5/5)——M1产卵镜回落,M2
+模糊门, M3 推出永课题, M4 用途归属, M5 sh`matches -eq 1`大门
 
-Everything below needs **a real Mac desktop + a real SSH host** with a curl-managed **standalone**
-Codex install + a **logged-in 2nd managed account**. Headless CI cannot run them.
+□ 拥有设备的验证——在S6被叫做之前,人类的MUST运行这些 我以为你会发现它
 
-- [ ] **U1 — a running app-server discovers a hardlinked rollout without a reindex.** Load-bearing for
-      the copy. Code mitigation: verify-then-recycle ⇒ a false U1 is a refused copy + rollback, never
-      silent. VERIFY: expose a thread to a 2nd account and confirm the **live daemon** finds it *before*
-      the node recycles.
-- [ ] **U2 — the conversation id survives copy + switch under a 2nd login.** Hardlinked inode +
-      resume-by-path + the `-32004` guard. VERIFY: switch a **running** node's account and confirm the
-      **same** conversation resumes — not a fork.
-- [ ] **U4 — live RPC payload shapes.** `account/read` → `{email}`, `thread/read` → `{path, cwd}`,
-      confirmed against Codex 0.146.0 via `app-server --listen`; the **curl-standalone `daemon start`**
-      path is still owed. VERIFY the shapes against the daemon the app actually starts.
-- [ ] **Full desktop → host flow over real WAN.** Add account, remote **device-login**, **import** a
-      conversation to an SSH account, then **recycle** the node onto the host. Owed on Mac + real host.
-- [ ] **The imperative pane-recycle glue** (commit → rebind → restartShell → finish) + a **live SSH
-      remote-account switch.** The pure logic + the main-side switch are unit-tested; the imperative
-      renderer sequencing is only exercised against the running app. The SSH switch is wired
-      (2026-09: node menu / kanban card → `switchThreadRemote` → relay `expose-thread` on the host →
-      recycle). VERIFY on a real host: switch an idle SSH Codex node A→B, the pane resumes the SAME
-      thread under B's `CODEX_HOME` (`echo $CODEX_HOME`, then the conversation history), and B's
-      usage moves; switch back B→A.
-- [ ] **Remote-host account LIFECYCLE** (add / login / remove **on** an SSH host). Wired 2026-09: the
-      machine panel's Add creates the home ON the host (`remoteCodexAccountAdd`), opens
-      `codex login --device-auth` in the host's tmux under that account's `CODEX_HOME`, and polls the
-      host for a real `auth.json`; Remove deletes it there. Unit-tested only. VERIFY on a real host:
-      the device flow completes, the row picks up the email (needs the relay runtime — without it the
-      login completes with no email), a new Codex node on that host runs under the managed home
-      (`echo $CODEX_HOME` in the pane), and Remove leaves no `~/.nodeterm/cx/<digest>` behind.
+下方的任何东西都需要 ** a real Mac 桌面 + a real SSH 主机 ** 有卷曲管理 ** 独立**
+代码安装 + a ** 登录的 2 管理账户 **. 无头CI不能运行它们。
 
-### Windows (managed local accounts)
+- [ ] **U1 — 一个运行中的应用服务器发现一个没有再索引的硬链接的推出. ** 负载
+副本。 代码缓解: 校验 - 当时的循环 QQ 假 U1 是拒绝复制 + 回滚, 绝不
+默然无语. VERIFY: 向第二帐户显示线程, 并证实** live 守护进程** 发现它之前 *
+节点回收,可以了
+- [ ] **U2 — 对话id在第二个登录下存活下来 + 开关。 ** 硬链接inode +
+恢复路径 +`-32004`警卫 切换一个**运行**节点的账户,确认
+** 同** 复谈——不是叉子.
+- **U4——RPC有效载荷活体。 **`account/read`→`{email}`, (中文).`thread/read`→`{path, cwd}`, (中文).
+已确认为 0.146.0 通过`app-server --listen`; ** curl 独立`daemon start`页:1
+路径仍然欠。 VERIFY的形状与守护进程相对,应用程序实际上开始.
+- [ ] ** 完全桌面 → 主机流过真实的WAN。 ** 添加账户,远程**device-login**,**进口** a
+对话到 SSH 账户,然后 ** 循环 ** 节点到主机。 欠Mac + 真实主机.
+- [ ] ** 必须的罐子循环胶**(承诺 → 重置 → 重新启动 → 完成) + a ** live SSH
+远程账户开关。 ** 纯逻辑 + 主侧开关经过单位测试; 必需
+渲染器的测序只针对运行中的应用程序进行才可以. SSH开关有线
+(2026-09):节点菜单/kanban卡~.`switchThreadRemote`• 中继`expose-thread`主持人名单
+(b) 再循环。 真实主机上的 VERIFY : 切换闲伎式 SSH 代码节点 A B, 窗帘恢复 SAME
+B's下的线程`CODEX_HOME`(单位:千美元)`echo $CODEX_HOME`然后是谈话史 B的
+用法移动只是一个B A。
+- [ ] **远程主机账户LifeCYCLE**(添加/登录/删除**on**一个SSH主机). 2026-09线:
+机床`remoteCodexAccountAdd`),打开`codex login --device-auth`在主机的 tmux 的账户下`CODEX_HOME`投票结果
+真实主机`auth.json`; 删除此处。 只有单位测试。 真实主机的VRIFY:
+设备流完成后,行会拾取电子邮件(需要中继运行时间——没有它
+登录完成后没有电子邮件, 该主机上的新 Codex 节点运行在管理之家下
+(单位:千美元协同增效作用)`echo $CODEX_HOME`和去除叶片`~/.nodeterm/cx/<digest>`后面 后面那个
 
-- [ ] **Add + login on a stock (non-admin, no Developer Mode) account.** Add completes (no EPERM);
-      `skills`/`plugins` in `~/.nodeterm/cx/<digest>` are junctions and `config.toml` a hardlink or
-      (with a logged warning) a copy. `codex login` completes, the row leaves pending and shows the
-      email read from `auth.json`'s id_token, and a new Codex node under that account runs with
-      `CODEX_HOME` set to the managed home (`echo %CODEX_HOME%` / `$env:CODEX_HOME`).
-- [ ] **System Codex row** shows the email from `%USERPROFILE%\.codex\auth.json`.
-- [ ] **No `codex app-server daemon start`** process appears while a login is pending.
-- [ ] **Remove does not follow the junctions.** After removing a managed account whose `skills` /
-      `plugins` were junctioned in, `%USERPROFILE%\.codex\skills` and `plugins` are still intact
-      (`fs.rm` must unlink the junction, never recurse through it into the system home).
-- [ ] **Conversation switch / transfer** between Codex accounts fails at once with "The Codex
-      app-server is not reachable on Windows yet" (no daemon spawned, no 15 s wait) — the explicit
-      degrade until a named-pipe app-server endpoint exists.
+QQ Windows( 管理的本地账户)
 
-## Happy-path acceptance walk (the one a human runs end to end)
+- [ ] ** Add + 登录到一个股票(非代理,无开发者模式)账户。 ** 添加完整( 无 EPERM ) ;`skills`页:1`plugins`输入`~/.nodeterm/cx/<digest>`是交汇点和`config.toml`硬链接或
+(有登录警告)一份副本。`codex login`并显示
+电子邮件从`auth.json`id token 你们的账户下的新代码节点运行`CODEX_HOME`设置到管理之家`echo %CODEX_HOME%`页:1`$env:CODEX_HOME`) (中文(简体) ).
+- [ ] **System Codex行** 显示来自`%USERPROFILE%\.codex\auth.json`。 。 。
+- [] **没有`codex app-server daemon start`** 正在等待登录时出现进程。
+- [ ] ** 移动不沿着交叉口。 ** 删除管理账户后`skills`/ 多谢`plugins`被连接在,`%USERPROFILE%\.codex\skills`和`plugins`仍然完好无损
+(单位:千美元)`fs.rm`必须解开连接点, 永远不要通过它回到系统之家。
+- [ ] ** Conversation switch / transfer** 在 Codex 账户之间一次失败,“代码”
+应用程序服务器尚未在Windows上达到"(没有守护进程产物,没有15 s 等待)——明确
+降解直到命名的管道应用服务器端点存在.
 
-On a real Mac with a real SSH host and a 2nd ChatGPT login available:
+□快乐的路途接受(一个人类的终点)
 
-1. **Add account** — Settings → add a managed Codex account, complete the device login; the row shows
-   its captured email and stops being `pending`.
-2. **New node under it** — stamp a fresh Codex node and pick the managed account in the per-node picker;
-   confirm the node runs against that account's isolated home (its own `auth.json`, not the system one).
-3. **Switch** — switch the running node to another account; confirm the **same conversation resumes**
-   (U2), not a new thread, and that the source account's copy is still usable (the hardlink).
-4. **Copy to SSH** — transfer the (idle) conversation to a remote account on the SSH host; confirm the
-   id survives, the far side **discovers** it (U1), the **local copy remains**, and a pre-existing
-   remote rollout is **never overwritten**.
-5. **Recycle** — recycle the node onto the host; confirm it resumes the imported conversation.
+在真实的Mac上,有真实的SSH主机和可供使用的第二个ChatGPT登录:
 
-Failure expectations to spot-check while walking it: a selected-but-missing account **refuses** (no
-fallback); the same thread id claimed by two accounts resolves to **no owner**; removing an account
-while a switch holds it is **refused**; the phone can **read** account state but never originate an
-add/switch/copy.
+1. ** 添加账户** — 设置 – 添加一个管理下的代码账户, 完成设备登录; 行 看到
+它被捕获的电子邮件并停止`pending`。 。 。 。
+2. ** 其下的新节点**——盖上新的Codex节点,并在每个节点 我感觉器中选取管理账户;
+: 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱  爱 爱  爱 爱   爱 爱 爱   爱 爱 爱      爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱 爱  爱 爱 爱  爱 爱    爱 爱    爱 爱 爱 爱 爱 爱 爱 爱              爱 爱     爱  爱                  爱            爱                       `auth.json`,而不是系统之一。
+3. **Switch** — 将运行的节点切换到另一个账户;确认** 相同的谈话恢复**
+(U2),不是新线程,而且源帐户的复制件仍然可用(硬链接).
+4. **Copy to SSH** — 将(idle)对话转到SSH主机上的远程账户;确认
+id幸存下来,最远的一面 发现它(U1),** 本地副本留下**,以及一个先前存在的
+远程推出是**从未覆盖**。
+5. ** 再循环**——将节点回收到主机上;确认它恢复了输入的对话。
 
----
+无法在行走时进行现场检查:一个被选中但缺失的账户** refuses**(无)
+倒置); 两个账户声称的同一线程 id 解决了** 无所有者**; 删除账户
+开关是** refused **;电话可以**读**账户状态,但从未发源于
+添加/开关/复制。
 
-Credit: @Corvin (external PR #112). S6 = PRs 1–9 (this gate is PR 9 of 9).
+- - - 说吧
+
+校对:Soup S6 = PRs 1–9(此门为 PR 9 of 9)好几门.

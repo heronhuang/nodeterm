@@ -1,44 +1,48 @@
-# Packaging (macOS and Windows)
+> English: [docs/en/PACKAGING.md](./en/PACKAGING.md)
 
-Desktop installers are built with [electron-builder](https://www.electron.build/). Configuration lives in the `build` block of `package.json`. Artifacts land in `dist/`.
+# 打包（macOS 与 Windows）
 
-## Local commands
+桌面安装包使用 [electron-builder](https://www.electron.build/) 构建。配置在 `package.json` 的 `build` 块中。产物输出到 `dist/`。
 
-| Command | Platform | Purpose |
+**官方安装包仅提供 macOS 与 Windows。** Linux 可从源码运行桌面版或 Server Edition，见根目录 [README.md](../README.md#-从源码构建)。
+
+## 本地命令
+
+| 命令 | 平台 | 用途 |
 |--------|----------|---------|
-| `npm run dist` | macOS (arm64, unsigned) | Local mac package: DMG + zip, updates disabled (`nodeTermUpdates=disabled`) |
-| `npm run dist:win` | Windows (x64, unsigned) | Local Windows package: NSIS + zip, updates disabled |
-| `npm run release` | macOS (arm64 + x64, signed) | Production mac build: sign, notarize, DMG + zip + `latest-mac.yml` |
-| `npm run dist:win:release` | Windows (x64, unsigned beta) | CI/release Windows build: NSIS + zip + `latest.yml`, manual update notice only |
+| `npm run dist` | macOS（arm64，未签名） | 本地 mac 包：DMG + zip，更新关闭（`nodeTermUpdates=disabled`） |
+| `npm run dist:win` | Windows（x64，未签名） | 本地 Windows 包：NSIS + zip，更新关闭 |
+| `npm run release` | macOS（arm64 + x64，已签名） | 生产 mac 构建：签名、公证、DMG + zip + `latest-mac.yml` |
+| `npm run dist:win:release` | Windows（x64，未签名 beta） | CI/发布 Windows 构建：NSIS + zip + `latest.yml`，仅被动更新提示 |
 
-Every packaging script runs `npm run make-icon` and the full `npm run build` (electron-vite bundles, session host, Codex relay) before invoking electron-builder.
+每个打包脚本在调用 electron-builder 前都会运行 `npm run make-icon` 和完整的 `npm run build`（electron-vite 打包、session host、Codex relay）。
 
-On macOS, `npm run release` expects a universal build and runs `npm run rebuild` afterward so native modules match your dev environment.
+在 macOS 上，`npm run release` 期望 universal 构建，并在之后运行 `npm run rebuild`，使原生模块与开发环境一致。
 
-## Code signing and notarization
+## 代码签名与公证
 
-### macOS (`npm run release`, CI `release-mac`)
+### macOS（`npm run release`，CI `release-mac`）
 
-Set these environment variables (GitHub Actions secrets on the self-hosted Mac runner):
+设置以下环境变量（GitHub Actions 在自托管 Mac runner 上的 secrets）：
 
-- **`CSC_LINK`** — base64-encoded Developer ID Application `.p12`
-- **`CSC_KEY_PASSWORD`** — password for the `.p12`
-- **`APPLE_API_KEY_B64`** — base64-encoded App Store Connect API key (`.p8`)
-- **`APPLE_API_KEY_ID`** — key ID
+- **`CSC_LINK`** — base64 编码的 Developer ID Application `.p12`
+- **`CSC_KEY_PASSWORD`** — `.p12` 密码
+- **`APPLE_API_KEY_B64`** — base64 编码的 App Store Connect API 密钥（`.p8`）
+- **`APPLE_API_KEY_ID`** — 密钥 ID
 - **`APPLE_API_ISSUER`** — issuer ID
 
-electron-builder uses them for signing and Apple notarization (`build.mac.notarize` in `package.json`).
+electron-builder 用它们完成签名与 Apple 公证（`package.json` 中的 `build.mac.notarize`）。
 
-### Windows (`npm run dist:win:release`, CI `release-win`)
+### Windows（`npm run dist:win:release`，CI `release-win`）
 
-Shipped Windows builds are currently **unsigned** (passive update notice only). When a Windows code-signing certificate is available, electron-builder accepts the same **`CSC_LINK`** / **`CSC_KEY_PASSWORD`** pair (or platform-specific cert env vars documented by electron-builder). Until then, SmartScreen may warn on install.
+当前发布的 Windows 构建为**未签名**（仅被动更新提示）。获得 Windows 代码签名证书后，electron-builder 接受相同的 **`CSC_LINK`** / **`CSC_KEY_PASSWORD`** 对（或 electron-builder 文档中的平台专用证书环境变量）。在此之前，安装时 SmartScreen 可能警告。
 
-## CI release workflow
+## CI 发布工作流
 
-Tag pushes (`v*`) run `.github/workflows/release.yml`:
+推送标签（`v*`）触发 `.github/workflows/release.yml`：
 
-- **`release-mac`** — self-hosted Apple Silicon Mac: `npm run release`, uploads DMG/zip/`latest-mac.yml`
-- **`release-win`** — GitHub `windows-latest`: `npm run dist:win:release`, uploads NSIS/zip/`latest.yml` (best-effort, does not block publish)
-- **`publish`** — promotes the GitHub Release to latest after mac assets upload
+- **`release-mac`** — 自托管 Apple Silicon Mac：`npm run release`，上传 DMG/zip/`latest-mac.yml`
+- **`release-win`** — GitHub `windows-latest`：`npm run dist:win:release`，上传 NSIS/zip/`latest.yml`（尽力而为，不阻塞发布）
+- **`publish`** — mac 资源上传后将 GitHub Release 设为 latest
 
-Update feed files are mirrored at `https://nodeterm.dev/updates` (outside this repo).
+更新 feed 文件镜像在 `https://nodeterm.dev/updates`（仓库外）。

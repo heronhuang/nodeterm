@@ -1,175 +1,163 @@
-# Atomic writes
+> English: [docs/en/atomic-writes.md](./en/atomic-writes.md)
 
-**The honest limit first: `renameAtomic` does not make a write reliable. It makes a write that
-would have been lost to a passing antivirus scan land instead.** A disk that is full, a directory
-that is read-only, or a file some process holds open indefinitely will still fail — loudly, which
-is the point. Nothing here protects against a machine losing power between two saves.
+# 原子写
 
-Implementation: [`src/core/fs-atomic.ts`](../src/core/fs-atomic.ts). Tests:
-`src/core/fs-atomic.test.ts` (behaviour) and `src/core/fs-atomic.guard.test.ts` (the scan that
-keeps every store on the helper).
+诚实的限度首先:`renameAtomic`不使写作可靠。 它写着:
+将会输给一个经过的抗病毒扫描场。 圆盘, 目录
+或者某个进程无限期 谢谢 但还是会失败的
+这是重点。 这里没有任何东西能防止机器失去两台救星之间的电源.
 
-## What every store does
+执行:[`src/core/fs-atomic.ts`(./src/core/fs-原子.ts). 测试 :`src/core/fs-atomic.test.ts`(行为)和`src/core/fs-atomic.guard.test.ts`(扫描
+保持每个商店的帮助。
 
-A store that persists JSON writes a temp file first and renames it over the target, so a reader
-sees either the old bytes or the new ones and never a half-written file:
+□每个商店都做什么
+
+一个坚持JSON的商店先写一个临时文件,然后在目标上重命名,所以一个读者
+查看旧字节或新字节, 并且从没有半写文件 :
 
 ```ts
 await fs.writeFile(tmp, JSON.stringify(store), { mode: 0o600 })
 await renameAtomic(tmp, target)
 ```
 
-That is correct on POSIX, where `rename(2)` is atomic and replaces the destination
-unconditionally.
+对POSIX来说是正确的,在那里`rename(2)`是原子并替换目的地
+无条件。
 
-## Why the plain version loses data on Windows
+□ 为什么普通版本在Windows上丢失数据
 
-`MoveFileEx` fails with a sharing violation — Node reports it as **`EPERM`**, sometimes `EACCES` or
-`EBUSY` — whenever the **destination** is open by anyone at that instant. Not held open for long:
-opened. The things that open a file the moment you finish writing it are not exotic:
+`MoveFileEx`与分享违规失败——节点报告为**`EPERM`所做的`EACCES`或`EBUSY`只要此时此刻有人打开**目的地**。 未长期开放 :
+打开。 在你写完文件后 打开文件的东西不是异国情调的
 
-| What | Why it has the file open |
-|---|---|
-| Windows Defender real-time scanning | scans each newly written file |
-| Windows Search indexer | indexes it |
-| OneDrive / a backup client | a user profile is usually synced |
-| Our own concurrent writers | two saves racing one destination |
+怎样? 它为什么打开文件?
+|,|也.
+QQ Windows Defender 实时扫描 QQ 扫描每个新写文件 QQ
+\\ Windows 搜索索引器\\ 索引它\ \
+QQ OneDrive / 一个备份客户端 QQ 用户配置通常被同步 QQ
+我们自己的作家 两人拯救了比赛目的地
 
-So on Windows a routine save could throw and the data was simply lost — intermittently,
-unreproducibly, and **more often on the machines that are best protected**. The stores affected
-are not peripheral: the user's canvas layout, their settings, their sealed credentials and their
-pinned remote devices.
+因此,在Windows上,一个常规保存可以抛出 数据只是丢失了——断断续续地,
+无法复制,而且** 更经常地在最受保护的机器上**。 受影响的商店
+并非外围:用户的画布布布局、他们的设置、他们的密封证书和他们的
+固定的远程设备。
 
-Twenty-odd files did this, across three spellings — `fs.rename`, `renameSync`, and a `rename`
-destructured from `node:fs/promises`. Every one of them reads as a correct atomic write, because
-on the platform most of this app was written on it *is* one. That is why the rule is enforced by a
-scan test rather than by convention: a store added next year gets the retry because the test
-refuses the alternative, not because its author read this page.
+20多份档案都这样 拼了三个字`fs.rename`, (中文).`renameSync`,则a`rename`从`node:fs/promises`每一个都读作正确的原子文字,因为
+在平台上,这个应用程序大多是写在上面的*是*1. 因此,该规则由
+扫描测试而非常规: 明年添加的商店会因为测试而得到重试
+拒绝该选项,而不是因为它 ,
 
-## What the helper does, and deliberately does not
+□帮助者所为,而故意不为.
 
-**Retries the rename, briefly.** Five attempts over about 310 ms. Each attempt is still one
-indivisible rename, so retrying cannot tear a write — it only tries the same operation again once
-whoever held the destination has let go. Scanner windows are milliseconds, so the first retry
-almost always wins; the tail exists for a sync client mid-upload.
+** 简短地重命名。 ** 五次尝试超过约310毫秒. 每一次都一样
+不可分割的重命名, 所以重试不能撕裂一个写入 —— 它只会再次尝试同样的操作
+谁守住目的地,谁就放手。 扫描机窗口为毫秒, 所以第一次重试
+几乎总是获胜;尾部存在用于同步客户端中上载.
 
-**Does not serialize application decisions.** Unique temps and rename retry guarantee complete
-bytes, not correct ordering between two snapshots loaded before either write. A shared store with
-multiple read-modify-write callers still needs one mutation funnel (or an equivalent
-revision/compare-and-swap protocol) of its own.
+** 不序列化申请决定。 ** 独特的临时和重命名重试保证完成
+字节,在写前加载的两个快照之间的顺序不正确 。 一个共享的商店
+多个 read-modify-write 调用者仍然需要一个突变漏斗(或等效的)
+修订/比较协议)
 
-**Does not retry forever.** A genuinely locked file must fail. Several callers have contracts that
-depend on a failed save being reported as one. A save that eventually lands is worth less than an
-accurate answer about whether it did.
+** 不永远重试。 ** 一个真正锁定的文件必须失败 。 有几个打电话的人有合同
+依赖于失败的保存被报告为一体。 最终土地的价值比
+准确回答它是否做到了。
 
-**Does not retry every error.** `ENOENT` means the temp file is gone, which is a caller bug;
-retrying delays a clearer error and then reports the same thing. `ENOSPC` will not improve by
-waiting.
+** 不重复每次错误。 **`ENOENT`表示临时文件已经消失,这是一个呼叫器错误;
+连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连环连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连连逐案连连连连连连连连 许多连连连连连连连连连连连连连连连连连连连连连连连连连连连连连`ENOSPC`无法改善
+等着
 
-**Does not branch on platform.** The retry is a no-op on POSIX, where these codes do not arise from
-this operation. Branching would mean the behaviour under test on a developer's Mac was not the
-behaviour shipped to a user on Windows.
+** 平台上没有分支。 ** 重试是 POSIX 上的禁用操作, 这些代码不会来自
+这次行动 分支意味着在开发者Mac上测试的行为不是
+行为在 Windows 上发送给用户。
 
-**Never swallows the final failure.** The last error is rethrown with its original `code`.
+永远不要吞掉最终的失败。 最后一个错误是用原错误重写`code`。 。 。
 
-## The second bug at the same sites
+□ 同一地点的第二个错误
 
-Independent of the platform question: a **fixed** temp name (always `<file>.tmp`) shared by
-concurrent writers. One writer's rename then publishes the other's half-written bytes, or moves the
-temp out from under it so the loser fails with a confusing `ENOENT`.
+独立于平台问题:一个**固定**临时名称(总是)`<file>.tmp`) 共享(为
+并行作者。 一个作家的重命名然后发布另一个半写字节,或者移动
+正在进行,所以失败者失败了`ENOENT`。 。 。
 
-`writeFileAtomic` and `tempNameFor` generate a per-call unique name
-(`<target>.<pid>.<seq>.<uuid>.tmp`). The UUID is the uniqueness guarantee. PID and sequence remain
-because they make ownership cleanup and diagnostics possible, but they are not globally unique:
-two containers can both be PID 1, worker isolates share a PID with independent module counters,
-and an OS can reuse a PID while crash litter remains. `Date.now()` does **not** make a name unique
-either — two bridge calls, shutdown flushes, or WS clients can enter a save inside one millisecond.
-The guard deliberately rejects pid-plus-clock and pid-plus-counter names. Remote-shell writes use
-the equivalent property with a locally minted random UUID; the remote host never has to
-interpolate a nonce.
+`writeFileAtomic`哎哟`tempNameFor`生成每个调用的唯一名称励志
+(单位:千美元)`<target>.<pid>.<seq>.<uuid>.tmp`) (中文(简体) ). UUID是独一无二的保证. 仍保留PID和序列
+因为它们使得所有权清理和诊断成为可能,但它们并非全球独一无二:
+两个容器都可以是PID 1,工人隔离器共用一个PID,配有独立的模块计数器,
+操作系统可以在垃圾残存时重新使用 PID 。`Date.now()`** 不** 使名称成为唯一
+要么——两次桥接,关闭冲洗,或者WS客户端可以在一毫秒内输入保存.
+警卫故意拒绝pid -plus -hour和pid -plus -counter的名字。 远程 shell 写入使用
+具有本地刻制的随机 UUID 的等价属性; 远程主机从不需要
+插入一个非ce。
 
-The same rule applies to SSH and scp staging even though those writes do not call `fs.writeFile`.
-`remoteAtomicWrite` mints a bounded `.nodeterm-<uuid>.tmp` sibling before quoting both complete
-remote paths, so spaces, apostrophes, literal POSIX backslashes and `~/` expansion keep their
-meanings. The bounded leaf is independent of the target: appending `.uuid.tmp` to a valid
-`NAME_MAX` filename would exceed the directory's component limit. It preserves the `cat`/`mv`
-status while removing exactly that invocation's temp. Uploads likewise use UUID directories rather
-than a timestamp plus a per-manager counter, and failed uploads remove only their own directory.
-Downloads and media-cache fetches stage through hidden UUID `.part` paths beside the target; the
-bounded name avoids lengthening an already maximum-length filename. Ordinary downloads also
-reserve the final candidate with an exclusive lock, so two app processes cannot both observe
-`report.pdf` as absent and overwrite each other after transferring. Candidate checks use `lstat`:
-a dangling symlink is an occupied directory entry, not evidence that the name is free. Atomic
-remote stdin sites all use the same helper: filesystem writes, tmux.conf, the credential-bearing
-hook endpoint and node tokens, agent status, pending answers, session env files, the Codex relay and
-launcher, agent hook scripts, the canvas-control and context-link shims and skills, and our own
-grok/copilot hook configs. The user's own files (settings.json, codex hooks.json/config.toml, the
-AGENTS.md-style instruction files) go through the guarded text transaction in
-`core/agents/hooks/remote-settings-file.ts`, which adds a lock, symlink resolution, mode
-preservation and a compare-before-publish.
+同样的规则也适用于SSH和SCP 中转,尽管那些写作不调用`fs.writeFile`。 。 。`remoteAtomicWrite`薄荷`.nodeterm-<uuid>.tmp`在引用两个完整的词前结为兄弟
+远程路径,所以空格,空格,字形 POSIX 反击和`~/`保持其扩展
+意 我不喜欢你 边 我不喜欢目标: 附加`.uuid.tmp`改为有效`NAME_MAX`文件名将超过目录组件限制 。 它保存着`cat`页:1`mv`并删除 引用的临时。 上传同样使用 UUID 目录
+而非 如果你不成功上传则只删除自己的目录。
+通过隐藏的 UUID 下载和媒体抓取舞台`.part`目标旁的路径;
+边框名称避免延长一个已经最长的文件名 。 普通下载也
+保留一个独家锁定的最终候选人, 因此两个应用进程都无法同时观察`report.pdf`互换,互换后,互换。 候选人检查使用情况`lstat`编号 :
+a digling symlink 是被占用的目录条目,而不是名称是免费的证据. 原子
+远程 stdin 站点都使用相同的帮助: 文件系统一事写, tmux.conf , 包含证书
+勾勾接端点和节点令牌、代理状态、待答 bacon、会话内存文件、编码继电器和
+发射装置 代理钩脚本 帆布控制和上下文链接 shims和技能 还有我们自己的
+grok/副驾驶钩配置. early.json/config.toml, 互联网档案馆的存檔,存档日期2013-03-02.
+AGENTS.md-tyle 指令文件),通过在`core/agents/hooks/remote-settings-file.ts`,它添加了锁, 共链接分辨率, 模式
+保存和比较前。
 
-A remote rename is atomic but not, by itself, complete. `cat` exits 0 when the ssh channel ends
-before the body does — the master killed or rebuilt on a reconnect, the runner's timeout, a dropped
-link — so a temp can hold nothing, or half the body, and still be renamed into place. Measured
-against OpenSSH 9.6 (2026-09-29): with the master SIGKILLed before the body arrived, both the old
-`cat > f` writer and the old temp + `mv` writer left the target at 0 bytes. Every remote write
-therefore checks the temp's byte count against the body's UTF-8 length before it renames, and
-exits 65 (`REMOTE_WRITE_SHORT_BODY`) with the target untouched when they differ. That check is also
-why `remoteAtomicWrite` takes the body: a command built for one body refuses any other stdin.
+远程重命名是原子化的, 但它本身并不完全。`cat`当 ssh 通道结束时退出 0
+在尸体之前——主人在重联上杀死或重建,跑者超时,掉头已经有了
+链接——所以临时工不能持有任何东西,或者半身,仍然被重新命名为位置. 计量
+反对OpenSSH 9.6 (2026-09-29):在尸体到达之前,主机SIGKILLLED,两者都是老的`cat > f`作者和旧临时+`mv`编剧以0字节离开了目标. 每个远程写入
+因此,检查临时的字节数 与身体的UTF -8长度 在它重命名之前,
+65号出口(`REMOTE_WRITE_SHORT_BODY`当目标不同时,目标未受影响。 那个支票也是
+为什么`remoteAtomicWrite`抢走尸体:为一具尸体建造的命令拒绝其他任何标准。
 
-"Only one instance exists" and "the write queue serializes this" are true within one process and
-silent about a second — and a second is not hypothetical: the Server Edition takes a `--data-dir`,
-so two servers can be aimed at one directory and a desktop app can share it.
+“只有一个实例”和“写队列序列化”在一个过程中是真实的,
+对第二段保持沉默——第二段不是假设:服务器版需要一个`--data-dir`, (中文).
+因此两个服务器可以瞄准一个目录,一个桌面应用程序可以共享.
 
-**A unique name owes cleanup.** A fixed name self-healed — the next save simply overwrote the
-litter. A unique one does not, so every caller must remove its own temp on failure.
-`writeFileAtomic` does that for you; a site that builds its own write sequence must do it by hand.
+** 一个独特的名称需要清理。 ** 一个固定ء子自愈的名字——下一个保存谭小te
+垃圾们 独具一格的不会,所以每个呼叫者必须取消自己在失败时的暂时性.`writeFileAtomic`这样做是为了你;一个建立自己写作序列的网站必须手动完成。
 
-Cleanup must not reverse the fix. A different pid only means "another process", not "a dead
-process": desktop multi-instance mode and two `nodeterm-server --data-dir X` processes can share a
-directory intentionally, including across PID namespaces where signal-0/`ESRCH` proves nothing.
-`sweepStaleTempFiles` therefore never auto-deletes any pid-bearing temp; only the exact historical
-ownerless `<file>.tmp` shape can be swept, after a conservative 24-hour grace.
+清净不可颠倒定. 不同的pid只表示"另一个过程",而不是"一个死了"
+进程”:桌面多功能模式和两个`nodeterm-server --data-dir X`进程可以共享 a
+有意设置目录,包括信号0的 拜托`ESRCH`证明什么。`sweepStaleTempFiles`因此,永远不要自动删除任何短片;只有确切的历史
+尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 将把 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔 尔  尔 尔 尔 尔 尔 尔 尔 尔 尔 尔   尔  尔 尔    尔 尔 尔 尔  我以为 尔  尔 尔 尔 尔 尔 尔 尔 尔 尔   尔  尔       尔       尔        尔                                                                                 我是 尔       尔       `<file>.tmp`在保守的24小时优雅之后,形状可以被扫荡。
 
-Stores whose orphaned temp would be a live credential (a GitHub token, a provider cookie, the
-phone pairing bearers in `agent.json`) make the opposite trade on purpose, through
-`sweepForeignTempFiles`. A unique name is never written twice, so such an orphan would sit on disk
-at 0600 forever; that sweep removes every temp this process does not own, with no grace, and
-accepts that a second live process's rename can then fail with `ENOENT`. The workspace store uses
-it too, for `workspace.json` and `project.json`. Both sweeps recognize temps through the same
-`atomicTempCandidate`, so a change to `tempNameFor` reaches both. The rule used to be re-typed at
-five call sites, each with its own copy of the temp-name regex.
+其孤儿临时住所为活证(GitHub代币、供货商饼干)
+电话配对`agent.json`故意进行相反的贸易,通过`sweepForeignTempFiles`奕 一个独有的名字从未写过两次 所以这样的孤儿会坐在磁盘上
+永远在6:00; 扫荡除去这个过程不拥有的,没有恩惠,
+接受第二个 live 进程重命名会失败`ENOENT`。工作空间商店使用
+也是为了`workspace.json`和`project.json`两次扫荡都通过同样的`atomicTempCandidate`因此更改为`tempNameFor`达到两个。 该规则曾于
+5个呼叫站点,每个站点都有自己的临时名称regex副本.
 
-## Deletes whose purpose is to stop something
+□ 删除目的为阻止某事
 
-`removeAtomic` retries the same transient Windows codes for `unlink`, and treats only `ENOENT` as
-"gone". The trap it closes is reporting, not retrying: such a delete is normally written as an
-unlink wrapped in a bare catch commented "already absent", which is correct for the failure the
-author had in mind and wrong for every other one — `EPERM` means the file is still sitting there.
-`clearAtomicTarget` extends that contract for credential clears: it reports incomplete while any
-recognized temp remains or the directory cannot be inspected, instead of telling the UI a
-credential is gone while its bearer bytes remain next door.
+`removeAtomic`重试相同的瞬态窗口代码`unlink`,只治疗`ENOENT`作为
+"离开"。 它关闭的陷阱是报告而不是重试: 这样的删除通常被写成一个
+赤裸的渔获物包裹着的无链接评论"已经不存在",这是正确的,因为失败了
+作者对其他人的想法和错误——`EPERM`说明文件还在那里`clearAtomicTarget`延长合同的证明理由:报告不完整,而任何
+已确认的临时遗骸或无法检查目录,而不是告诉UI a
+证书不见了 而它的无记名字节仍然在隔壁
 
-## The rule, and how it is enforced
+□规则,如何执行
 
-> No store publishes a file with a bare `fs.rename`. Use `renameAtomic`, or `writeFileAtomic` if
-> the whole temp-write-publish cycle is what you want.
+> 没有商店发布空文件`fs.rename`启用`renameAtomic`,或`writeFileAtomic`若为
+> 整个临时写作- publish 循环就是你想要的.
 
-`src/core/fs-atomic.guard.test.ts` scans `src/core`, `src/main` and `src/server`, and fails on any
-bare rename in all three spellings. The only exemption is `core/fs-atomic.ts` itself. It flags a
-bare `rename`/`renameSync` only when the file actually imported that name from `fs` — several
-stores have a `rename()` method of their own, and a guard that cries wolf is a guard somebody
-deletes.
+`src/core/fs-atomic.guard.test.ts`扫描`src/core`, (中文).`src/main`和`src/server`失败。
+在所有三种拼写中赤重命名. 唯一的例外是`core/fs-atomic.ts`它本身。 它的标志是
+赤线ury`rename`页:1`renameSync`仅当文件实际导入此名称时`fs`几个
+商店有一个`rename()`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}他们自己的方法 {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}一个哭狼叫的警卫就是个警卫 {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}有人
+删除。
 
-The temp-name half checks the PROPERTY, not the helper: an inline `randomUUID()` path is also
-correct. The guard strips comments before matching, so a file may still *discuss* `fs.rename` in
-prose. It also asserts it found a source tree at all — a scan that matches nothing otherwise
-reports clean, which is the same class of silent failure as the bug.
+半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个一系列半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个阿姨的半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个半个`randomUUID()`路径也是
+没错 护卫队在比对前会发表评论 所以文件可能还会讨论`fs.rename`输入
+传言. 还声称它发现了一棵源树 一种没有匹配的扫描
+报告干净,这是与错误相同的无声故障。
 
-## Surfaces
+□ 表面
 
-| Surface | Status |
-|---|---|
-| **Desktop** (Electron) | Covered. Windows is the platform this exists for; on macOS/Linux the retry is inert and behaviour is unchanged. |
-| **Server Edition** | Covered for core stores — the helper is in `src/core`, so both shells get it. Its usual host is Linux, where the retry is inert, but a Windows-hosted server gets the same protection. The ControlMaster/scp manager is desktop-only. |
-| **Mobile companion** | No client change. It holds no local stores of its own, but the agent-status mirror it reads from an SSH host now arrives through the unique remote temp path. The transport shape is unchanged. |
+|  Surface  Surface  Status  Status  Status  Status | |
+|,|也.
+* **Desktop** (Electron) * * * 覆盖。 Windows是这个存在的平台;在macOS/Linux上,重试是惰性的,行为是不变的. |
+* ** 服务版 ** * * 覆盖核心商店——帮助者在`src/core`,所以两个贝壳得到它。 其通常主机是Linux,其中的重试是惰性,但Windows托管的服务器获得同样的保护. ControlMaster/ scp 管理器是只使用桌面的 。\\\ x
+* ** 移动伴** 客户端不变。 它没有自己的本地商店,但是它从一个SSH主机读到的代理状态镜像现在通过独特的远程临时路径到达. 运输形状不变. |

@@ -1,521 +1,482 @@
-# Session memory: the RAM pill and the per-session panel
-
-A bottom-left **RAM pill** beside the usage pill, and the **session-memory panel** it opens: how
-much memory the machine the *active project* runs on is using, and which `nt-*` tmux session is
-holding it.
-
-> Design spec: `docs/superpowers/specs/2026-08-10-session-memory-panel-design.md`.
-> The condensed rules live in `CLAUDE.md` ("Session memory"); this document carries the
-> measurements, the reasoning that is too long for that file, and **§10, the device checklist** for
-> everything that could not be verified on the headless Linux box this was built on.
-
-Files:
-
-| Layer | File |
-|---|---|
-| Local read + pure assembly | `src/core/session-memory.ts` |
-| The SSH host's leg (generated `sh`) | `src/core/session-memory-remote.ts` |
-| RPC + routing (booted by BOTH shells) | `src/core/session-memory-service.ts` |
-| Renderer store (two cadences) | `src/renderer/state/sessionMemory.ts` |
-| Rows → titles / projects / orphans | `src/renderer/lib/sessionMemoryRows.ts` |
-| Where a kill has to land | `src/renderer/lib/sessionKill.ts` |
-| Pill + panel | `src/renderer/components/SystemResourcePill.tsx`, `SessionMemoryPanel.tsx` |
-
----
-
-## 1. What was measured, and what it means
-
-The feature exists because a user reported *"Claude terminals are killing my memory, each one takes
-2 GB"*. Measured on the production host (64 GB, 95 live `claude` processes):
-
-| What | Measurement |
-|---|---|
-| `claude` process alone | avg **335 MB**, peak **1159 MB** |
-| 95 `claude` processes | **31.1 GB** |
-| MCP children per session | +30–200 MB (playwright-mcp + Chrome ≈ 200 MB alone) |
-| One "Claude terminal" tree | **440 MB – 1.2 GB** |
-| nodeterm-server (per user) | 49–82 MB |
-| tmux client (per attached session) | 5.1 MB × 59 = 303 MB |
-
-Two facts settle the attribution:
-
-1. **nodeterm does not allocate it.** It is the agent CLI's own V8 heap. `RssAnon` is essentially
-   all of the RSS (1165 MB of 1187 MB on the largest process), and this repo sets no `NODE_OPTIONS`
-   / `--max-old-space-size`, so V8 sizes its heap from system RAM (`heap_size_limit = 4144 MB` on
-   that host).
-2. **It is not a leak.** RSS is flat with process age — 0–24 h avg **340 MB**, 1–7 day avg 339 MB,
-   7 day+ avg **326 MB**. Each process takes a flat baseline and never returns it.
-
-So the user's *number* was right and their *attribution* was wrong — but nodeterm is not innocent
-either: it keeps those processes alive (only `×` kills a session; project close and app quit merely
-detach) and the canvas invites many at once. One measured client held **51 attached sessions ≈
-17 GB**.
-
-**The gap this closes is the blindness, not the allocation.** Nothing in the product told the user
-that 18 sessions were live, that one of them was 1.2 GB, or that six belonged to a project they
-closed three weeks ago. Capping agent memory (`--max-old-space-size`) was considered and rejected
-for v1: a low ceiling OOM-kills a long-context session, which is worse than the 2 GB.
-
-**Do not re-derive these numbers.** They are here so the next person does not spend an afternoon on
-`/proc` arithmetic to reach the same conclusion.
-
-**Power users: capping a node-based agent's heap.** nodeterm still ships no cap and must not grow a
-`NODE_OPTIONS` default. A user who wants one can set `NODE_OPTIONS=--max-old-space-size=2048` in a
-**custom agent's env** (Settings → Agents); project env cannot, because `NODE_OPTIONS` is a reserved
-spawn key (a code-execution guard). Three caveats belong with that advice: a session that outgrows
-the cap is OOM-killed (the pane and `--resume` recover the conversation, not the turn); it only
-affects npm-installed **node** CLIs (`claude.cmd`, gemini) — the native `claude.exe` is a Bun
-binary and codex is Rust, so there it does nothing (`where claude` says which one a Windows user
-runs); and it is a per-machine choice, never a project one.
-
-**Attached sessions are never reaped, by design.** The reaper (`session-budget.ts`) only ends
-DETACHED sessions; anything mounted on a canvas is watched and untouchable, on tmux and on the
-Windows session host alike. The levers for live sessions are offscreen release (which detaches the
-viewer, so the grace window / count cap can apply), Eco, Pause, and the panel's `×`. Heavy users can
-shorten the grace with `NODETERM_SESSION_GRACE_HOURS` (fractional values are honoured; see below).
-
-**Windows: the session host's own cost is shown, not hidden.** On Windows the panel adds a
-non-killable `nodeterm session host (N consoles)` line — the host process (headless emulators,
-node-pty's per-session conout worker thread) plus its conhost/OpenConsole children, which no
-session row can reach. It is a measured working set, added to the total only when measured. See
-docs/windows-session-host.md ("Observability", "Pane probes").
-
-### A fractional `NODETERM_SESSION_*` value must not disarm the guard
-
-Found while running the live reaper experiment with `NODETERM_SESSION_GRACE_HOURS=1`.
-
-`envInt` used `Math.floor(n)` behind `n > 0`, so a fractional setting became **zero** — and a zero
-here is not a smaller setting, it is the removal of a safety:
-
-| Input | Before | Effect |
-|---|---|---|
-| `GRACE_HOURS=0.5` | 0 s | a session was reapable the moment it detached |
-| `MAX_DETACHED=0.5` | cap 0 | every detached session counted as over-cap: a full batch died every sweep |
-
-The asymmetry is what made it dangerous rather than merely wrong: `abc`, `''`, `0` and `-3` all fell
-back to the safe default, while `0.5` — the most PLAUSIBLE thing an operator would type, meaning
-"half" — silently disarmed the guard. **A hand-editable value must degrade to the safe default,
-never to something more destructive than the default.**
-
-`envInt` now requires `>= 1`, and sub-hour grace (a legitimate wish) is served properly by
-`envHours`, which keeps the fraction: `0.5` is 1800 seconds, not zero.
-
-## 2. Why the reaper is deliberately untouched
-
-`src/core/session-budget.ts` reaps only **detached** sessions idle past a grace window. On the
-measured host that made its kill list **empty** — 60 `nt-` sessions, 50 attached, **0 eligible** —
-while 31 GB sat there. An open canvas is attached, and attached is untouchable.
-
-Retargeting the reaper is a separate change with separate risk (it would start killing sessions a
-user is looking at). This feature adds **sight**, not policy: it shows the 31 GB and lets a human
-decide. The one thing it shares with the reaper is `readMemInfo` (§3).
-
-
-### The reaper does not cull on a byte watermark on macOS either
-
-Fixing `readMemInfo` made the bytes HONEST; it did not make them the right instrument. The same
-capture that verified the formula showed the machine at **82% used with macOS's own Memory Pressure
-graph GREEN** (8.38 GB compressed, 1.77 GB swap in use). A 10%-available watermark therefore fires
-in states the OS itself calls healthy — and the reaper's pressure trigger culls sessions.
-
-So `hostMemReader` (darwin ⇒ `null`) is the reaper's **default** reader, not something the shells
-inject. That is deliberate: a wiring line can be deleted with the whole suite green — measured twice
-on this branch — whereas a default cannot. `planReap` treats `null` as *no pressure signal*, so on
-macOS only the detached-COUNT cap can trigger a cull, and that is not memory-based at all.
-
-The reaper keeps its purpose on macOS: the count cap bounds accumulation, the pty-pressure monitor
-covers the resource that actually ran out, and this panel gives the user the visibility to cull
-deliberately. What it loses is the ability to cull on a signal that was telling it the wrong thing.
-
-**Guarded at the source, and honestly:** `hostMemReader` differs from `readMemInfo` ONLY on darwin,
-and CI runs on Linux where they are the same function — so reverting the default leaves every
-BEHAVIOURAL test green (measured). `session-budget.test.ts` therefore asserts the default in the
-source text, with that limitation written next to it.
-
-## 3. `readMemInfo` has exactly one home
-
-It lives in `session-memory.ts`; `session-budget.ts` imports **and re-exports** it. Two features now
-read host RAM — the reaper's watermark and the pill — and a second copy would drift. The reaper and
-the pill must never disagree about how much RAM is free.
-
-Linux `/proc/meminfo` `MemAvailable` is the honest number; `os.freemem()` is the fallback elsewhere
-(on Linux that fallback would report `MemFree`, materially smaller under a warm page cache, which
-is why the file read comes first). `null` when nothing is readable — **never zero**.
-
-## 4. `ok:false` is not `ok:true` with no rows
-
-This is the rule the whole feature exists to honour, and every layer preserves it:
-
-- `collectSessionMemory` returns `ok:false` when there is no tmux binary, when the process table is
-  unreadable, or when **no socket answered**. A socket with no tmux server is an *answer* (the
-  normal state of a socket nobody has used), classified by `isNoServerError` — deliberately narrow
-  and **anchored** to tmux's own connect message, because `promisify(execFile)` folds stderr into
-  `err.message` and a bare `no such file or directory` also matches a tmux client missing a shared
-  library (exit 127 on *every* socket) and a dead ssh ControlMaster. Laundering either into "no
-  sessions here" prints an empty panel over 20 live ones.
-- `parseRemoteSessionMemory` returns `ok:false` on a missing **or out-of-order** section marker, on
-  an empty process table (a host always has processes), and — the remote counterpart of the rule
-  above — when **no socket answered**. Each socket is fenced in the reply (`##SOCK <name>` … its
-  tmux exit status as `##SOCKRC <n>`) with tmux's stderr folded in (`2>&1`), and the SAME
-  `isNoServerError` classifies it: exit 0 answers with panes, "no server running" / "error
-  connecting to … (no such file or directory)" answers "nothing here", **anything else did not
-  answer** (nor did a fence the stream cut off mid-socket). Before this the sweep was
-  `{ tmux …; tmux …; } || true` with stderr discarded, so a host whose tmux client could not start
-  — exit 127 on *every* socket, live sessions untouched — produced a stream byte-identical to an
-  idle host's and the panel said "No sessions are running here." over thirty of them.
-- The store carries `ok:false` through untouched, and treats a *rejected* call as the same fact.
-- The panel renders four distinct sentences: "Could not measure sessions on this machine.",
-  "Measuring…", "No sessions are running here.", and the list. The grand total and the
-  "*n* sessions" count are gated on a `measured` flag (`ok && loadedScope === scopeKey`), so a
-  failure can never show "0 B / 0 sessions" beside it.
-
-## 5. Reading this machine
-
-`/proc/<pid>/status` is read for the whole table, **never `statm`**. `status` carries `PPid` and
-`VmRSS` in one file and already in kB; `statm` reports RSS in **pages**, which forces a page-size
-assumption — a hard-coded 4096 under-reports **4×** on a 16 KiB-page arm64 kernel and **16×** on the
-64 KiB-page enterprise arm64 builds (it would print 40 MB for a 640 MB session). Do not "optimise"
-this back to `statm`.
-
-Non-Linux (and an unreadable `/proc`) falls through to one `ps -eo pid,ppid,rss` call, through the
-same injectable seam as tmux — nothing in `session-memory.ts` reaches a subprocess around it.
-
-`rollupTree` walks each pane pid's descendants with a `seen` guard (a table captured while pids are
-recycling can present a cyclic ppid chain, and a sweep that hangs is worse than one that
-under-reports). **`childCount` counts EVERY descendant**, the agent CLI included: `pane_pid` is the
-pane's *shell*, so a claude session with two MCP servers reports **3**. The panel therefore says
-"child processes", never "MCP" — a plain `npm run dev` has children too.
-
-`list-panes -a` emits one line per **pane**, so the first pane of a session wins in both legs (same
-key, same order) — one session is one row.
-
-### On macOS the PANEL reads phys_footprint, not `ps`'s rss
-
-Two surfaces describing one machine must not use two accountings. The pill's `vm_stat` reading
-counts compressor pages and matches Activity Monitor to 0.05%; `ps`'s `rss` does not count them at
-all, so the panel was measuring something else.
-
-Measured on a real Mac (2026-08-12), 8 `claude` processes captured in the same tick against Apple's
-own `footprint` tool — the source of Activity Monitor's "Memory" column:
-
-| Process state | footprint / rss |
-|---|---|
-| Active | ~1, and one read **0.73x** |
-| Idle | **1.84 - 2.20x** |
-
-Both directions matter. `rss` counts shared resident pages footprint does not (hence 0.73x), and
-drops the compressed pages of an idle process (hence 2x). **The idle case decides it:** this panel
-exists to answer what idle sessions cost, and macOS compresses exactly those, so `rss` understated a
-six-hour-idle session by about half.
-
-`parseTopFootprint` reads `top -l 1 -stats pid,mem`, verified identical to the `footprint` tool.
-`ps` is still called for the parent links (`top` has no ppid column) and the two merge on pid; a pid
-`top` did not list keeps its `rss`, since the snapshots are a moment apart.
-
-The format facts in that parser were CAPTURED, not composed — including the one that would have
-broken a naive implementation: the MEM column is left-aligned in five characters, so values carry
-TRAILING SPACES (`12M  `, `859M `, `1314M`) and a `/M$/` regex misses two thirds of the column. `G`
-is accepted but was never observed (a 1314M process stayed in M); `B` and any restricted-process
-rendering were not observed and are deliberately not guessed — an unrecognised suffix skips the row.
-
-**Linux is untouched:** `/proc/<pid>/status`'s `VmRSS` is the right number there.
-
-### macOS reads `vm_stat`, not `os.freemem()`
-
-libuv's `os.freemem()` counts only genuinely FREE pages, and a healthy Mac keeps that near zero on
-purpose — file-backed and purgeable pages are held until something needs them. So `total - free`
-renders every Mac at ~100% used. Observed in the field: a 24 GB Mac reporting **23.9 / 24.0 GB**
-while the panel's sessions summed to 2.8 GB.
-
-`parseVmStat` computes what Activity Monitor calls Memory Used —
-`anonymous - purgeable + wired + compressor` — and treats the rest as available. It is an
-**approximation of Activity Monitor, not a reproduction**: Apple documents no exact figure, and on
-Apple Silicon the parts are known not to sum to its total.
-
-**The page size is read from `vm_stat`'s own header, never assumed.** Apple Silicon uses 16 KiB
-pages; hard-coding 4096 would report a quarter of real usage — the identical mistake this file
-already fixed on the Linux side, where `statm` tempted the same constant.
-
-**This also fixed the reaper, which is why the change lives in `readMemInfo` rather than in the
-pill.** `sessionBudgetConfig`'s watermark defaults to 10% of RAM (2457 MB on a 24 GB machine), and
-`os.freemem()` sat permanently below it — so `planReap` saw memory pressure on EVERY sweep and a Mac
-reaped idle detached sessions every 10 minutes regardless of how much memory was actually free. One
-reader, two consumers: that is the reason they share a definition.
-
-**A failed `vm_stat` yields NO SIGNAL, not a fallback.** `darwinMemInfo` returns `null` rather than
-dropping through to `os.freemem()` — that value is exactly what caused the bug, so falling back to it
-would restore it on any Mac where `vm_stat` is missing, slow or unparseable. Both consumers degrade
-correctly on `null`: `planReap` treats it as no pressure (absence of evidence never triggers a kill)
-and the pill pulses instead of printing a number it has not earned.
-
-**Confirmed in the field.** The reaper symptom was reported independently as "my sessions keep
-disappearing" on macOS, before the cause was known. Until this ships, the workaround on an affected
-machine is the reaper's own kill switch: `NODETERM_SESSION_REAP_DISABLED=1`.
-
-**VERIFIED on a real Mac (2026-08-12, 24 GB machine) — device checklist item 6 is closed.**
-Activity Monitor reported App 7.67 GB + Wired 2.95 GB + Compressed 8.38 GB = **19.00 GB**; the pill
-read **19.1 GB**. AM's own headline "Memory Used" said 19.73 GB — it exceeds the sum of its own
-parts on Apple Silicon, a documented discrepancy rather than an error here. Before the fix the same
-machine read **23.9 / 24.0 GB**.
-
-The test fixture remains composed from Apple's documented format; what is verified is the FORMULA
-against a real machine, not that fixture's specific numbers.
-
-### Swap and kernel pressure in the pill (display only)
-
-Added 2026-10-19, from a performance measurement on a Mac. The pill said 86% "warn" while 8.5 GB
-were swapped and the kernel sat at pressure level 2, and nothing on screen said either.
-
-- **Where.** `MemInfo.display` — `swapUsedMb`, `swapTotalMb`, `pressureLevel`. darwin reads
-  `sysctl vm.swapusage` (`total = 9216.00M  used = 7853.62M  free = 1362.38M  (encrypted)`, parsed by
-  `parseSwapUsage`; K/M/G only) and `kern.memorystatus_vm_pressure_level` (`parsePressureLevel`:
-  1 normal, 2 warn, 4 critical, anything else omitted). Both come from ONE `/usr/sbin/sysctl` run
-  in `darwinMemInfo` (one more synchronous process per 30 s pill read, beside `vm_stat`); each field
-  is still optional on its own — an oid with no line omits that field, and a failed run leaves the
-  `vm_stat` reading untouched. Linux
-  copies its swap from the `/proc/meminfo` text already parsed. Linux has no kernel level; PSI is
-  not mapped to one because no threshold has been measured.
-- **Why a sub-object.** `hostUnderMemoryPressure` reads `swapTotalMb`/`swapFreeMb`. Filling those on
-  darwin would turn a Mac that keeps most of its swap in use (16% free on the measured one) into permanent "pressure" for the
-  reaper. The pill reads only `display`; nothing else does.
-- **The tint.** `max(used-% threshold, kernel level)`: the level can raise the colour, never lower it.
-- **No fake zero.** No `display` → no swap text. A measured 0 used is stated in the title only.
-- **Owed.** Pill vs `sysctl vm.swapusage` and Activity Monitor's pressure colour over a day.
-
-### "nodeterm itself" in the panel
-
-From the same measurement. The GPU helper's real footprint was 1557-1845 MB (window swap chain,
-raster tiles, terminal WebGL buffers, driver memory) while `ps` rss said 96-153 MB; the pill counted
-it in the host total, but the panel never attributed it.
-
-- **Data.** The desktop shell injects `appProcesses` (`app.getAppMetrics()` → pid, type,
-  `cumulativeCPUUsage`). Memory is looked up per pid in the sweep's own process table, so the group
-  uses the rows' accounting with no second `top`: footprint on darwin (only for pids `top` covered,
-  `ProcEntry.footprint`), VmRSS on Linux, working set on Windows. `getAppMetrics().memory` is not
-  used: on macOS `workingSetSize` is resident size and `privateBytes` is Windows-only.
-- **Groups.** Browser → main, Tab → renderer (the HUD is a second one), GPU → gpu, everything else
-  → helpers. A group with an unmeasured pid has no MB; the group total exists only when every group
-  has one.
-- **States.** Absent = this surface cannot enumerate its processes (Server Edition, SSH, relay):
-  nothing drawn. `ok:false` = it tried and could not: "Could not measure nodeterm's own processes."
-  Never in the header total, never a row, local scope only.
-- **CPU** is lifetime CPU time per group, not a percentage (`percentCPUUsage` returns 0 on its
-  first call, and the sweep takes one sample).
-- **Owed.** Panel GPU figure within 5% of `footprint <gpu pid>` and not equal to `ps rss`, on a
-  real build. The Linux (VmRSS) and Windows (working set) legs are unit-tested only; neither has
-  been checked on a real machine.
-
-## 6. The SSH leg
-
-An SSH project's sessions live on the host, so the sweep runs there: core generates ONE POSIX `sh`
-script, the shell runs it over the project's ControlMaster, and only the printed sections come back
-— the same division of labour as `remote-claude-usage.ts` (core owns the command *and* the parsing;
-the shell owns the master). One round trip carries all three facts, because each extra `ssh` exec is
-a login on someone else's machine.
-
-It is generated shell that no compiler checks, so `session-memory-remote.test.ts` runs it **for real
-under `/bin/sh`** against a fake host tree — the same discipline as `remote-claude-usage.test.ts` and
-`canvas-control-shim.test.ts`. Keep it that way. It is not ceremony: the plan's own script said
-`echo ##MEM`, which prints an **empty line** under POSIX sh (an unquoted `#` starts a word-initial
-comment), and would have made **every healthy host report `ok:false`**. The markers are quoted for
-that reason.
-
-Three more properties of that script are load-bearing: every section header is printed
-**unconditionally** (a missing one means the stream was cut short, not that the host had nothing);
-the socket names + `-F` format come from the shared constants, so the remote sweep can never
-look at a different socket or ask for different fields than the local one; and **each socket is
-fenced with its own tmux exit status and its stderr** (§4) — an exit status alone cannot tell an
-unused socket from a broken tmux, and dropping both is what let a failed sweep render as an empty
-host. A non-Linux host has no
-`/proc/meminfo`, so its `mem` is legitimately `null` — the pill must pulse there, never show 0.
-
-## 7. Which machine answers
-
-`session-memory-service.ts` makes exactly one decision: local sweep or remote leg. Two independent
-sources say "remote" and **either is enough** (OR, never AND) — the renderer's own `remote` flag
-(it already knows from `usageScope`) and the shell's `isRemoteProject`. A source that answers "no"
-because it is momentarily uninformed (an index not loaded, a master that just dropped) would
-otherwise turn a remote query into a local sweep and publish **this** machine's sessions under the
-host's name.
-
-`sshScopePredicate` builds that shell-side answer from **identity, not liveness**:
-`workspaceStore.sshProjectIds()` (a disconnected SSH project is still someone else's machine),
-OR-ed with the live masters for a project the index has not yet listed.
-
-The `remote` option pair is deliberately asymmetric: `run` is optional (a shell may be unable to
-read another host), `isRemoteProject` is **required** — reading-without-knowing is not coherent and
-stays a compile error.
-
-One in-flight remote read per project is coalesced (the panel wants both the RAM number and the
-rows; that is two identical `ps` execs on someone else's machine otherwise). The key is the
-`projectId` and nothing else, because that is the only thing deciding which host the command lands
-on. It is cleared on settle — a concurrency guard, never a cache.
-
-## 8. The renderer: scope, cadence, ownership
-
-**Scope** is `usageScopeKey(activeProject)` — the same helper the usage indicator uses, so the two
-pills cannot disagree about which machine they describe. The store stamps every request with the
-scope itself (not a counter: `refreshFull` and `startHostPoll` can be called for different scopes
-with no intervening bump), discards a response stamped with a scope it has left, and clears the
-previous machine's facts on a real change.
-
-**The cadence split follows the cost:**
-
-- **Local scope** — the pill polls `HOST_POLL_MS` (30 s). One file read, free.
-- **SSH scope** — **never polled.** One read on scope entry, one when the project's ControlMaster
-  comes up (an SSH project is opened before its master is ready, and with no timer behind it a first
-  read against a dead master would leave the pill blank), and one per panel open / `⟳`. This is the
-  rule `CLAUDE.md` already sets for remote usage, for the same reason.
-
-**The full sweep never runs on a timer and never from the pill.** The panel is *unmounted* while
-closed and its mount is what triggers the sweep. One additional consumer follows the same rule:
-the welcome screen runs one **local** sweep per appearance (only while "Recently closed" lists
-projects) to badge each closed project with its live `nt-*` session count (issue #442,
-`renderer/lib/projectCloseSessions.ts` `closedSessionCounts`). It calls
-`window.nodeTerminal.sessionMemory.read({ remote: false })` directly — not through
-`state/sessionMemory.ts`, whose module-level scope stamp belongs to the pill/panel pair — and a
-failed sweep (`ok:false` / rejection) renders **no badge**, never "0".
-
-**The pill is icon-only at rest.** It sits on every canvas, always, so a permanent
-`RAM 15.6 GB / 62.5 GB` is a row of numbers nobody asked for — the pill's job is to be findable, not
-to report continuously. Hover (or keyboard focus, or an open panel) reveals used/total; the icon
-itself carries the pressure reading through the same thresholds the old mini-bar used, tinting as
-memory is CONSUMED. The reveal is **CSS, not a conditional mount**: the numbers stay in the DOM at
-rest so they remain the button's accessible name, and a hover-mounted figure would be unreachable to
-anything that reads the control without pointing at it. The pill sits to the LEFT of the usage pill
-— this machine's resources before this account's quota.
-
-**Ownership contract:** the store's poll timer and its active-scope stamp are **module singletons**,
-and the **pill is their single owner**. The panel must never call `startHostPoll` / `stopHostPoll` —
-a `stopHostPoll` on unmount would clear the pill's interval with nothing left to restart it, and the
-number would silently freeze until the next scope change.
-
-The store resolves its api through `sessionForProject(projectId).api`, not `window.nodeTerminal`: a
-relay tab's renderer runs on the guest while its sessions live on the host, and its api is the
-stub — `ok:false`, which the panel surfaces as *not available here*, not as a failure to retry.
-
-## 9. Rows, orphans, and where a kill lands
-
-`resolveSessionRows` resolves each `nt-<nodeId>` against **every** project the store holds:
-
-- **A closed project is not an orphan.** `closeProject` only sets `closed = true` and keeps the
-  project and its nodes on disk, so its sessions resolve to a real title and are labelled with their
-  project. Calling them orphans would invite the user to kill sessions they deliberately parked. The
-  panel therefore passes the full `projects` array — filtering to open tabs defeats this rule
-  silently, from outside the file that states it.
-- **`orphan` is the distinguishing field, not `state === null`.** A plain terminal never enters the
-  agent-status map, so deriving orphan-ness from a missing agent state would flag every one of them.
-  An orphan's state is dropped rather than passed on (the panel could not explain a "working" dot on
-  a row it cannot travel to) and its dot renders hollow.
-- Orphans are the point: they are exactly what the reaper cannot see and no canvas can show.
-
-**The kill is routed by the SCOPE, not by the row** (`planSessionKill`). `transport.destroy(nodeId)`
-reaches a *remote* tmux session only through a LIVE local client carrying `sshRemote` — which an
-orphan has not, and neither has a node owned by a non-active project. Before this, every orphan
-row's `×` on an SSH project promised a kill it could not perform: the local socket was touched, the
-host's `nt-<id>` kept running, and the row came back on the next refresh with no explanation. So on
-an SSH scope the kill *additionally* runs `sshProject.killSessions(activeProjectId, [nodeId])` over
-that project's own ControlMaster, which needs no live session and is idempotent (the mounted case,
-where `destroy` already ended it, is a harmless best-effort miss).
-
-That is safe because it is a **round trip, not a lookup**: the panel's `nodeId` is literally
-`session.slice('nt-')` from the sweep, and `killSessions` maps it back through the same idempotent
-`sessionName()`, so the remote leg kills **the exact session name the sweep observed, on the host it
-observed it on**. It does not rest on node ids being globally unique (they are only per-launch
-unique).
-
-**The name and the host were never the hard part — the SOCKET was.** Two nodeterm tmux sockets exist
-on one machine at the same time: `node-terminal` for a nodeterm running ON it (desktop or Server
-Edition) and `nodeterm-rmt` for one SSH-ing INTO it. The sweep lists **both**
-(`session-memory.ts`, `session-memory-remote.ts`) while the kill targeted **one** — so every row that
-came off the other socket got the confirm "this stops its tmux session" and a kill that landed
-nowhere. That is not an exotic host: one running its own `nodeterm-server` *and* being SSH'd into is
-exactly it, and the local mirror is the same shape (this machine's panel listing the `nodeterm-rmt`
-sessions that another machine's nodeterm spawned here — all of them orphans locally, since their
-nodes are on that machine's canvas). So a kill that knows only a NAME now goes to **every socket that
-name could be on**: `KILL_TMUX_SOCKETS`, via `remoteTmuxKillEverySocketArgs` (remote) and
-`localKillSockets` (local). Three things make that safe rather than reckless:
-
-- It is **best-effort by contract**: tmux exits non-zero with "can't find session" on whichever
-  socket does not hold it, which is the already-ignored case both legs were written around.
-- The target is **exact** — `-t =nt-<id>`. Without `=`, tmux falls back to fnmatch and then to
-  PREFIX matching whenever the name is not found, and "not found" is the normal outcome of a
-  speculative kill. Node ids end in a counter, so `nt-…-1` is a prefix of `nt-…-12`: a miss could
-  have killed a *different* session. The reaper already killed this way, for this reason.
-- **The fan-out is opt-in, and only the panel opts in.** Two conditions have to hold: we do not know
-  the socket, *and* the caller asked for it (`localKillSockets(liveSocket, everySocket)`,
-  `sshProject.killSessions(…, { everySocket: true })`, `transport.destroy(id, { everySocket: true })`).
-  A destroy for a session we hold aims at that session's socket alone whatever the caller asked, so
-  the ordinary node-`×` on a mounted node still fires exactly one kill. But the **unheld** branch is
-  not rare — an ordinary node-`×` on a node that was never mounted in this process takes it every
-  time, which is the common case right after an app restart and for every non-active project's node
-  — and project deletion is the same shape remotely. Those callers know their own nodes, so they
-  stay narrow: speculating at `nodeterm-rmt` aims at sessions ANOTHER machine's nodeterm SSHed in to
-  spawn here, and speculating at a host's `node-terminal` aims at sessions a nodeterm running ON it
-  owns. Both defaults and both opt-ins are pinned (`pty-single-user.test.ts`,
-  `control-master.test.ts`, `ssh-project.killSessions.test.ts`), including that the wire flag must
-  be a literal `true`.
-
-Note the deliberate duplication: the sweep and the reaper keep their own `[TMUX_SOCKET,
-RMT_TMUX_SOCKET]` arrays. For them the ORDER is load-bearing — the sweep's `bySession` is first-wins,
-so it decides which socket a duplicate name is attributed to — and for a kill it means nothing.
-Sharing one constant would couple a de-duplication preference to a kill list.
-
-Ownership is re-resolved at click time rather than taken from the row's `orphan` flag — the rows are
-a snapshot of the last sweep, and a node created since would otherwise be killed as an orphan. With
-an owner, the kill goes through `closeSession`, the same path the sessions sidebar and the node's
-own `×` use.
-
-### Surfaces
-
-- **Desktop** — full, including the SSH leg.
-- **Server Edition** — the service runs and reports the machine it is served from. An SSH scope
-  answers `ok:false` (no ControlMaster is injected) — and it says so **by identity**, via
-  `sshScopePredicate` over `workspaceStore.sshProjectIds()`, rather than trusting the renderer's
-  flag. See `docs/SERVER.md`.
-- **Relay tabs** — the ws-bridge stub answers `ok:false`; the panel says session memory is not
-  available on a relay tab rather than reporting a failure.
-- **Kanban board** — Canvas passes `overBoard={kanbanOpen}`, which raises the pill to z 26 over the
-  board's opaque 25 (the same prop `UsageIndicator` takes beside it); an open panel rises to 60, over
-  the board and the banners but below ConfirmDialog / the palette.
-- **Sessions sidebar** — an open panel also has to clear the sidebar (z 12) when the board is
-  *closed*, which is a separate rule: `.sysres-indicator:has(.sessmem-panel) { z-index: 13 }`,
-  mirroring `.usage-indicator:has(.usage-popover)`. Both `:has()` rules only work because the pill
-  cluster is mounted OUTSIDE `<ReactFlow>` — the library's wrapper carries an inline `z-index: 0`
-  that would trap any value inside it, however large. The collapsed pill deliberately keeps its low
-  layer (5) and passes *under* the sidebar.
-- **Mobile companion** — **N/A for v1.** *nodeterm mobile* attaches to tmux sessions over the
-  transport protocol and has no concept of per-session host memory; adding one means extending that
-  protocol. A follow-up in `~/projects/nodeterm-ios`, not built here.
-
-### Known gaps (v1, deliberate)
-
-- The session list is **uncapped**. A host with hundreds of sessions makes a long list; truncating
-  silently would hide exactly the rows that matter. If it becomes a problem the fix is a visible
-  "showing top N" line, never a silent cap.
-- A pane pid that exits between the tmux call and the process sweep emits a legitimate-looking
-  **0 MB row** rather than being dropped — the same "measurement failure rendered as zero" shape as
-  §4, at row granularity.
-- Switching between two SSH projects with the **same `user@host`** (the scope key carries no port)
-  leaves the previous rows on screen until the re-sweep, because `enterScope` only clears when the
-  scope *string* changes.
-- **CLOSED (was: the sessions sidebar has the bug this feature fixed in the panel).** The fix did
-  not land on the sidebar; it landed a layer down, where every surface benefits at once.
-  `PtyManager.runEndSession` used to read remoteness off the live `Session` object alone
-  (`dying?.sshRemote`), so a delete with no mounted client — the sidebar's cross-project close, the
-  node `×` after an app restart or an offscreen release, Delete on a parked node — skipped the
-  remote branch silently and sent its one kill to the LOCAL socket, where a `requireRemote` node has
-  nothing. A resolver wired from the persisted index (`setRemoteNodeOwner` →
-  `workspaceStore.sshProjectIdForNode` plus that project's ControlMaster, see `core/remote-end.ts`)
-  now answers without a live client, and an undelivered kill is recorded
-  (`core/pending-remote-kills.ts`) and settled on that host's next connect instead of being
-  swallowed. `planSessionKill` stays for the panel's ORPHAN rows, which no project claims.
-
-## 10. Device checklist
-
-Everything below was argued from code, CSS or a Linux measurement and could **not** be exercised on
-the headless Linux box this was built on. Format follows `docs/grok-agent.md` §9 /
-`docs/gemini-agent.md` §9. Highest value first: items 1–5.
+> English: [docs/en/session-memory.md](./en/session-memory.md)
+
+# 会话内存:RAM避孕药和每会话面板
+
+左下方的药丸** 与使用药丸相邻的药丸** 并打开会议-记忆面板** :
+* 活动项目* 正在运行的机器使用, 以及该机器`nt-*`tmux 会话是
+拿着
+
+> 设计规格 :`docs/superpowers/specs/2026-08-10-session-memory-panel-design.md`。 。 。 。
+> 凝聚的规则生活在`CLAUDE.md`(“会议记忆”);本文件载有
+> 测量,对文件来说太长的推理,和XQ10,设备清单**
+> 在无头的 Linux 框参加了无法核实的每件工作。
+
+文件 :
+
+QQ 层文件QQ
+|,|也.
+本地读 + 纯装配`src/core/session-memory.ts`|
+SSH 主机的腿( 生成)`sh`· 国家`src/core/session-memory-remote.ts`|
++ RPC + 路由(由双壳启动) +  `src/core/session-memory-service.ts`|
+* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *劳工市场* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *`src/renderer/state/sessionMemory.ts`|
+~ 标题 / 项目 / 孤儿 ~`src/renderer/lib/sessionMemoryRows.ts`|
+死亡必须降落的地方`src/renderer/lib/sessionKill.ts`|
+药片+面板`src/renderer/components/SystemResourcePill.tsx`, (中文).`SessionMemoryPanel.tsx`|
+
+- - - 说吧
+
+□1. 测量到什么,意味着什么
+
+这个功能之所以存在,是因为一个用户报告 *“Claude终端正在杀死我的记忆,每个都带走了
+2 GB"*. 量产主机(64 GB,95 直播).`claude`进程:
+
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}什么衡量 {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}什么衡量
+|,|也.
+|`claude`单程 | avg **335 MB**,峰值 **1159 MB** |
+| 95`claude`流程 **31.1 GB ** ++
++30–200 MB(玩法-mcp + Chrome → 200 MB 单曲)
+[永久失效連結] [永久失效連結] 1"Claude terminal"树 | **440 MB – 1.2 GB ** |
+QQ 节点服务器( 每个用户) QQ 49 快去82 MB QQ
+QQ tmux 客户端 (每个附加会话) QQ 5.1 MB × 59 = 303 MB →
+
+两个事实解决了归属:
+
+1. ** 决定不分配。 ** 这是CLI的V8重机`RssAnon`本质上是
+全部RSS(1165 MB of 1187 MB on the bigest process),而这个Repo设置没有`NODE_OPTIONS`页:1`--max-old-space-size`,所以V8从系统RAM(`heap_size_limit = 4144 MB`打开
+说到这里
+2. ** 这不是泄漏。 ** RSS是平的,过程年龄为 0–24 havg **340 MB**, 1–7 avg 339 MB,
+7即便是7天+avg **326 MB**. 每个过程即便是平坦的基线,也不会返回.
+
+因此用户的*数字*是正确的,他们的*归属*是错误的——但节点不是无辜的.
+要么:它使这些进程保持活力(只有`×`杀死会话; 项目关闭和应用程序仅退出
+和画布邀请 许多人同时。 一个量度客户端举行了**51次附加会议
+17GB** (英语).
+
+** 这一差距的所确认的是盲目,而不是分配。 ** 产品中没有告诉所确认的用户
+18场比赛是现场直播,其中一场是1.2GB, 或六场是属于他们的一个项目
+三周前关闭了 抓取代理内存( E)`--max-old-space-size`)被审议和拒绝
+v1: 低天花板 OOM 杀死长文本会话, 比 2 GB 更糟糕.
+
+** 不要重新确定这些数字。 ** 他们在这里,所以下一个人 不花一个下午`/proc`算术得出同样的结论。
+
+** 电源用户:封顶一个基于节点的代理商的堆积。 ** 节点决定仍然没有封顶,并且不能生长`NODE_OPTIONS`默认。 一个想要的用户可以设置`NODE_OPTIONS=--max-old-space-size=2048`在一个
+** 海关代理人的巢穴** (定居) 代理人;项目巢穴不能,因为`NODE_OPTIONS`是一个保留的
+产卵密钥(一个代码执行警卫). 3个警告与该建议有关:一个超出范围的会议
+盖子是 OOM 杀死的(窗格和`--resume`恢复对话,而不是转弯;它只是
+影响 npm- installed **node ** 国家升力(`claude.cmd`——土生土长.`claude.exe`是块
+二进制和编码是Rust,所以它什么都不做(`where claude`表示 Windows 用户的哪个
+运行);它是一个每台机器的选择,从来不是一个项目。
+
+** 从设计上说,连带的会议从未收获。 ** 摄取者(`session-budget.ts`仅结束
+预设会议;帆布上挂载的任何东西都受到监视,无法触碰。
+视窗会话主机相同 。 直播会话的杠杆是屏外释放(这可以解除
+查看器,所以宽度窗口 / 计数盖可以应用),依循生态,暂停,和面板`×`。      
+缩短优雅`NODETERM_SESSION_GRACE_HOURS`(违例价值观得到尊重渊博;见下文)。
+
+** Windows:显示会议主办方自己的费用,而不是隐藏。 ** 在 Windows 上,面板添加一个
+非杀人`nodeterm session host (N consoles)`线条——主机进程(无头模拟器,
+节点-pty的每场会展工人线条)加上它的宿主/开放孔索尔儿童,没有
+会话行可以到达。 它是一套量度工作设备,只有在量度时才加入总量。 见
+docs/windows-session-host.md ("可观察性","Pane探测器").
+
+一个分数`NODETERM_SESSION_*`值不能解除守卫
+
+运行现场收割者实验时发现`NODETERM_SESSION_GRACE_HOURS=1`。 。 。
+
+`envInt`使用过的`Math.floor(n)`后面`n > 0`,所以分数设置变为**0**——零
+这里不是一个较小的环境,它是一个安全的去除:
+
+QQ 效果前的输入 QQ 效果
+|,|在当地.
+|`GRACE_HOURS=0.5`0秒,一个会话一旦脱离,就可收获
+|`MAX_DETACHED=0.5`QQ 封顶 0 QQ 每一个分离的会话都算为超额: 每一次扫荡,一整批死亡 QQ
+
+误差是:`abc`, (中文).`''`, (中文).`0`(单位:千美元)`-3`都掉下来了
+返回安全默认值,同时`0.5`- 操作员会打的PLAUSIBLE 最多的东西,意思是
+"半"——默默解除警卫武装. ** 手动编辑值必须降解为安全默认值,
+永远不要对比违约更具有破坏性的东西。 **
+
+`envInt`现在需要`>= 1`,而且分时的优待(合法的愿望)由`envHours`,保留分数 :`0.5`是1800秒,而不是零视情况而定。
+
+□2. 死神为何故意不受伤害
+
+`src/core/session-budget.ts`仅可在优雅的窗口上闲暇地收获** 已删除的** 会话。 打开
+编制其杀伤性清单的计量主机**空虚** - 60`nt-`参加届会的50人,**0人
+31GB坐在那的时候 张开的帆布是无法接触的
+
+重新确定收割者的目标是一个单独的改变,有不同的风险(它会开始杀死会话 a)
+用户正在查看). 这个功能增加了**视觉**,而不是政策:它显示31GB,让一个人
+决定 它与收割者分享的一件事`readMemInfo`(第3节)
+
+
+{\fn华文楷体\fs16\1cHE0E0E0}收割者也不会在macOS上的字节水印上出现
+
+修复`readMemInfo`使字节成为HONEST;它并没有使它们成为正确的的乐器. 一样
+抓取已校验的公式, 显示机器使用 macOS 自身的内存压力为 ** 82%
+图GREEN** (8.38 对全球数字压缩,1.77 GB互换使用). 因此,10%的可用水更积极地燃烧
+在状态中,OS本身称为健康——而收割者的压力触发积分会.
+
+展示了`hostMemReader`(达文)`null`)是死神的** 默认** 阅读器,而不是什么贝壳
+注射剂 这是有意的:用整个套间绿色——两次测量——可以删除一条线。
+这支树枝上,有缺省,不能缺省。`planReap`处理`null`*没有压力信号*,等等
+macOS只有脱落的-COUNT盖可以触发凸起,这根本不是基于内存.
+
+收割者在macOS上保持目的: 计数封顶限制积聚,pty-pressure监视器
+覆盖实际耗尽的资源,这个面板可以让用户看到 Cull
+蓄意的 它失去的就是 隐藏在信号上的能力 信号告诉它错误的东西。
+
+** 在来源方面受到保障,而且诚实地说:**`hostMemReader`与`readMemInfo`只有达文,
+CI 运行在 Linux 上, 它们的功能是相同的 —— 因此返回默认值会留下每个
+BEAVIOURAL测试绿色(计量).`session-budget.test.ts`因此,在
+源文本,旁边写有限制。
+
+□□□□□□□□三.`readMemInfo`只有一个家
+
+它住在这里`session-memory.ts`· ;`session-budget.ts`进口**和再出口**。 现在有两个特色
+被拒绝的反对反对的反对和拒绝的反对的反对和反对的反对的反对。 收割者与
+药丸绝对不能对免费的RAM有多少有异议.
+
+链接`/proc/meminfo` `MemAvailable`是诚实的,`os.freemem()`是别处的后退
+(在后退的Linux上报告)`MemFree`,在温暖的页面缓存下,物质上较小,
+因此,阅读文件要先。`null`任何内容都不可读——**绝不是零**。
+
+□□四时.`ok:false`没有`ok:true`无行
+
+这个规则是整个特征存在是为了遵守,每一层都保留着它:
+
+- 怎么样?`collectSessionMemory`返回时`ok:false`当没有 tmux 二进制时, 当进程表是
+无法读取,或当 ** 没有套接字回答 ** 。 没有 tmux 服务器的套接字是一个 * 回答 * (即
+套接字的正常状态`isNoServerError`- 故意缩小
+和** anchored** 到 tmux 自己的连接信息,因为`promisify(execFile)`折叠 stderr 到`err.message`赤裸裸的,`no such file or directory`还匹配缺少共享的 tmux 客户端
+库(在 *ever* socket 上退出 127)和一个死Ssh Control Master。 清洗到"不"
+这里的会议“ 打印一个超过 20 个活的面板 。
+- 说吧`parseRemoteSessionMemory`返回时`ok:false`丢失的**或失序** 路标
+空进程表(一个主机总是有进程评判),以及——规则的远程对应程序
+上——当**没有套接字回答为一个**。 每个套接字在回执中设置栅为一个栅栏(`##SOCK <name>`.其的一个基本性
+tmux 退出状态为`##SOCKRC <n>`)与 tmux 的 stderr 折叠成 (`2>&1`), 以及同样的`isNoServerError`分类它: 退出 0 个答案, 有窗体, “ 不运行服务器 ” / “ 错误 ”
+连接到... (没有这样的文件或目录)" 再回答“ 这里什么都没有”, ** 其它东西没有
+回答**(溪流也没有被隔开)。 之前的扫荡`{ tmux …; tmux …; } || true`已丢弃 stderr, 因此无法启动 tmux 客户端的主机
+- 127号出口,每座插座,现场会话没有变化——产生一个与一个小区相同的小区字节
+闲置主持人和小组说"这里没有会话",超过30个.
+-店里装着`ok:false`通过未触动, 并视一个* 拒绝* 呼叫作为相同的事实。
+- 面板做了四句不同的句子: "可能不测量广泛地在这个机器上的会话。"
+"测量...","这里没有开会",还有名单。 总计和
+"***会话"计数在a`measured`旗帜( N)`ok && loadedScope === scopeKey`因此,一个
+失败永远无法显示旁边的“ 0 B / 0 会话 ” 。
+
+□5. 读这台机器
+
+`/proc/<pid>/status`改为全表,**从未`statm`页:1`status`携带`PPid`和`VmRSS`a. 在一个文件中并已在 kB中;`statm`以**页**表示的RSS报告,这要求页数
+假设——硬码为4096的下报**4×**在16 KiB页的arm64内核上,**16×**在
+64 KiB页的企业 arm64(将为640 MB会议打印40 MB)。 不要"优化"
+这回`statm`。 。 。
+
+非Linux( 以及无法读取)`/proc`跌至一个`ps -eo pid,ppid,rss`呼叫,通过
+与 tmux 相同的可注射接合器——无输入`session-memory.ts`到达周围的子进程。
+
+`rollupTree`走路的每个表皮的 蜘蛛的后代有一个`seen`警卫(一张被俘的桌子,而皮条客是
+循环利用可以呈现一个环状的斑点链, 和一个吊断的扫描比一个更糟糕
+页:1 页:1`childCount`包括:`pane_pid`这是
+pane 的 *shell *,所以有两台 MCP 服务器的 Claude 会话报告 **3 **. 因此,小组说:
+"孩子的过程",从来不是"MCP"——一个平原`npm run dev`还有孩子
+
+`list-panes -a`每个**平板喷出一行**,所以一个会话的第一个面板在两条腿中获胜(相同)
+, ; ; ; ; ; ; ; ; ; ; ; ;
+
+在macOS上,PANEL读 phys 脚印,而不是`ps`rs
+
+描述一台机器的两面面不得使用两种核算. 药片`vm_stat`读取
+计算压缩器页面,并将意见交流显示器匹配到0.05%;`ps`因为`rss`不计算在
+所有,所以面板是测量 其它的东西。
+
+在真实的Mac上测量(2026-08-12),8`claude`与 Apple 对应的同一勾选中的进程
+拥有`footprint`工具——活动监视器"记忆"一栏的来源:
+
+* 进程状态 * * 脚印/ rs * *
+|,|也.
+                                                                                                                                            欢迎      
+* * **1.84 - 2.20x** * * *
+
+, 两条方向都很重要。`rss`共享居民页脚印没有(因此0.73x),
+将一个闲置进程的压缩页(因此为2x)放下。 ** 闲置案件决定:** 本小组
+解决闲散会议的费用问题,而macOS压缩的正是这些,所以`rss`少报a
+六小时半的年龄
+
+`parseTopFootprint`读取`top -l 1 -stats pid,mem`,经核实与`footprint`工具。`ps`仍然被调用父链接(`top`(没有 pid 列), 我给你两个 合并在 pid; a pid`top`没有列表保留其`rss`因为快照是分开的
+
+该分析中的格式事实是经过核对的,而不是由它构成的,包括本可以
+打破一个天真的执行: MEM 列以五个字符左对齐,所以值带
+飞行空间`12M  `, (中文).`859M `, (中文).`1314M`和 a 数据`/M$/`regex 错过了列的三分之二.`G`(a) 被接受,但从未被遵守(在M保留1314M程序);`B`和任何限制性程序
+渲染没有被观察到,并且被刻意不猜测——一个未识别的 我有后缀跳过行.
+
+** Linux 未受影响:**`/proc/<pid>/status`因为`VmRSS`是右边的号码。
+
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}========和各科================================================================================`vm_stat`没有`os.freemem()`
+
+利布维的`os.freemem()`而健康的Mac保持了接近零的状态
+目的——文件备份和可以清除的页面被保存到有需要的时候. 这么说`total - free`使 她在 ~ 100% 时使用每个 Mac 。 实地观察:24GB Mac报告 **23.9 / 24.0 GB**
+讨论小组的会期为2.8GB。
+
+`parseVmStat`计算“活动监视器”所称的内存`anonymous - purgeable + wired + compressor`- 其它的就当有 这是一个
+** 活动监测器的近似值,而不是复制**: 苹果文档没有确切的数字, 并运行
+苹果硅这些部分已知不会与其总量相加。
+
+** 页面大小读自`vm_stat`自己的信头,从不假设。 ** 苹果硅使用 16 KiB
+页面; 硬编码 4096 将报告四分之一的实际使用量—— 同样的错误 此文件
+已经固定在 Linux 一侧, 其中`statm`诱惑同样的常数。
+
+** 这也决定了收割者, 这就是为什么变化存在于`readMemInfo`而不是在
+避孕药。 **`sessionBudgetConfig`水印默认为RAM的10%(2457 MB在24GB机上),以及`os.freemem()`永远坐在它下面,所以`planReap`看到记忆压力 每一个扫描和一个Mac
+每10分钟收获一次闲置的脱机会,不管实际上有多少记忆是免费的. 一个
+读者,两个消费者:这就是他们共享定义的原因.
+
+**A 失败`vm_stat`没有信号,不是反弹。`darwinMemInfo`返回时`null`而不是说
+转机到`os.freemem()`——这个值正是引起虫子的原因,所以倒回它.
+在任何麦克恢复它`vm_stat`缺少、缓慢或无法解析。 两个消费者都退化了
+正确打开`null`编号 :`planReap`将它视为没有压力(缺乏证据永远不会引发杀戮)
+和药促进对症的治疗,
+
+** 在外地得到确认。 ** 死神的症状是独立报告的,因为"我的疗程保持
+消失"在macOS上, 在原因已知之前。 直到这艘飞船, 工作围绕一个受影响的
+机器是死神的开关:`NODETERM_SESSION_REAP_DISABLED=1`。 。 。
+
+7)\fs90\bord1\shad1\1cHF0F0F0}但...
+活动监视器报告 App 7.67 GB + Wired 2.95 GB + 压缩 8.38 GB = **19.00 GB **;丸
+读作**19.1 GB**. AM自己的标题"Memory Used"说 19.73 GB——它超过了自己的总和.
+部分在 Apple Silicon 上,一个有文件记载的差异而不是错误。 在修旧之前
+机器改为**23.9 / 24.0 GB**.
+
+测试固定仍由 Apple 的文档格式组成; 经验证为 FORMULA
+而不是ù的号码
+
+避孕药中的交换和内核压力(仅播放)
+
+增加2026-10-19,从Ma 你是谁? 药片上说86%"警告" 你是谁?
+内核被换掉 内核压在2级 屏幕上也没说
+
+- 哪里? 你说什么?`MemInfo.display`-- -- 说`swapUsedMb`, (中文).`swapTotalMb`, (中文).`pressureLevel`. Darwin 读`sysctl vm.swapusage`(单位:千美元)`total = 9216.00M  used = 7853.62M  free = 1362.38M  (encrypted)`,以`parseSwapUsage`;只有K/M/G)和`kern.memorystatus_vm_pressure_level`(单位:千美元)`parsePressureLevel`编号 :
+1个正常,2个警告,4个关键,其他任何省略). 都来自一个`/usr/sbin/sysctl`运行
+输入`darwinMemInfo`(每30个药丸再加一个同步过程)`vm_stat`); 每个字段
+仍然可以自行选择 —— 我们得用没有线程的 Oid 省略该字段,`vm_stat`读取未触及。 链接
+复制其交换`/proc/meminfo`文本已解析。 Linux 没有内核级别; PSI 是
+未映射到一个,因为没有测量阈 可是没有测量。
+- **为什么是子对象。 **`hostUnderMemoryPressure`读取`swapTotalMb`页:1`swapFreeMb`。填充这些倡仪
+Darwin会把一个保持大部分互换使用的Mac(在测量的1上为16%自由)变成永久的"压力".
+摄受者. 药丸只读`display`;没有别的了。
+- 罐头。`max(used-% threshold, kernel level)`:关卡可以提高颜色,永远不要降低.
+-**没有假零。** 没有`display`没有互换文本。 标题中仅说明使用的测量值为0。
+- ** 已执行。 ** 药丸对`sysctl vm.swapusage`和活动监视器的 压力颜色超过一天。
+
+在面板中“节点本身”
+
+从同一度量. GPU帮助器的真正足迹是1557-1845 MB(窗口互换链,
+光栅砖、终端W的投诉`ps`rs说96-153 MB;药丸数
+它在主机总数, 但面板从来没有 归属它。
+
+- 数据。 ** 桌面外壳注入`appProcesses`(单位:千美元)`app.getAppMetrics()`→,类型,`cumulativeCPUUsage`) (中文(简体) ). 内存在扫描器自己的流程表里 被逐个查找,所以组
+在无秒的情况下使用行的会计`top`:  我还要在Darwin上留下足迹(只给皮条客)`top`覆盖,`ProcEntry.footprint`),在Linux上的VmRSS,在Windows上工作设定.`getAppMetrics().memory`没有
+使用: 在macOS上`workingSetSize`居民人数和`privateBytes`仅使用 W 咱们的窗口。
+- ** 团体。 ** 浏览器 → 主, Tab → 渲染器(HUD是第二个),GPU → gpu, 其他所有
+- 帮手。 未测量的 pid 组没有 MB; 组总数只存在于每个组时
+有个
+- ** 国家。 ** 缺席 = 此表面无法列举其进程( Server Edition, SSH, 中继) :
+没什么`ok:false`=它尝试并且不能:"Could not measure nodeterm's own progress." ="Could not measure the nodeterm's own process." ="Could not measure the nodeterm's own process." =它尝试了,并且不能:"Could not measure own process." ="Could not subsession of nodeterm's own process." ="可以不测量节点的节点的自身过程。
+从不在总标题中,从不一行,仅局部范围.
+- **CPU**是每个组的周期性CPU时间,而不是一个百分比(`percentCPUUsage`返回 0
+先打个电话,然后打一个样本
+- ** 已执行。 ** 在5%范围内的小组GPU数字`footprint <gpu pid>`且不等于`ps rss`,在一个
+真正的建筑。 Linux (VmRSS) 和 Windows (工作套件) 的腿只经过单位测试; 也没有
+在真正的机器上检查过
+
+□ 6. SSH腿
+
+一个 SSH 项目的会话在主机上直播, 所以扫描会运行在那里: 核心生成 One POSIX`sh`脚本,贝壳在工程的"控制大师"上运行,只有印刷部分回来
+- 分工与`remote-claude-usage.ts`(核心拥有 我发誓)
+贝壳拥有主人。 一次往返都包含三个事实 因为每个额外`ssh`执行是
+登录别人的机器
+
+生成的 shell 没有编译器检查, 所以`session-memory-remote.test.ts`运行它 ** 真实
+下级`/bin/sh`** 与假主树对战——与`remote-claude-usage.test.ts`和`canvas-control-shim.test.ts`保持这样。 这不是仪式:计划自己的剧本说`echo ##MEM`,在 POSIX sh 下打印一条**空行**(未引用)`#`开始单词初始
+并且本可以写出所有健康的东道主报告`ok:false`**. 引用标记为:
+那个原因。
+
+该脚本的另外三个属性带有负载: 每个区头都打印
+* 无条件**(缺一条意味着溪流被缩短,而不是东道主一无所有);
+套接字名称+`-F`格式来自共享常数,所以远程扫描永远无法
+查看一个不同的套接字或请求一个与本地不同字段不同的字段;**每个套接字是
+以自己的 tmux 退出状态及其 stderr** (§4) —— 单凭退出状态不能告诉一个
+损坏 tmux 未使用的套接字, 丢下两套是让失败的扫描变成空的
+主持人。 非Linux 主机以最佳方式`/proc/meminfo`,所以,这是`mem`是正当的`null`药片必须在那里脉搏,永远不要显示0。
+
+□ 7. 哪个机器回答
+
+`session-memory-service.ts`作出准确的决定:局部扫荡或偏僻。 2个独立
+来源说“远”和** 都足够**(或,从来没有和)—— 渲染器自己的`remote`旗帜
+(它已经知道`usageScope`和贝壳的`isRemoteProject`。一个回答“否”的来源
+因为它是瞬间不知情的(一个没有加载的索引,一个刚刚掉落的主人),
+否则将远程查询转换为本地扫描, 并发布 ** this** 机器的会话
+宿主名号.
+
+`sshScopePredicate`从**身份,而不是活性** 来构建贝壳边的答案:`workspaceStore.sshProjectIds()`(一个断开的SSH项目仍然是别人的机器),
+与现场主机一起运行,用于索引尚未列出的项目。
+
+该`remote`选项对是故意不对称的 :`run`是可选的( shell 可能无法
+读另一个主机,`isRemoteProject`- 阅读-不知情是不一致的;
+保留编译错误。
+
+每个项目有一个在飞行中远程读取器是连在一起的(面板需要RAM号码和
+行; 两行相同`ps`在别人的机器上执行 否则。 关键是`projectId`没有别的了,因为只有这样 才能决定哪一个是司令部所在地
+继续 它在结算时被清除——一个货币守卫,从不缓存。
+
+□ 8. 渲染器:范围、粗略、所有权
+
+** 范围** 借以`usageScopeKey(activeProject)`——用量指标使用的同一种帮助,所以两者
+药丸不能不同意它们描述的机器 店里每个要求都印有
+范围本身(不是计数器:`refreshFull`财务报告和已 就这样`startHostPoll`可以调用不同的范围
+在没有间歇性凸起的情况下,丢弃了用它留下的瞄准镜盖上的反应,并清除了
+前机器的事实 真正的变化。
+
+** 开销按成本划分:**
+
+- **地方范围**——避孕药民意测验`HOST_POLL_MS`(30 s) (英语). 一个文件,免费。
+- **SSH范围**——从未接受过调查。 ** 一个在范围条目上读,一个当项目的控制主
+上来(一个SSH项目在主机准备好前打开,没有计时器后方)
+将药丸留空,每块一块打开。`⟳`。这是
+规则`CLAUDE.md`已设定远程使用, 原因相同 。
+
+完全扫荡从不在计时器上运行 从不从药丸。 面板已卸载* 而
+关上它,它就会引发扫荡。 另有一名消费者遵循同样的规则:
+欢迎屏幕运行 难道每次显示一次 ** ** 本地** 扫描(仅在“最近关闭”列表时)
+将每个已关闭的项目作为项目直播的标志`nt-*`会话次数(问题442),`renderer/lib/projectCloseSessions.ts` `closedSessionCounts`) (中文(简体) ). 它呼唤`window.nodeTerminal.sessionMemory.read({ remote: false })`直接——不通过`state/sessionMemory.ts`,其模块级瞄准镜盖章属于避孕药/小板配对——和
+失败的扫描( E)`ok:false`/ 拒绝) 使** 没有徽章**,从不"0".
+
+** 药片仅限图标休息。 ** 它坐在每张帆布上,总是,所以的各项活动`RAM 15.6 GB / 62.5 GB`药丸的工作是可以找到的,而不是
+继续报告。 Hover( 或键盘焦点, 或打开面板) 显示已使用/ 总计; 图标
+压力读数通过相同的阈值 旧的迷你巴, 锡
+记忆是凝固的。 披露内容是**CSS,而不是一个有条件的挂载**:数字留在DOM中。
+休息后,它们仍为按钮的可访问名称。
+任何读取控制器而不指向它。 药片坐到用药的LEFT
+——这台机器的资源在本账户定额之前.
+
+** Ownership 合同:**商店的民意测验计时器及其活动镜章为**module singletons**,
+和**pill是他们的单一所有人**。 小组绝对不能打电话`startHostPoll`页:1`stopHostPoll`. . . . . .
+(单位:千美元)`stopHostPoll`在卸载时,可以清除药丸的间隔 不再有任何东西可以重启,
+数字会默默冻结,直到下一个范围改变。
+
+店铺解决它的Api通过`sessionForProject(projectId).api`没有`window.nodeTerminal`页:1
+中继标签的渲染器运行在宾客上,而宾客的会话则在主机上直播,它的亚庇是
+树枝...`ok:false`, 面板表面显示为 * 不在此提供 *, 而不是无法重试 。
+
+□ 9. 排队,孤儿,以及杀戮之地
+
+`resolveSessionRows`分别决定.`nt-<nodeId>`店里的所有项目:
+
+- ** 关闭的项目不是孤儿。 **`closeProject`只设定`closed = true`并保留
+工程及其磁盘上的节点,所以其会话会决定一个真正的标题,并用它们的标签标注
+项目。 称他们为孤儿会邀请用户杀害他们故意停放的会话. 这个
+因此,面板通过全部`projects`数组——过滤打开标签会击败此规则
+沉默地,从文件外 说它。
+- ****`orphan`是区别领域,而不是`state === null`.** 平原终点站从未进入过
+代理状态图,所以从缺少代理状态中衍生出孤儿,将标注每个代理状态.
+孤儿的状态被放弃vocat 而不是传承(面板无法解释一个“工作”点)
+它无法行走的一行),它的圆点变得空洞。
+- 孤儿才是重点:他们正是收割者所看不见的,没有帆布能够显示的。
+
+** 死亡由SCOPE处理,而不是排队**(`planSessionKill`一、导 言`transport.destroy(nodeId)`仅通过携带 LIVE 本地客户端到达 *remote * tmux 会话`sshRemote`- 哪一个
+孤儿没有,也没有一个非活动项目拥有的节点。 在这之前 每个孤儿
+专栏`×`在SH项目上,他承诺要杀死他。
+主办单位`nt-<id>`继续运行, 排回来 在下一个刷新,没有解释。 就这样
+力争实现目标`sshProject.killSessions(activeProjectId, [nodeId])`结束
+该工程的"控制大师"(Control Master),不需要现场直播,而且具有独家能力(挂载的病例,
+地点`destroy`已经结束了, 是一个无害的 最好的失败。
+
+这是安全的,因为它是一个** 圆形旅行,而不是一个检查**:`nodeId`从字面上`session.slice('nt-')`从扫荡,`killSessions`通过同一个同位素将其映射回来`sessionName()`,所以远程腿杀死** 准确的会话名称 所观察到的扫荡,在主机上
+在**上观察到了这一点。 它并不依赖于全球独一无二的节点标识(它们只是每次发射)
+页:1
+
+** 名称和东道主从来都不是最难的部分——SOCKET是。 ** 有两个节点 tmux 套接字
+在一个机器上同时:`node-terminal`用于运行在其上的节点(桌面或服务器)
+(编辑)和`nodeterm-rmt`为了一个SSH -ing进入它。 清查清单 ** 两者 **
+(单位:千美元)`session-memory.ts`, (中文).`session-memory-remote.ts`),而杀戮的目标是**1,所以每行
+从另一个套接字上传过来的确认语是"停止它的tmux会话"和圆满完成的命案
+没有 这不是一个异国情调的东道主, 一个运行自己的`nodeterm-server`. . . .
+并且本地镜像的形状是相同的(这台机器的面板列出`nodeterm-rmt`另一机器的节点产于这里的病症 ——他们都是当地的孤儿,因为他们
+节点在机器的帆所体现的。 所以一个知道现在只有名字的杀手 就会امين الك الك الك الك الك الك الك الك , الك الك
+姓名可以写上**:`KILL_TMUX_SOCKETS`,通过`remoteTmuxKillEverySocketArgs`(远)和`localKillSockets`(当地). 有三件事是安全的,而不是鲁莽的:
+
+- 这是** 通过合同取得的最佳成绩**: tmux 退出非零 与"找不到会话"在任何
+套接字不能按住,这是两条腿都写着的 已经擦过的箱子。
+- 目标是**准确**-`-t =nt-<id>`没有`=`,tmux 返回到 fmmatch ,然后返回到
+当找不到名称时, PRIFIX 匹配, 而“ 未找到” 是 a 的正常结果
+投机杀人 节点ID在柜台上结束,所以`nt-…-1`是一个前缀`nt-…-12`: 错失可能
+杀死了一个“不同”会议。 因为这个原因 死神已经这样杀了人
+- ** 粉丝退出是选入的,只有面板选择加入。 ** 有两个条件:
+插座,* 和* 呼叫者要求它(`localKillSockets(liveSocket, everySocket)`, , (中文(简体) ).`sshProject.killSessions(…, { everySocket: true })`, , (中文(简体) ).`transport.destroy(id, { everySocket: true })`) (中文(简体) ).
+我们所举行的会议的破坏 仅仅针对那次会议的插座 不论呼叫者荚里有什么
+普通节点 -`×`{\fn华文楷体\fs16\1cHE0E0E0}在固定的节点上 {\fn华文楷体\fs16\1cHE0E0E0}还是只开了一枪 但是,**无控**分支是
+非罕见——普通节点-`×`在这个过程中从未挂起的节点上,它需要每一个
+时间, 这是应用程序重新启动后常见的情况, 对于每个非活动项目节点来说
+——和项目删除是相同的形状ĩ远. 那些打电话的人知道自己的节点 所以ĩ
+保持窄处: 假设`nodeterm-rmt`目标为 Another 机器节点 SSH 的会话
+在这里产卵, 在宿主的推测`node-terminal`目标为: 工作室 工作室
+拥有。 默认和选择进入均被固定(`pty-single-user.test.ts`, (中文).`control-master.test.ts`, (中文).`ssh-project.killSessions.test.ts`),包括电线旗必须
+成为文字`true`。 。 。
+
+注意故意的重复:扫荡和收割者保持自己的`[TMUX SOCKET,
+转弯曲` arrays. For them the ORDER is load-bearing — the sweep's `以会议先胜者发誓,
+所以它决定了哪个套接字 重复的名字归结于—— 对于杀它来说,它毫无意义。
+分享一个常数会减少重复 而不是杀人名单
+
+所有权在点击时重解, 而不是从行中取出`orphan`旗帜——行是
+上次扫荡的一幕 以及从此建立的一个节点 否则会被当孤儿杀死 与
+一个主人,杀人经过`closeSession`,与会话侧边栏和节点的路径相同
+拥有`×`应用。
+
+### 表面
+
+- ** Desktop**——包括SSH腿在内。
+- **服务版**——服务运行并报告服务机。 SSH 范围
+回复`ok:false`(没有输入控制 Master)——它说**通过身份**,通过`sshScopePredicate`结束`workspaceStore.sshProjectIds()`,而不是信任 渲染器的
+旗帜。 见`docs/SERVER.md`。 。讲授。
+- ** 中继制表** — Ws-bridge stub 答案`ok:false`; 面板表示会话内存不是
+可在中继标签上使用,而不是报告失败。
+- 坎班板**-坎瓦斯通行证`overBoard={kanbanOpen}`将药丸提升到26号
+棋盘的不透明 25( 同一道具)`UsageIndicator`一个开放的面板上升至60,结束
+显示板和横幅,但低于 VirtualDialog 原来/调色板。
+- **会场旁栏** - 当会场旁栏(z 12)是时 Forum bar(z 12)也必须清除会场旁栏(z 12)
+* 非公开*,这是一项单独的规则:`.sysres-indicator:has(.sessmem-panel) { z-index: 13 }`, (中文).
+镜像`.usage-indicator:has(.usage-popover)`两者`:has()`规则只起作用 因为药丸
+集群挂载在外部`<ReactFlow>`- 图书馆的包装带内线`z-index: 0`它会将任何价值 困在其中,无论大小。 倒塌的药片故意保持低迷
+层(5)和通过 * 下 * 侧边栏。
+- ** 移动伴奏** - ** v1. ** * 节点移动* 附加在 tmux 会话中
+运输协议,没有每会场主机内存的概念;添加一个意味着扩展
+协议。 后续行动`~/projects/nodeterm-ios`这里不是建造的
+
+* 已知差距(v1,故意)
+
+- 会议清单**未封装**。 由数百届主持人组成的长列表; 切换
+默默地隐藏着那些很重要的行 如果它成为一个问题 固定是一个明显的
+"炫耀顶尖N"一行,从来不是无声盖.
+- 一个在 tmux 呼叫和进程扫描之间退出的窗格 显示一个合法的外观
+**管教所的“测量失败”与“零”形状相同。
+§4,在行颗粒度.
+- 将两个SSH项目与**相同`user@host`** (范围键没有端口)
+将上行保留在屏幕上,直到重新刷新,因为`enterScope`只有当
+范围 *字符串 * 变化。
+- ** 关闭(是:会话侧边栏有这个在面板中固定的bug)** 修补过了
+而不是降落在侧柱上,它落下一层, 每一个表面都同时受益。`PtyManager.runEndSession`经常在座的座椅上`Session`单独对象
+(单位:千美元)`dying?.sshRemote`),所以一个没有挂载客户端的删除——侧边栏的跨项目关闭,
+节点`×`在应用程序重新启动或屏幕外发布后,删除已停放的节点——跳过
+远程分支默默地将其一个杀入LOCAL套接字,其中a`requireRemote`节点有
+没什么 由持续指数组成的解析器(`setRemoteNodeOwner`→`workspaceStore.sshProjectIdForNode`加上那个项目的"控制大师" 看`core/remote-end.ts`页:1
+现在没有活的客户的回答, 和未交付的杀人记录
+(单位:千美元)`core/pending-remote-kills.ts`并安顿在宿主的下一个连接 而不是是
+吞了下来`planSessionKill`留作小组的ORPHAN行,没有项目索赔。
+
+□ 10. 设备核对表
+
+以下所有内容都是根据代码、CSS或Linux的测量法进行论证的,可以****不使用
+这个没有头的 Linux 框是建立在上面的。 格式遵循`docs/grok-agent.md`第9条/`docs/gemini-agent.md`§9. 第一高值:项目1-5。
 
 ```
 The kill actually reaching the host (the bug most recently fixed, and the one no test can prove)

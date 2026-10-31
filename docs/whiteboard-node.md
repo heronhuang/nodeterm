@@ -1,163 +1,160 @@
-# Whiteboard nodes
+> English: [docs/en/whiteboard-node.md](./en/whiteboard-node.md)
 
-A **whiteboard** is a canvas node holding an infinite drawing board, for sketching an idea during a
-call or a screenshare: freehand pen, shapes, arrows that stay attached to what they point at, text,
-pasted images, undo and export. It embeds [Excalidraw](https://github.com/excalidraw/excalidraw)
-(`@excalidraw/excalidraw`, MIT) rather than reimplementing one.
+# 白板节点
 
-Add one from right-click → **New view → New whiteboard**, the sessions-sidebar "+", the Dock, or
-⌘K "New whiteboard" (`node.newWhiteboard`, unbound by default). A new board opens ready to draw.
-Double-click (or Enter on) a board to draw on it again; Esc or a click outside finishes — once the
-board is saved (see "When a save does not land" below). The header
-has **Present** (maximize + Excalidraw's zen mode, restored on Esc) and **Copy as image** (the board
-as a PNG on the clipboard). Its default size is a Settings → Behavior → Default node size entry.
+一个**白板**是一个帆布节点 持有一个无限的绘图板,用于勾画一个想法
+调用或显示屏: 自由手笔,形状,箭头, 紧紧贴在指针,文字,
+粘贴图像, 撤销和导出 。 它嵌入[excalidraw](https://github.com/excalidraw/excalidraw).
+(单位:千美元)`@excalidraw/excalidraw`,MIT),而不是重新执行一个.
 
-## Editing happens in an overlay, not in the node
+从右键单击 → ** 新视图 → 新白板 **, 会话边栏“ +” , 停靠, 或
+K "新白板" (中文(简体) ).`node.newWhiteboard`,默认情况下不绑定). 一个新的棋盘打开准备绘制 。
+双击( 或输入) 棋盘以再次绘制; Esc 或外部单击完成( 一旦
+棋盘被保存(见下文"当一个保存不着陆")劳工市场. 标题
+已存在 **( 最大值 + Excalidraw 的 zen 模式, 在 Esc 上恢复) 和 ** 复制为图像 **( 棋盘)
+作为剪贴板上的PNG). 它的默认大小是一个设置 → 行为 → 默认节点大小条目.
 
-React Flow scales every node with `transform: scale(zoom)`. Excalidraw sizes its canvas and maps
-the pointer from `getBoundingClientRect()`, so inside a scaled node it draws away from the pointer
-and its bitmap goes soft. So at rest the node shows a **picture** of the board, and editing mounts
-**one** live Excalidraw portaled into `.canvas-root` — outside `.flow-wrap` — laid exactly over the
-node's on-screen box (`nodes/WhiteboardNode.tsx`). That also keeps it away from the canvas's
-capture-phase wheel listener on `.flow-wrap` (⌘-wheel and pinch always zoom the canvas, even over
-`.nowheel`) and from xyflow's middle-button pan. The overlay:
+□ 编辑发生在一个覆盖,而不是在节点
 
-- follows the box as the canvas pans/zooms and the node moves, resizes or maximizes, and calls
-  Excalidraw's `refresh()` when it does (Excalidraw caches its offsets otherwise);
-- runs Excalidraw at `boardZoom × canvasZoom` (`whiteboard/zoom.ts`), so the drawing scales with the
-  canvas like every other node — and stays sharp, since Excalidraw redraws at the real size. The
-  file stores only the board zoom;
-- is clipped to the canvas area and stacked at z 10, under the sessions sidebar (12) and Dock (20);
-- treats a press on the node's own frame (header, Maximize, title) as staying in the board.
-- keeps its events out of the node. A portal leaves the node's DOM but not its React tree, so
-  React bubbled the editor's events into React Flow's node wrapper: a right-click opened the node
-  menu over Excalidraw's own, an arrow key nudging a shape also moved the node (and every other
-  selected node), and a double-click (Excalidraw's "add text") flew the camera to the node. The
-  portal root stops click, double-click and context-menu, and only the keys the wrapper acts on
-  (arrows, Enter, Space, Escape): stopping a React event also stops the native one at the React
-  root, so every other key still reaches document and window listeners.
+反应流程缩放每个节点`transform: scale(zoom)`缩略图和地图
+指针来自`getBoundingClientRect()`所以在一个缩放的节点里 它从指针上引开
+它的位图变软了 节点会显示一个盘子的图样, 并进行编辑。
+** 1个应该在现场使用 Excalidraw 门户进入`.canvas-root`外部`.flow-wrap`- 完全铺在
+节点在屏幕框上( N)`nodes/WhiteboardNode.tsx`) (中文(简体) ). 这也让它远离画布
+抓捕阶段的车轮监听器`.flow-wrap`(轮子和捏 总是放大画布,甚至结束)`.nowheel`)和从xyflow的中键锅. 上面写着:
 
-Only one editor is ever mounted, and it unmounts when editing ends — Excalidraw keeps some state
-module-global, and one live instance costs ~3 MB the first time. Measured: no heap growth over five
-open/close cycles, no running animations open or closed.
+- 随框随帆布锅/区域及节点移动、调整大小或最大化,并呼叫
+缩略图`refresh()`当它发生时(可算出缓存,以其他方式抵消);
+- 运行 Excalidraw 在`boardZoom × canvasZoom`(单位:千美元)`whiteboard/zoom.ts`因此,绘图比例尺与
+画布像其他的节点一样——并且保持锋利,因为Excalidraw重新绘制了真正的尺寸. 这个
+文件只存储一声板缩放;
+- 剪到画布区,堆积在z 10,会话旁栏(12)和Dock(20);
+- 将节点自己框上的媒体(头条,最大化,标题)视为留在板上.
+- 保持它的事件远离节点。 一个传送门离开节点的DOM 但不是它的反射树,所以
+React 泡泡编辑器的事件进入 React Flow 的节点包:右键点击打开节点
+在 Excalidraw 上,一个箭头对一个形状进行折叠也移动了节点(和所有其他)
+选定的节点),并双击(Excalidraw的"添加文本")将相机飞向节点. 这个
+门户根停止点击、双击和上下文菜单,只有包件上的键
+(arrows, Enter, Space, Escape):停止一个反应事件也会在反应中阻止原生事件
+root,所以其他 还能够到达文档和窗口的听众。
 
-## The keyboard belongs to the board while it is open
+只有一个编辑器被挂载, 编辑结束时会卸载—— Excalidraw 保持一定状态
+模块-全局,一个现场实例首次花费~3 MB. 计量:5岁以上无堆积增长
+打开/关闭循环,不打开或关闭运行中的动画。
 
-Excalidraw's focused element is a plain `<div>`, which no "is this a text field" check recognises,
-so canvas commands fired over it: Space panned the whole canvas (verified in the dev build),
-Delete/⌘Z/⌘[ reached canvas commands. The overlay carries `data-nt-keyboard-owner`; the shared
-check `isKeyboardOwnerTarget` (`lib/keyContext.ts`) makes every typing-aware site stand down for
-it: the dispatcher's `isTypingTarget`, Space-to-pan, pane-focus release, the zoom shortcuts and the
-copy gesture. Esc is caught in the capture phase (Excalidraw does not let it bubble) and ends
-editing only when Excalidraw has nothing of its own to cancel. ⌘0 stays with the canvas: main
-claims it before the page.
+□ 键盤在開啟時屬於機板
 
-## Storage: a side file addressed by node id
+Excalidraw的焦点元素是一个平原`<div>`,没有"这是文本字段"的检查识别,
+画布的命令就射在它的上面,
+删除/⌘Z/⌘[到达帆布命令]. 背面带`data-nt-keyboard-owner`; 共享
+检查`isKeyboardOwnerTarget`(单位:千美元)`lib/keyContext.ts`)使每个打字意识网站都站倒
+它:调度员的`isTypingTarget`,"从"从"从"应该在"和"从"从"到"从"从"从"从"从"从","从"从"到","从"从","从"从","从"从"到","从"从","从"从","从","从","从","从",","从","从",",",",","从",",",",",",",","凄,",""和",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",",
+复制手势。 Esc被夹在捕捉阶段( Excalidraw 不让它泡泡) 并结束
+仅在 Excalidraw 自身无任何可取消时进行编辑。 QQ0 留在画布上: 主
+在页面前声明。
 
-The drawing is **not** in node data — a board with a pasted screenshot is megabytes, and node data
-rides the 800 ms whole-workspace save (one ≤8 MiB Server Edition frame), the 256 KB-per-node
-team-sync cap, 100 canvas-undo snapshots and the phone mirror. `core/whiteboards.ts` writes:
+□ 存储: 由节点 id 地址的侧式文件
 
-    <cwd>/.nodeterm/whiteboards/<nodeId>.excalidraw   + <nodeId>.png (the resting picture)
+绘图在节点数据中是**not**——有粘贴截图的棋盘是兆字节,节点数据
+运行 800 ms 整个工作空间保存( 1% 8 MiB 服务器版框架), 256 K 祝你好运
+团队同步帽,100张画布 -undo快照和电话镜。`core/whiteboards.ts`写道:
 
-falling back to `<userData>/whiteboards/` for a cwd-less canvas, an SSH project and a deleted or
-read-only project folder (the `canvas-images.ts` rules). Writes are atomic (`writeFileAtomic`; the
-PNG through `tempNameFor` + `renameAtomic`, since `writeFileAtomic` writes text).
+<cwd>/.nodeterm/whiteboards/<nodeId>.excalidraw + <nodeId>.png(休息图).
 
-A folder project whose canvas is kept in app data (issue #1145) writes nothing into its folder: its
-boards go to the same layout under its own app-data root,
-`<userData>/project-files/<projectId>/.nodeterm/whiteboards/`, which is deleted with the project
-(`WorkspaceStore.whiteboardLocationForProject`, wired into both shells as `whiteboardLocation`). Not
-the shared `<userData>/whiteboards/`: that folder is keyed by node id, and two folders holding the
-same committed canvas share node ids, so two such projects would read and overwrite each other's
-boards. The folder's boards, drawn before the move, are read after every place a save can land and
-never written, so a board still opens after the move and its next save lands in app data. A move
-back into the folder first copies the app-data boards over the folder's older files
-(`carryWhiteboards`), since the folder is read first again; a folder project reads its app-data
-root after its folder for a board that did not copy.
+倒计时`<userData>/whiteboards/`用于无 cwd 画布、 SSH 项目和已删除或
+仅读工程文件夹(`canvas-images.ts`规则)。 写作是原子(有悖于)`writeFileAtomic`; 数据
+巴布亚新几内亚通过`tempNameFor`+ 键`renameAtomic`,从`writeFileAtomic`写入文本)。
 
-**The core derives the path from (project, node id); it never accepts one.** Node data comes from
-the git-shared `project.json`, which anyone with commit access can edit — a path taken from it
-could aim a read or an overwrite anywhere. A node id must be a `string` passing `isSafeNodeId`
-(the regex alone would accept a number). Node data carries only:
+一个将画布保存在应用数据中的文件夹项目(问题 #1145)不会写进它的文件夹:它的
+板子在自己的应用数据根下进行相同的布局,`<userData>/project-files/<projectId>/.nodeterm/whiteboards/`,随项目删除
+(单位:千美元)`WorkspaceStore.whiteboardLocationForProject`,线装入两个贝壳作为`whiteboardLocation`) (中文(简体) ). 没有
+共享`<userData>/whiteboards/`:该文件夹由节点 ID 键入,有两个文件夹持有
+同样的承诺的画布共享节点 ID, 所以两个这样的项目 阅读和覆盖对方的
+董事会。 在移动前绘制的文件夹的板, 在每个保存可以降落的地方后被读取
+从未写过,所以移动后一个板仍然打开,它的下一个保存土地在应用数据中. 一个动作
+返回到文件夹中, 将应用数据板复制到文件夹的旧文件上
+(单位:千美元)`carryWhiteboards`),因为文件夹是首先阅读的;文件夹项目是读取其应用数据
+root 在未复制的棋盘文件夹后面。
 
-- `whiteboardSource` — the board a **duplicate or reopen** (which get new ids) reads until it saves
-  its own. No file is ever copied, and none is deleted when a node is, so undo and ⇧⌘T always find
-  the drawing. Re-validated on load like every hand-editable field.
-- `boardRev` — epoch ms, bumped once per editing session that changed the board (never per
-  stroke), so strokes never reach the workspace save, canvas undo or team sync.
+** 核心来源(项目,节点id);它从未接受过。 ** 节点数据来自
+数字`project.json`,任何有承诺访问权限的人都可以编辑——从中提取的路径
+可以在任何地方瞄准读物或覆盖物。 节点ID必须是`string`通过`isSafeNodeId`(只有regex会接受一个数字). 节点数据仅包含:
 
-Saves happen 1.5 s after the last change, when editing ends (with the picture), on unmount
-(project switch, node closed), and — on the desktop — when the app quits or restarts to update: an
-open editor registers its pending save with `lib/quitFlush.ts`, which Canvas's answer to main's
-flush request waits for (main caps that wait at ~1 s). A browser tab of the Server Edition has no
-such request, so closing it can lose the last ≤1.5 s of strokes. Whether there is anything to save is decided by comparing the
-scene's version with the one this editor last saved, not by an `onChange` flag; the unmount flush
-writes a snapshot kept from `onChange`, because by cleanup time Excalidraw's api answers an empty
-scene. A board whose file does not parse is shown as unreadable and never opened, so an autosave
-cannot overwrite it.
+- 怎么样?`whiteboardSource`- 一张**复制件或重新打开的**(获得新的ID)读到,直到保存
+它自己来的。 没有任何文件被复制过, 当节点被复制时, 没有被删除, 所以撤消和QQT 总是找到
+绘画。 重新认证在负载的案例上,就像每个手工编辑场一样.
+- 怎么样?`boardRev`– 划时代 ms, 每一次编辑会话, 更改棋盘( 绝不是
+中风),所以中风永远无法到达工作空间保存,画布撤销或团队同步.
 
-**Every save is a compare-and-set against the file on disk.** A board can be open in two places:
-two Server Edition tabs, the desktop and a browser on one folder, two Editors of a hosted team, or
-a `git pull` that rewrites the file while it is open. Each read returns the scene file's revision
-(`rev`: `dev:ino:size:mtimeNs` of the descriptor read — every writer publishes by rename, so it
-changes on every write, also on a coarse-mtime filesystem), the editor sends the revision it last
-read or wrote with every save (`null` when the node has no board of its own yet — a new board, or a
-copy still showing its source), and the core refuses a save whose revision is not the one on disk.
-Nothing is written then, and the header says **Changed elsewhere**: the other version was kept.
-Saves of one board are serialized inside one core, so two saves racing there cannot both pass the
-check; two cores writing one folder (a desktop and a Server Edition) can still interleave in the
-moment between the check and the rename. A core on an older build ignores the revision and answers
-the bare path, and the save is then unchecked, as before.
+保存在上次更改后的1.5 s, 当编辑结束时( 带有图片) , 在卸载时
+(项目切换,节点关闭),以及——在桌面上——当应用程序退出或重新启动更新时:a
+打开编辑器登记其待决事项,但以`lib/quitFlush.ts`这是坎瓦斯对主的回答
+冲洗请求等待(主盖等待~1 s). 服务器版的浏览器标签没有
+这样的请求,所以关闭它 可能会失去最后的\\\ 1.5 s的中风。 是否有什么需要保存的,通过比较
+场景的版本与该编辑器最后保存的版本,而不是由`onChange`旗帜; 卸载冲洗
+写一个快照`onChange`,因为通过清理时间 Excalidraw的api 回答空
+现场。 无法解析文件的棋盘显示为不可读且从未打开, 所以自动保存
+不能覆盖它。
 
-**When a save does not land, the board stays open.** Finishing (Esc, a press outside) waits for a
-save that succeeded; a failed or refused one keeps the editor open, because once editing ends the
-unsaved strokes have nowhere to go. The header says why — **Not saved** (the save could not be
-written: a full disk, a board over the Server Edition's 8 MiB frame, a core that went away) or
-**Changed elsewhere** (above) — and offers the way forward: **Keep mine** after a conflict saves
-over the other version knowingly (it sends that version's revision), and **Discard my changes**
-ends editing without the unsaved strokes, leaving the board on disk as it is. A project switch or
-deleting the node still flushes what it can on the way out; a failure there is not reported.
+** 每个保存都与磁盘上的文件相对应。 ** 棋盘可以在两个地方打开拱门:
+两个服务器版标签,一个文件夹上的桌面和一个浏览所从事的浏览器,一个主机组的两个编辑器,或者
+(单位:千美元)`git pull`在打开时重写文件。 每个读取者返回场景文件的修订版
+(单位:千美元)`rev`编号 :`dev:ino:size:mtimeNs`每个作家都改名出版 所以
+编辑器在每次写作时都会更改, 在粗糙的mtime文件系统中也会更改。 编辑器会发送它最后的派系
+与每个保存一起读或写( E)`null`当节点还没有自己的棋盘——一个新的棋盘,或者
+复制件仍然显示其来源),核心拒绝一个保存,其修改不是磁盘上的版本.
+当时没有文字,标题说**在别处变化**:另一个版本被保留.
+在一个核心内连载一个板块,所以两个板块保存赛车不能同时通过
+检查; 写一个文件夹的两个核心( 一个桌面和一个服务器版) 仍然可以在
+在检查和重命名之间。 一个老建筑的核心 忽略了修改和答案
+那条路是赤裸裸的,那条路是象以前一样不受控制的。
 
-**A hosted-team Viewer or Commenter opens the board view-only** (Excalidraw's view mode): the host
-refuses their saves, so the editor never offers drawing that cannot be written.
+** 当一个储蓄没有落地时,董事会继续开放。 ** 完成( Esc, 外部的媒体) 等待
+保存此成功; 失败或被拒绝的编辑器会打开, 因为一旦编辑结束
+未保中风无处去. 该标题说为什么——**没有保存**(保存不可能是
+写入:一个完整的磁盘,一个覆盖服务器版8 MiB框架的板,一个核心消失)或
+** 在别处有所改变**(以上)——并提出前进的道路:** 在冲突结束后保留我的**
+超越另一版本,明知故犯(它发送了该版本的修改)和** 放弃我的修改**
+结束编辑时没有未保存的中键,将棋盘保留在磁盘上。 项目开关或
+删除节点仍然会冲出它能冲出去的东西; 没有报告失败 。
 
-**The project folder is bound by its real path.** `.nodeterm/` is git-shared, so a repository can
-commit `.nodeterm` or `.nodeterm/whiteboards` as a symlink to any directory on this machine. Each
-existing component is resolved before anything is created through it and must stay inside the
-project's real root; a link that leads out (or dangles) means the project folder is not used — a
-save lands in the app folder, a read does not look there. A link that stays inside the project is
-followed.
+** 主机-团队查看器或注释器只打开棋盘查看器**(Excalidraw的查看模式):主机
+拒绝他们的保存, 因此编辑者从来不提供无法写入的绘图 。
 
-The two channels (`files.saveWhiteboard`, `files.readWhiteboard`) are registered in core for both
-shells and classified in both relay policies exactly like a canvas image (save: editors only;
-both scoped to the shared project).
+** 项目文件夹受其真实路径的约束。 **`.nodeterm/`是 git- 共享的, 因此仓库可以
+承诺`.nodeterm`或`.nodeterm/whiteboards`由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由全面地由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由均已和由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由貂和由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由和由由由由由由由由由由由由由由由由由由由由由由由由由和和和和和由由由由由由由由由由由由由由由由由由由由由由由由与与 由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由,由由由由由由由由由由由由由由由由由由全面地、由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由均已,由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由貂由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由、由由由由由由由由由由、由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由由
+现有组件在通过它创建任何组件之前得到解决,必须留在其中
+工程的真根; 引出珉( 或 dangles) 的链接, 表示工程文件夹未被使用 – a
+保存在国家应用程序文件夹中的土地, 读数不查看 。 在项目还应保持链接
+随顺.
 
-## Bundle and assets
+两个渠道(`files.saveWhiteboard`, (中文).`files.readWhiteboard`在核心中为两者登记
+b. 外壳和在两个中继策略中分类的完全类似画布图像(只保存编辑器);
+两者都属于共同项目的范围)。
 
-- Excalidraw is a renderer-only **devDependency**, loaded with `React.lazy` the first time a board
-  is opened: its JS (~1.7 MB) and CSS (~145 KB) are their own chunks, never in `boot`.
-- **Fonts are served locally** by `scripts/excalidraw-assets-plugin.ts`: Excalidraw fetches
-  `${EXCALIDRAW_ASSET_PATH}fonts/<Family>/<file>.woff2` by exact path (default: a CDN, blocked by
-  the CSP and absent offline). The plugin serves `dist/prod/fonts` in dev and emits it under
-  `excalidraw-assets/` in builds, without Xiaolai (the 12 MB CJK family; CJK text falls back to a
-  system font). ~480 KB.
-- **Export under the app's CSP (measured, headless Chrome over http, Excalidraw 0.18.1 built by
-  this repo's Vite, the exact `index.html` policy):** SVG and PNG export both work, with Workers and
-  with Workers unavailable, and the SVG embeds its font. Two things the console shows are expected:
-  one `script-src 'eval'` violation — `script-src 'self'` refuses the WebAssembly Excalidraw uses to
-  SUBSET fonts, so it embeds the unsubset font file (~33 KB for Latin text: a bigger SVG, not a
-  broken one) — and a `font-src` violation per font face for Excalidraw's own CDN (esm.sh), which it
-  tries besides the local file; the CDN is blocked and the local font is the one that loads. The
-  CSP is deliberately not widened for either. Not run: the packaged desktop app over `file://`.
-- `@excalidraw/mermaid-to-excalidraw` is **aliased to a stub** (`whiteboard/mermaid-stub.ts`): it
-  pulls in all of mermaid for "text to diagram", ~10 MB of chunks (renderer output 48 MB → 38 MB).
-  A pasted mermaid definition falls back to plain text.
-- Scoped `overrides` under `@excalidraw/excalidraw` (nanoid, sass, lodash-es, katex, mermaid,
-  @mermaid-js/parser) clear the 14 advisories 0.18.1 brings in; without them Dependency review fails.
+□ 捆绑和资产
 
-## Not in this version
+- Excalidraw是只用于渲染器的**devDependency**,装有`React.lazy`第一次棋盘
+打开:它的JS(~1.7 MB)和CSS(~145 KB)是它们自己的块,从来没有在`boot`。 。 。
+- ** 在当地提供服务**`scripts/excalidraw-assets-plugin.ts`: excalidraw 抓取`${EXCALIDRAW_ASSET_PATH}fonts/<Family>/<file>.woff2`按精确路径( 她在默认情况下: CDN, 由
+并且离线。 插件服务`dist/prod/fonts`以编译并按下发音`excalidraw-assets/`中,没有小莱(12 MB CJK 家族; CJK 文本返回到一个
+系统字体)。 ~480 KB (英语).
+- ** 应用软件CSP下的出口(经过测量,无头的Chrome over http, Excalidraw 0.18.1 由
+这个Repo的Vite,准确的`index.html`** SVG和PNG都与工人一起工作,
+而SVG则嵌入了它的字体。 控制台显示的两件事是:
+一个`script-src 'eval'`违反...`script-src 'self'`拒绝WebGasem Excalidraw 使用
+sublictET字体,所以它嵌入了未子集字体文件(拉丁文为~33 KB:一个更大的SVG,而不是一个)
+——————————————————————————————————————————————————————————————————————————————————————————————————————————.`font-src`对 Excalidraw 自己的 CDN (em.sh) 的每个字体面的违反, 它
+尝试除本地文件外; CDN 被屏蔽, 而本地字体是加载的字体 。 这个
+CSP也有意不扩大范围。 不运行: 软件包的桌面应用程序`file://`。 。 。
+- 怎么样?`@excalidraw/mermaid-to-excalidraw`改为`whiteboard/mermaid-stub.ts`:
+在所有美人鱼中拉动“ 文本到图表”, ~ 10 MB 块( 递归输出 48 MB ~ 38 MB ) 。
+贴上的人鱼定义回到了纯文本.
+- 范围`overrides`下级`@excalidraw/excalidraw`该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该该,,该,,该,,,,,,该,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,该,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,berries,蓓,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,, 这是你的,,,,,,,,,,,,,,,,,,,,,,,,,,
+@mermaid-js/parser)澄清了带入的14条建议0.18.1;没有它们,依赖性审查失败.
 
-Live multi-user drawing (team sync is whole-node, last writer wins), agents reading a linked board
-(a follow-up), kanban cards (CLAUDE.md: non-session kinds are not cards), and Excalidraw's own
-open/save-file actions (they fail in Electron; saving is ours).
+□ 本版本没有
+
+实时多用户绘图( 团队同步为全节点, 最后的作者获胜), 代理读取链接的棋盘
+(后续),kanb取决于卡(CLAUDE.md:非会场类型不是卡),以及 Excalidraw 自己的
+打开/保存文件动作(它们在Electron中失败;保存是我们的).

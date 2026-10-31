@@ -1,54 +1,55 @@
-# Codex metrics on SSH projects
+> English: [docs/en/codex-ssh-metrics.md](./en/codex-ssh-metrics.md)
 
-The usage popover and the context meter answer different questions. Usage reports the
-remote account's subscription limits; context reports the current conversation's input
-tokens against the window recorded by Codex itself. Neither should read the desktop's
-credentials or substitute another local conversation when the host cannot be reached.
+# SSH 项目的编码计量标准
 
-Claude's existing SSH readers provide the transport pattern. Codex keeps its own account
-layout, authentication format and token parser. In particular, cached input is already
-included in Codex input tokens, and cumulative session usage is not context occupancy.
+使用波波弗和上下文表解答了不同的问题. 用法报告
+远程账户的订阅限制; 上下文报告当前对话的输入
+与 Codex 本身记录的窗口相对应的符号。 也不应该读取桌面的
+当主机无法联系时, 证书或替换另一个本地对话 。
 
-## Reading and identity
+克劳德现有的SSH阅读器提供了传输模式. 代码保存自己的账户
+版式、认证格式和符号解析器。 尤其是缓存输入已经
+包含在 Codex 输入符中,累积会话使用不是上下文占用.
 
-Quota requests execute in the host login environment and require Node and curl. The
-system account uses that environment's `CODEX_HOME` (otherwise `$HOME/.codex`); managed
-accounts use the validated private remote account home. The reader does not refresh auth
-or start a Codex daemon. Missing tools and failed reads produce an error state rather than
-invented zero usage. The existing Codex visibility switch covers both local and SSH rows.
+□ 阅读和身份
 
-Context observations carry the requesting node ID as well as the conversation ID. They
-are kept separately from local session snapshots and are not restored from browser storage.
-A changed account, connection or transcript replaces the tracking generation. An explicit
-mount-time lookup rechecks the host's configured home, while ordinary hook events do not
-replay unchanged data. No transcript-reported window means no fabricated Codex denominator.
+在主机登录环境中执行配额请求,并需要节点和卷曲. 这个
+系统账户使用该环境`CODEX_HOME`(其他`$HOME/.codex`; 管理
+账户使用已验证的私人远程账户之家。 读者不刷新认证
+或启动 Codex 守护进程。 缺少工具和读取失败生成错误状态而不是
+发明了零使用. 现有的Codex能见度开关既包括本地行,也包括SSH行.
 
-## Surfaces
+上下文观察带请求的节点ID以及对话ID. 他们
+与本地会话快照分开保存,而不从浏览器存储中恢复。
+更改的账户、连接或记录取代了跟踪生成。 明确
+挂载时间查找重检查主机配置的家, 而普通的钩子事件不
+重放未改变的数据 。 没有记录的窗口就意味着没有编造的编码分母.
 
-- Desktop: SSH usage belongs to the active project's host. The context meter is shared by
-  terminal nodes and the kanban terminal modal.
-- Server Edition: the server reads its own local Codex accounts and transcripts. It has no
-  desktop SSH project manager; the remote usage dependency remains absent.
-- Mobile companion: its independent SSH reader is outside this repository. These desktop
-  changes do not implement an iOS usage panel or context reader.
+□ 表面
 
-## Device verification
+- 桌面:SSH的使用属于活动项目的主机. 上下文表为共享
+终端节点和kanban终端代号。
+- 服务器版:服务器读取自己本地的Codex账户和笔录. 没有
+桌面 SSH 项目管理器;远程使用依赖仍然不存在。
+- 移动同伴:它的独立的SSH阅读器在这个寄存器之外. 这些桌面
+更改不执行 iOS 使用面板或上下文阅读器。
 
-Automated shell fixtures exercise generated commands with fake homes and transports.
-They do not establish compatibility with a live subscription endpoint or every SSH shell.
-Before claiming device verification, record the host OS, shell and Codex version, then:
+□ 设备校验
 
-1. Connect a Desktop SSH project whose system Codex account is signed in. Open usage and
-   compare the session and weekly buckets with that account's own usage readout.
-2. Add a managed Codex account on that host. Verify each row remains attributed to its own
-   account, including after refresh, project switches and a temporary disconnection.
-3. Use a system installation with a relocated `CODEX_HOME`; verify the metrics follow the
-   host's configured home rather than the desktop environment.
-4. Start a Codex turn. Compare the context popover with the last input-token record and
-   `model_context_window` in that conversation's rollout. Repeat in the kanban modal.
-5. Restart Desktop with an idle, continuing SSH session. The mount-time read should restore
-   its meter without requiring a new prompt. A disconnected session must not read locally.
-6. Repeat with Linux and macOS SSH hosts. Windows Desktop should preserve POSIX remote
-   paths; a native Windows OpenSSH target is not implied by the existing POSIX SSH transport.
+自动弹壳固定装置演练产生带有假住房和运输装置的命令。
+它们不与实时订阅端点或每个SSH shell建立兼容性.
+在声称设备验证之前,记录主机OS, shell和Codex版本,然后:
 
-Do not include credentials or raw authenticated responses in verification reports.
+1. 连接一个系统编码账户被签名的桌面SSH项目。 开放使用和
+比较会话和每周桶与该账户本身的读取功能.
+2. 在主机上添加一个管理好的代码账户。 校验每行所属的遗迹
+账户,包括刷新后的项目开关和暂时断开。
+3. 使用搬迁后的系统安装`CODEX_HOME`; 核查衡量标准遵循
+主机的配置家而不是桌面环境 。
+4. 开始代码转弯。 将上下文弹出与最后的输入键记录和`model_context_window`在对话的推出。 在坎班模式中重复。
+5. 以闲置的连续SSH会话重新启动桌面. 挂载时间应该恢复
+它的计数器不需要新的提示。 断开的会话不能在本地读取 。
+6. 与 Linux 和 macOS SSH 主机重复。 Windows 桌面应保存 POSIX 远程
+路径; 本地Windows OpenSSH目标不为现有的POSIX SSH运输所暗示.
+
+核查报告中不包括全权证书或原始认证的答复。

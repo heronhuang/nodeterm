@@ -1,48 +1,49 @@
-# Hosted team relay (a Server Edition as the relay host)
+> English: [docs/en/hosted-team-relay.md](./en/hosted-team-relay.md)
 
-**Status:** built from 2026-09 on: the relay host, the shared canvas authority, host key proof of
-possession and Share with team. Everything below was checked against the code. Where a design spec
-says something else, the code wins; the specs are local planning files and are not the reference.
+# 主机团队中继(作为中继主机的服务器版)
 
-**Builds on:** `docs/remote-sessions.md` (relay tabs, the trust gate, Team Access) and
-`docs/team-presence.md` (presence, co-attach, canvas sync).
+** 现状:** 建于2026-09年,基于:中继主机,共享帆布权威,主机密钥证明
+拥有和分享团队。 下方所有东西都是按照密码检查的 设计规格
+说别的东西,代码是赢的;Specs是本地规划文件,不是参考文献.
 
-## What it is
+** 建造在:**`docs/remote-sessions.md`(转发标签、信任门、团队访问)和`docs/team-presence.md`(在场,同音,帆布同步).
 
-A Server Edition core on a Linux host can now be a **standing relay host** for a team. Teammates'
-desktops join it over the same E2EE relay that Team Access uses, with no SSH access of their own
-and no inbound port on the host. The owner does not need their own laptop to be awake: the host
-keeps one idle relay listener registered at all times, and each device an owner approved once is
-pinned in the host's `team.json`, so it reconnects without anyone approving it again. Each member
-has a role (Viewer, Commenter, Editor or Owner), and **the role is enforced in the host core, on
-every message**. The desktop's UI only mirrors it.
+□这是什么
 
-## How it fits together
+一个Linux主机上的服务器版核心现在可以成为一个团队的**常设中继主机**. 队友们
+桌面通过 Team Accessý 使用的相同的 E2EEE 中继连接它, 没有自己的 SSH 访问
+并且主机上没有入境端口。 老板不需要自己的笔记本电脑才能醒过来:主机
+随时保持一个闲置的中继收听器注册,每个设备的拥有者一次被批准
+钉在主机上`team.json`,所以它重新连接 没有任何人再次批准它。 每个成员
+具有一个角色(Viewer, 注释器, 编辑器或所有者), ** 该角色在主机核心中强制, 运行于
+每条消息** 桌面的UI只镜像它.
 
-| Piece | Where | Notes |
-|---|---|---|
-| Relay mechanism (E2EE socket, trust gate, host and client sessions) | `src/core/relay/` | Moved from `src/main/remote/`, which now holds re-export shims and the desktop's own wrappers. Team Access and the hosted team run the **same** handshake and tunnel (`relay-host.ts`). |
-| The seam | `relay-host.ts` `PeerAttach`, `PinStore`, `RelayHostHooks` | A host that passes no hooks (the desktop's Team Access) takes the unhooked path, unchanged. |
-| Hosted service | `src/core/relay/hosted-service.ts` | Composes the host key, team store, scheduler and access policy; holds pending join requests; answers the `relay:hosted:*` verbs. |
-| Standing listener | `hosted-scheduler.ts` + `host-token.ts` | A pure scheduler over injected mint / open / timers. |
-| Host identity | `host-key.ts` | `<dataDir>/relay/host-key.json`, 0600, plaintext secret (headless Linux has no keyring). |
-| Host key proof | `relay-pop.ts` + `relay-pop-vector.json` | The only place the relay PoP proof (host-token mint, push host-auth) is computed. See [Host key proof of possession](#host-key-proof-of-possession). The push webhook's management proof is a separate protocol (`src/core/push-webhook.ts`). |
-| Membership | `team-store.ts` | `<dataDir>/relay/team.json`, 0600, single writer. |
-| Role policy | `access-policy.ts` | `VIEW`, `COMMENT`, `EDITOR_ONLY`, `VIEW_EVENTS`; the guard test is `access-policy.guard.test.ts`. |
-| Admin channel | `team-admin.ts` (socket) + `src/server/team-cli.ts` (CLI) | `<dataDir>/relay/admin.sock`, 0600 in a 0700 directory. |
-| Server boot | `src/server/index.ts` (search "Hosted team relay") | Booted in headless AND serving mode, after every handler is registered and the workspace index is loaded. |
-| Canvas authority | `src/core/canvas-authority.ts`; store seams in `src/core/workspace-store.ts`; wired in `src/server/index.ts` | The one writer of a shared project's canvas content. See [Shared canvas authority](#shared-canvas-authority). |
-| Desktop joiner | `src/main/remote/hosted-join.ts`, `relay-bookmarks.ts`; core `join-code.ts`, `join-token.ts` | Runs the core relay client with **no pin store**. |
-| Renderer | `lib/hostedJoin.ts`, `lib/hostedAttempts.ts`, `lib/hostedOwner.ts`, `lib/hostedPendingQueue.ts`, `components/HostedApprovalDialog.tsx`, `bridge/hosted-gate.ts`, `bridge/relay-local-close.ts`, `@shared/hosted-access.ts` | Every hosted branch sits behind a join code, a hosted api or a hosted role, so a Team Access tab and a local tab take their old paths (`canvas/hosted-team.source.test.ts`). |
-| Share with team | Desktop: `lib/shareSshTeam.ts`, `src/main/remote-ssh/share-team.ts`, `src/core/remote-ssh/share-team-remote.ts`. Server: `team-bootstrap.ts`, `team-resume.ts`, `admin-error.ts` | An SSH project handed to a hosted team on its own host. See [Share with team from the desktop](#share-with-team-from-the-desktop). |
-| End-to-end test | `src/server/hosted-e2e.test.ts` | A real headless server boot, the real admin socket, access policy, `PtyManager`, git handlers (a real repository) and trust gates, with an in-process relay and a fake token API. It also checks that shared canvas edits are written with no browser attached and survive a restart. |
+# 如何融为一体 #
 
-## Setup over SSH
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}小块儿 哪里?
+|,|也.
+中继机制(E2EE套接字、信任门、主机和客户端会话)`src/core/relay/`QQ 从`src/main/remote/`,它现在持有再出口shims和桌面本身的包装。 Team Access和东道主团队运行**同**握手和隧道(`relay-host.ts`. |.
+缝合`relay-host.ts` `PeerAttach`,所确认的`PinStore`,所确认的`RelayHostHooks`QQ 主机不通过钩子(桌面的"团队访问")采取无钩路径,不变. |
+主机服务`src/core/relay/hosted-service.ts`QQ 组成主机密钥、 团队存储、 调度器和访问策略; 持有待合并请求; 回答`relay:hosted:*`动词。
+现场听众`hosted-scheduler.ts`+ 键`host-token.ts`QQ 注射薄荷/ 打开/ 计时器上的纯排程器 。 @ @ info/ plain
+QQ 主机身份 QQ`host-key.ts`|`<dataDir>/relay/host-key.json`, 如果你不是 6:00 , 便出版物密语( 无头 Linux 没有密钥环 ) 。
+主机密钥证明 {}`relay-pop.ts`+ 键`relay-pop-vector.json`QQ 唯一的中继 PoP 证明 Anh( host-token mint, push host-auth) 被计算出来 。 见[Host key proof of position] (#host-key-proof-of-position) (#host-key-proof-position). Push Webhook的管理证明是单独的协议(`src/core/push-webhook.ts`. |.
+成员`team-store.ts`|`<dataDir>/relay/team.json`, 0600, 单曲作家.
+角色政策`access-policy.ts`|`VIEW`,, , , , ,`COMMENT`,, , , , ,`EDITOR_ONLY`,, , , , ,`VIEW_EVENTS`; 警卫测试是`access-policy.guard.test.ts`。 。 。 。
+管理频道`team-admin.ts`(袜子)+`src/server/team-cli.ts`(                                                                                                                                                   (                                                                                                           `<dataDir>/relay/admin.sock`, 0600 in a 0700 目录.
+服务器启动器`src/server/index.ts`(搜索"Hosted team search") QQ在无头和服务模式下,在每个处理器注册后加载工作空间索引后启动. |
+坎瓦斯权威`src/core/canvas-authority.ts`; 存储接合符`src/core/workspace-store.ts`; 有线`src/server/index.ts`一个共享项目的画布内容的作者。 见[共享帆布权威](#共享-canvas-权威)。
+桌面加载器`src/main/remote/hosted-join.ts`, (中文).`relay-bookmarks.ts`; 核心`join-code.ts`, (中文).`join-token.ts`QQ 运行核心中继客户端 。 @ info: whatsthis
+{\fn黑体\fs22\bord1\shad0\3aHBE\4 她在说`lib/hostedJoin.ts`, (中文).`lib/hostedAttempts.ts`, (中文).`lib/hostedOwner.ts`, (中文).`lib/hostedPendingQueue.ts`, (中文).`components/HostedApprovalDialog.tsx`, (中文).`bridge/hosted-gate.ts`, (中文).`bridge/relay-local-close.ts`, (中文).`@shared/hosted-access.ts`QQ 每一个主机分支都坐落在一个连接代码,一个主机api或一个主机角色后面,所以一个Team Access标签和一个本地标签会使用他们的旧路径(`canvas/hosted-team.source.test.ts`. |.
+与团队共享 桌面 :`lib/shareSshTeam.ts`, (中文).`src/main/remote-ssh/share-team.ts`, (中文).`src/core/remote-ssh/share-team-remote.ts`。服务器 :`team-bootstrap.ts`, (中文).`team-resume.ts`, (中文).`admin-error.ts`一个SSH项目交给了自己主机的托管团队. 见[与团队从桌面共享](#共享-与团队从桌面共享). QQ
+QQ 端对端测试QQ`src/server/hosted-e2e.test.ts`真正的无头服务器启动器,真正的管理套接字,访问策略,`PtyManager`, git 处理器(一个真正的寄存器)和信任门,带有一个进程内继电器和一个假的代号 API. 它还检查 |
 
-From a desktop **SSH project**, **Share with team…** does all of this for you, your device key
-included: see [Share with team from the desktop](#share-with-team-from-the-desktop). By hand it is
-two steps, run on the host **as the unix user the nodeterm service runs as** (the user you install
-it as):
+□ 在 SSH 上设置
+
+从桌面 ** SSH 项目 **, ** 与团队分享... ** 为您, 您的设备密钥做这一切
+包括: 见[与桌面上的团队共享] (# 与桌面上的团队共享). 手边是
+两个步骤,在主机上运行 ** 作为unix 用户,节点服务运行为 ** (您安装的用户)
+编号如下:
 
 ```bash
 # 1. Install (or update) nodeterm-server: a systemd service plus a daily auto-update.
@@ -53,108 +54,100 @@ APP=~/.nodeterm-server-app/out/server/main.cjs
 node $APP team bootstrap --owner-key <your device key> --adopt <folder> [--owner-label <name>]
 ```
 
-The installer builds the app from source in `~/.nodeterm-server-app` (about 600 MB), keeps the
-data in `~/.nodeterm-server`, and installs a per-user `systemd --user` service, or a system service
-when run as root (`docs/SERVER.md`, "One-line install"). When it provisioned its own Node, `node`
-may not be on `PATH`; the service's `ExecStart` line (`systemctl --user cat nodeterm-server`, or
-the system unit for a root install) names the exact binary and script to use. Your device key comes
-from your desktop: see [Your desktop's device key](#your-desktops-device-key). `--adopt` is the
-project's folder on the host, as an absolute path.
+安装器从源创建应用程序 。`~/.nodeterm-server-app`(约600 MB),保留
+数据`~/.nodeterm-server`,并安装每个用户`systemd --user`服务,或系统服务
+当运行为 root (`docs/SERVER.md`,"一线安装"). 当它提供自己的节点时,`node`可能没上`PATH`祝你好运。`ExecStart`线璞 (`systemctl --user cat nodeterm-server`,或
+用于 root 安装的系统单元)命名要使用的精确二进制和脚本。 您的设备密钥来了
+从您的桌面上: 查看 [您的桌面设备密钥] (# 您的桌面- device- key) 。`--adopt`这是
+项目文件夹在主机上, 作为绝对路径 。
 
-The CLI never touches `team.json`, the host key or the workspace itself. It talks to the running
-server over the admin socket, so the service must be up.
+CLI从不碰`team.json`,主机密钥或工作空间本身。 它对奔跑说话
+女友 服务器通过管理员套接字,所以服务必须上线 。
 
-`--data-dir <dir>` (anywhere on the line) or `NODETERM_DATA_DIR` points the CLI at a server running
-with a non-default data directory. `node $APP team --help` prints the verb list. Exit codes: 0 done,
-1 the server refused or could not be reached (or the command ran but its outcome did not happen,
-such as hosting not starting), 2 the command line is wrong.
+`--data-dir <dir>`(线上任何地方)或`NODETERM_DATA_DIR`在服务器运行时点到 CLI
+带有非默认数据目录。`node $APP team --help`打印动词列表。 退出代码: 0 完成,
+1 服务器拒绝或无法到达(或命令运行但结果没有发生),
+2 命令行错误。
 
-| Command | Effect |
-|---|---|
-| `team bootstrap --owner-key <key> --adopt <dir> [--owner-label <name>] [--json]` | `init`, `add-owner`, the folder's adoption into this core's workspace and `share`, in one idempotent call. See [What `team bootstrap` does](#what-team-bootstrap-does). |
-| `team init` | Creates the host key (once) and `team.json` if absent, then starts hosting. Prints the address and join code when hosting started. An unreadable key is refused, never replaced. |
-| `team add-owner <device-key> [--label <name>]` | Pins that device as an **owner**. An existing member's key is promoted to owner. The key must be the canonical 44-character base64 public key; a typo gets its own message before anything is sent. |
-| `team remove <device-key> [--force]` | Unpins the key and cuts its live sessions (they are told `removed`). Removing the last owner needs `--force`. |
-| `team share <projectId>` / `team unshare <projectId>` | Adds or removes a project in `sharedProjects`. The id is **not** checked against the workspace. An unshare applies to the next message: a Viewer already watching one of its terminals gets no more output from it. |
-| `team info [--json]` | The team address and join code. The plain form prints the join code only while hosting is on; `--json` returns `{enabled, info, joinCode}`. |
-| `team status [--json]` | Hosting state, members, and pending join requests (see [Status and troubleshooting](#status-and-troubleshooting)). |
-| `team rotate-key` | Replaces the host key. Every bookmark and join code stops working. A hosting service restarts on the new key; one that was not hosting stays off. |
-| `team resume --project <id> [--json] < sessions.json` | Restarts agent sessions handed over from a desktop, on this core. Reads the session list on stdin. See [`team resume`](#team-resume). |
+命令 效果
+|,|也.
+|`team bootstrap --owner-key <key> --adopt <dir> [--owner-label <name>] [--json]`|`init`, (中文).`add-owner`,文件夹被采纳到这个核心的工作空间和`share`在一个独断专行的电话里 见[什么`team bootstrap`(#什么-团队-bootstrap-does). |
+|`team init`QQ 创建主机密钥( 一次) 和`team.json`如果缺席,则开始托管。 开始托管时打印地址并加入代码 。 无法读取的密钥被拒绝, 从未被替换 。 |
+|`team add-owner <device-key> [--label <name>]`将那个装置作为**所有者**。 现有会员的密钥晋升为所有者. 密钥必须是Cononical 44-Charcter Base64 公钥;在发送任何信息之前,一个打字器会得到自己的消息. QQ
+|`team remove <device-key> [--force]`解开密钥并剪切其直播会话(他们被告知)`removed`) (中文(简体) ). 删除最后所有者需要`--force`。 。 。 。
+|`team share <projectId>`/ 页 次`team unshare <projectId>`QQ 添加或删除工程`sharedProjects`编号与工作空间对照**不**。 一个未 Beatricera 应用到下一个消息: 一个已查看其终端的查看器不会从它得到更多的输出 。 |
+|`team info [--json]`- 团队地址和密码 plain表单仅在托管时打印连接代码;`--json`返回时`{enabled, info, joinCode}`。 。 。 。
+|`team status [--json]`++的案件中,以及待处理的合并请求(参见[状态和故障排除](#状态-和-障碍排除)). |
+|`team rotate-key`QQ 替换主机密钥 。 每个书签和加入代码停止工作. 托管服务在新密钥上重新启动; 不托管的则停止运行 。 |
+|`team resume --project <id> [--json] < sessions.json`从桌面上, 在这个核心上移交的重新启动代理会话 。 阅读 stdin 上的会话列表。 见[`team resume`[#团队-重修]。
 
-With no team on the server, the admin socket answers only `init`, `status`, `info` and `bootstrap`
-(which is `init` plus the rest): every other verb would create team state on a server that never
-asked to host.
+在服务器上没有团队的情况下,管理员套接字只回答`init`, (中文).`status`, (中文).`info`和`bootstrap`(这是`init`加上其他: 所有其他动词都会在服务器上创建团队状态
+请求托管。
 
-### What `team bootstrap` does
+怎样?`team bootstrap`已经
 
-One idempotent call, in this order:
+依此顺序,
 
-1. **Team.** Creates the host key and `team.json` if absent and starts hosting, as `team init`
-   does, then waits up to 15 s for the relay's first answer. A refusal (`E_HOSTING_OFF`, with the
-   scheduler's reason) stops here: no owner, project or share was written. No answer within the
-   15 s is still a success; the output says "Hosting: starting — teammates can join in a moment.",
-   and a join retries.
-2. **Owner.** Makes the device key an owner, as `team add-owner` does. A member is promoted; an
-   existing owner is left as it is.
-3. **Adopt.** Adds the folder to this core's workspace. `--adopt` must be an absolute path to an
-   existing directory, and it is resolved with `realpath`. The root, this user's home directory and
-   any folder that contains it are refused (`E_BAD_CWD`): every teammate, Viewers included, may
-   read any file under a shared folder, and a home holds the ssh keys and the agents' credentials.
-   A folder already in the workspace (by real path) is reused, never added twice, and reopened if it was closed. A folder with a
-   `.nodeterm/project.json` is adopted the way the desktop's "Open folder…" adopts one: a fresh
-   project id, with the node ids (they are the tmux session names), canvas and board kept, and each
-   node's `~/…` folder expanded to this user's home (an SSH project writes its folders that way). A
-   folder without one becomes an empty project named after the folder. The project is saved before
-   it is shared, so the canvas authority can read it.
-4. **Share.** Adds the project to `sharedProjects`, as `team share` does.
+1. ** 团队造福于妇女。 ** 创建主机造福于`team.json`如果缺席并开始托管, 如`team init`,然后等待 最多15 s 为继娄的第一个答案。 拒绝(`E_HOSTING_OFF`,与
+调度员的理由)在此停留:没有写入所有者,项目或共享. 内无答复
+15 s仍然是成功的;产出表示"热情:开始——队友可以在一瞬间加入",.
+和一次复赛。
+2. ** 欧纳。 ** 让设备键成为所有者, 如`team add-owner`当然 成员获得晋升;
+现有所有者按原样保留。
+3. ** 通过。 ** 将文件夹添加到此核心的工作空间。`--adopt`必须是一条通往
+已有目录,并以`realpath`。根,这个用户的主目录和
+拒绝包含此内容的任何文件夹( Q)`E_BAD_CWD`:的可能性:每个队友,包括观众
+在一个共享文件夹下读取任何文件,一个家持有ssh密钥和代理证书.
+已经位于工作空间的文件夹( 按真实路径) 被重用, 从未凤凰加过两次, 如果关闭则重新打开 。 带有文件夹的文件夹`.nodeterm/project.json`采用桌面“ 打开文件夹... ” 的方式
+project id, 带有节点 ids( 它们是 tmux 会话名称) , 画布和画板保存, 每个
+节点的`~/…`文件夹扩展到此用户的家( 一个 SSH 工程以这种方式写入文件夹) 。 A级
+文件夹中没有一个成为以文件夹命名的空项目。 工程保存在之前
+它被共享, 这样帆布权威可以读取它。
+4. ** 份额。 ** 将工程添加到`sharedProjects`,作为`team share`当然
 
-A re-run on a host that is already set up changes nothing (every `created` flag in the `--json`
-answer is false) and prints the same join code. Sharing a second folder is the same command with
-another `--adopt`: the same team and the same join code, and teammates who are connected get its tab
-at once (see [Hosted tabs](#hosted-tabs)).
+在已经设置的主机上重运行, 将改变什么( 每个`created`旗帜`--json`答案是虚假的),并打印同样的加码. 共享第二个文件夹是相同的命令
+另外一个`--adopt`: 同一团队和同一加入代码, 连接的队友获得其标签
+(见[挂号标签] (# 托管-tabs))。
 
-`--json` prints `{hostId, projectId, projectName, joinCode, hosting, created}`. Under `--json`, a
-failure from the server (a refusal, or a server that cannot be reached; exit 1) is one JSON
-line on **stdout**, `{"ok":false,"error":"…","code":"E_…"}`, beside the human sentence on stderr,
-because a caller reading over an ssh exec channel (the desktop) reads stdout only. `code` is there
-only when the server sent one. A command line (or, for `team resume`, a stdin) that the CLI itself
-refuses exits 2 and prints to stderr only. The codes are stable; branch on them, never on the
-sentence:
+`--json`指纹`{hostId, projectId, projectName, joinCode, hosting, created}`下调`--json`页:1
+服务器的失败( 拒绝, 或服务器无法到达; 退出 1) 是一个 JSON
+运行于 **stdout **,`{"ok":false,"error":"…","code":"E_…"}`除了人类对Stderr的判决之外
+因为一个在 ssh exec 频道( 桌面) 上读取的呼叫者只读 stdout 。`code`那边
+仅在服务器发送时。 命令行(或用于`team resume`,一个 stdin),CLI本身
+拒绝输出 2 和打印到 stderr 。 代码是稳定的; 分支上,从来没有在
+所订句子:
 
-| Code | Meaning |
-|---|---|
-| `E_BAD_KEY` | `--owner-key` is not a canonical 44-character base64 public key. |
-| `E_BAD_CWD` | `--adopt` is not an absolute path, does not exist, is not a directory, or is the root, the home directory or a folder that contains the home. |
-| `E_HOSTING_OFF` | Hosting could not start (the scheduler's reason follows), or it stopped before a join code could be issued. |
-| `E_ADOPT_FAILED` | The folder's `.nodeterm/project.json`, or this core's own workspace index, is there but cannot be read. Nothing is set aside; fix the file and run it again. |
-| `E_BAD_REQUEST` | A malformed request: a bad label, project id or resume list. |
-| `E_UNSUPPORTED` | This server cannot adopt folders or resume sessions. (Separately, the renderer's `shareTeam` verbs REJECT with an error coded `E_UNSUPPORTED` in the Server Edition's browser and in relay tabs; that is the bridge refusing, not a JSON reply from a server.) |
+密码 意思是
+|,|也.
+|`E_BAD_KEY`|`--owner-key`不是一个可口的44字符基础64公钥。
+|`E_BAD_CWD`|`--adopt`不是一个绝对路径,不存在,不是目录,或者是根,主目录或包含主目录的文件夹. |
+|`E_HOSTING_OFF`QQ 主机无法启动( 排程器的理由如下), 或在加码发布前停止 。 |
+|`E_ADOPT_FAILED`\ 文件夹的`.nodeterm/project.json`,尽可能广泛地使用。 没有东西被搁置; 修复文件并再次运行 。 |
+|`E_BAD_REQUEST`QQ 错误的请求:标签, 项目 id 或恢复列表 。 |
+|`E_UNSUPPORTED`QQ 此服务器无法通过文件夹或恢复会话 。 (分别,铸造者.`shareTeam`以错误编码的动词 REJECT`E_UNSUPPORTED`在服务器版的浏览器和中继标签中;这就是拒绝的桥,而不是服务器的JSON回复. ) QQ
 
-### `team resume`
+###`team resume`
 
-`team resume --project <id> [--json]` restarts agent sessions handed over from a desktop, on this
-core. It reads the list on **stdin**, `[{nodeId, agentId, sessionId, permissionMode?}]`, at most 200
-entries, and answers one result per entry: `resumed`, `already-running`, or `refused` with a reason.
-Every entry is checked again here: the node must be a terminal of that project running that agent,
-the agent must be resumable and not run under a managed account, and the session id must pass the
-same rule as every other resume; an unknown permission mode gives the bare command. A node whose
-`nt-<id>` session already exists on this core's socket (`node-terminal`, checked with the exact
-target) is `already-running`, and so is a node another `team resume` on this server is still
-launching (the desktop's call gives up after 60 s while the server keeps going, and the user may
-share again). One whose session this core cannot check is refused rather than started, so a re-run
-never puts a second agent on one conversation. Launches run four at a time, in
-the node's folder and with this core's hook environment, so each agent's status reaches every
-teammate. Share with team calls it only for sessions it has verified gone from the desktop's socket.
+`team resume --project <id> [--json]`重新启动从桌面移交的代理会话, 有关此
+核心。 上面写着:`[{nodeId, agentId, sessionId, permissionMode?}]`,最多200个
+条目,并回答每个条目的一个结果:`resumed`, (中文).`already-running`,或`refused`有个理由
+这里再次检查每个条目: 节点必须是运行该代理的工程的终端,
+代理必须是可收回的,而不是在管理下的账户下运行,会话 ID 必须通过
+规则与每个其它恢复相同;未知的许可模式给出了赤裸的命令. 一个节点`nt-<id>`在此核心的套接字上已经存在会话( C)`node-terminal`Motor. 目标)为:`already-running`一个节点也是`team resume`在此服务器上仍然
+(在服务器持续启动时,桌面的呼叫在60s后放弃,用户可能
+页:1 此核心无法检查的会话被拒绝而不是开始, 因此重运行
+从来没有让第二个经纪人在一次谈话。 发射一次运行四个,在
+节点的文件夹和这个核心的钩子环境, 所以每个代理的状态到达每一个
+队友 与团队分享它只用于它从桌面套接字中被证实的会话 。
 
-### Your desktop's device key
+您的桌面设备密钥
 
-The key is the `publicKey` field of `<userData>/remote-peer-key.json` on your desktop
-(`src/main/remote/peer-identity.ts`). The public key is always stored as plaintext base64, even when
-the keyring encrypts the secret next to it (`key-file-codec.ts`), so it is readable either way.
+关键是`publicKey`领域`<userData>/remote-peer-key.json`在您的桌面上
+(单位:千美元)`src/main/remote/peer-identity.ts`) (中文(简体) ). 公用密钥总是作为普通文本基数存储64,即使
+键环加密旁边的秘密( Q)`key-file-codec.ts`),所以无论哪种方式都可读取.
 
-`<userData>` is named after `package.json`'s `name`, **`node-terminal`**, not the product name
-(the shipped hook scripts search the same directories): `~/Library/Application Support/node-terminal`
-on macOS, `~/.config/node-terminal` on Linux, `%APPDATA%\node-terminal` on Windows. On macOS:
+`<userData>`以`package.json`因为`name`页:1`node-terminal`**,不是产品名称
+(已发送的钩脚本搜索相同的目录):`~/Library/Application Support/node-terminal`在马科斯,`~/.config/node-terminal`在Linux上,`%APPDATA%\node-terminal`在视窗上。 在macOS上:
 
 ```bash
 grep -o '"publicKey":"[^"]*"' ~/Library/Application\ Support/node-terminal/remote-peer-key.json | cut -d'"' -f4
@@ -162,753 +155,712 @@ grep -o '"publicKey":"[^"]*"' ~/Library/Application\ Support/node-terminal/remot
 ls ~/Library/Application\ Support/*/remote-peer-key.json
 ```
 
-Share with team reads this key for you; nothing else in the UI shows it in v1.
-
-The file is created the first time the desktop hosts a Team Access invite, connects to another
-desktop's pairing code (New Remote Connection), joins a hosted team or runs Share with team. Pairing
-a **phone** does not create it; that uses a different key file (`remote-host-key.json`). Only if the
-file is really not there, run `team init` and `team info` for a join code and paste it once (see
-[The first connect](#the-first-connect)); that join spends one of the team's shared device mints.
-While your desktop asks you to read a code to an owner, `team status --json` lists your device under
-`pending` with its `peerKeyB64` and `sas`. Take the key whose `sas` matches your prompt, press
-Cancel on the prompt (that ends the request), run `team bootstrap` (or `team add-owner`) with that
-key, and paste the code again. A request that is still pending when its key becomes an owner is not
-upgraded; it would wait out its 10 minutes.
-
-### The first connect
-
-On the desktop, choose **New Remote Connection** (dock or ⌘K) and paste the
-`nodeterm://join?code=…` code. The host already trusts an owner's key, so it approves its own half
-without anyone. Your desktop has no record of this host yet, so it asks once, with the SAS, to "read
-this code to an owner"; nobody on the host compares it (the host key itself is checked against the
-one in the join code), so press OK. The desktop records the approval in its bookmark, and every
-later connect opens without a prompt. Share with team joins without this prompt; see
-[The owner's own join skips the SAS](#the-owners-own-join-skips-the-sas).
-
-### Inviting teammates
-
-An owner's hosted tab has **Copy team invite code** in the command palette; `team info` prints the
-same code. A join code carries public material only (relay endpoint, host id, host public key, host
-device id, label). A leaked code cannot get anyone in, because an owner still approves each device.
-It **can** take hosting offline, though, and removing the member who leaked it does not stop that:
-see [Threat notes](#threat-notes).
-
-The teammate pastes it into New Remote Connection and reads the SAS it shows to an owner (a call
-or a chat). The owner's desktop shows "A device wants to join" with the same SAS, a device-key
-fingerprint (the key's first 8 characters) and a role picker that defaults to **Viewer**. Allow
-grants the chosen role once the joiner has pressed OK too.
-
-## Share with team from the desktop
-
-**Share with team…** turns a desktop **SSH project** into a hosted team on the same host, with this
-desktop as an owner. It is in the project tab's ⌄ menu and in the sessions sidebar's project menu
-(SSH projects only), and in ⌘K as "Share <name> with team" for the active one. While the project's
-SSH connection is down the two menu items are disabled with the reason "Connect this project first
-(its SSH connection is down).", and the ⌘K row shows that reason and does nothing when run.
-
-The code: `src/renderer/lib/shareSshTeam.ts` (the order, pure), `components/ShareTeamDialog.tsx`,
-`src/main/remote-ssh/share-team.ts` (the `shareTeam` IPC verbs),
-`src/core/remote-ssh/share-team-remote.ts` (every command it runs on the host, generated shell
-tested under a real `/bin/sh`), and the server's `src/core/relay/team-bootstrap.ts` and
-`team-resume.ts`.
-
-### What it does
-
-1. Makes sure nodeterm-server is installed and running on the host, as your SSH login user. It
-   installs it, after you confirm, when it is missing, too old to know `team bootstrap`, or not
-   answering. A server that is ready is never reinstalled; it is only probed.
-2. Sets up a hosted team with this desktop as an owner
-   ([`team bootstrap`](#what-team-bootstrap-does)).
-3. Moves the project to the server core and shares it.
-4. Hands its terminals over to the server core.
-5. Joins the team as an owner: the SSH project closes and the team's tab takes its place.
-6. Shows the invite code for teammates.
-
-Teammates then join from their own desktops with the code
-([Inviting teammates](#inviting-teammates)), and keep working while your computer is off.
-
-### The confirm
-
-Nothing changes before you press **Share**. The dialog ("Share <name> with a team") says:
-
-- the host and the login (`user@host`);
-- what the installer will do, when it has to run: "nodeterm-server will be installed on the host:
-  about 600 MB, built from source, as a systemd --user service that updates itself daily." (or that
-  it will be updated, or reinstalled and restarted). Updating a server whose team already exists
-  adds "Updating restarts the server; teammates connected to it are briefly disconnected.";
-- **"Editors get a shell as <user> on <host> and can make themselves owners; Viewers cannot."** The
-  server core runs as your SSH login, so an Editor's terminal is a shell as that user, and that shell
-  can run `team add-owner` (see [Threat notes](#threat-notes));
-- three lists: "These agents continue on the server:", "These terminals are running something that
-  will stop:" and "These agents will not be resumed — resume them by hand:".
-
-The installer's output streams into the dialog; a build takes many minutes, and the desktop waits up
-to 30 of them. The desktop downloads the installer to a temp file before running it, never pipes it
-into `bash`: with no `pipefail`, a failed download pipes an empty script that exits 0, which would
-read as a successful install. **Cancel** stops the install and ends the share there. Whatever the
-installer already did on the host stays, and the project has not been touched yet.
-
-### Which terminals continue
-
-Every terminal of the project is handed over: its session on this desktop's remote tmux socket
-(`nodeterm-rmt`) ends, and the node lives on in the server core's copy of the project.
-
-- **An agent continues its conversation** when its agent is resumable (`RESUMABLE_AGENTS`) and its
-  conversation id is known. The server core restarts it with `--resume` (`claude --resume <id>`,
-  `codex resume <id>`, …), in the project's permission mode, on the core's own tmux socket, where its
-  status reaches every teammate.
-- **Some agents are not resumed**, and the confirm lists each with its reason: "runs under a managed
-  account" (the server core cannot map this desktop's account directory to an account of its own),
-  "no conversation to resume yet" (no session id was ever reported), and "this agent cannot be
-  resumed" (a custom agent, for instance). Resume them by hand from the team's tab. A hosted tab
-  never resumes an agent by itself.
-- **A plain terminal's process stops.** The confirm lists each one whose pane runs something other
-  than a shell. Its node stays; the next time an Editor opens it, it is a fresh shell on the server
-  core.
-
-### The handover, in order
-
-The order is the safety property. No terminal ends before the server has taken the project. No agent
-starts on the server while its old session might still run: two processes on one conversation
-interleave its transcript. And once the server owns the project's file, this desktop never writes it
-again.
-
-1. **Refusals first, before the host is touched.** An agent that is working, waiting on a
-   permission prompt, or holding a question or an approval nobody has answered (hook state
-   `working`, `blocked` or `waiting`; a Codex approval prompt and an open AskUserQuestion are
-   `waiting`, a finished turn is `done`) refuses the share: "Wait for these agents to finish (or
-   stop them), then share again.", with the agents listed. An agent launched by hand in a plain
-   terminal counts too (the status store knows it), though only a node created as an agent is ever
-   resumed. A terminal attached to another host than the project's refuses it, naming each one,
-   because the handover would "stop" it on the project's host (where it has no session) and leave it
-   running where it is. More than 200 terminals is refused too.
-2. **Probe**, one generated command over the project's ControlMaster: the OS and the login, git and
-   curl, which unit runs nodeterm-server and with which binary, its version, whether it knows
-   `team bootstrap`, whether it answers, the real paths of the home directory and the project
-   folder, and what each of this desktop's remote panes is running. A refusal stops here (see
-   [Refusals](#refusals)). Main keeps this probe and re-reads its plan before every later step: it
-   installs only for a plan that does not refuse, and bootstraps and resumes only for a ready one.
-3. **Confirm.** Cancel changes nothing.
-4. **Install**, only when needed, then probe again. The server must now be ready, or the share stops
-   with nothing changed. After an install that exited 0 a not-ready answer gets three probes, 2 s
-   apart, because the restarted service may not answer `team status` at once. **Cancel** during the
-   install ends the share there (the dialog keeps the focus on itself, not on Cancel, so a stray
-   Enter does not stop a long install): no second probe, nothing saved, marked or closed, and the
-   result says "The install was cancelled, so nothing was shared. The host may keep a partly
-   installed nodeterm-server; the next install replaces it."
-5. **Save the canvas, and read it again.** The install can take many minutes. If an agent became
-   busy meanwhile, or a terminal was added or removed, the share stops with nothing changed (the
-   busy refusal above, or "The canvas changed while preparing the share. Nothing was changed; share
-   again."). The rest of the handover works on this read.
-6. **Mark the project handed off, in progress** (`handedOffTo` with no host yet), and save, so no
-   later save on this desktop mirrors the project to the host.
-7. **Flush the pending mirror write and read the host's `project.json` back.** Every node of the
-   project, read again now (terminals, notes, frames), must be in it, because that file is what the
-   server adopts. If one is missing, the share stops: "The canvas on the host is not up to date (N
-   nodes missing). Nothing was changed; try again in a moment."
-8. **Close the SSH project**, non-destructively: it moves to "Recently closed", and its tmux sessions
-   keep running.
-9. **`team bootstrap`**, as the login user, with the folder's real path from main's own probe (the
-   renderer names no folder).
-10. **Record the handover**: `handedOffTo` now names the team (`hostId`) and the project's id on the
-    server.
-11. **End the sessions, and check.** One generated command kills each node's session on this
-    desktop's remote socket only (`nodeterm-rmt`, exact target `=nt-<id>`), then asks tmux whether
-    each one is gone. A session counts as gone only when tmux itself says it does not exist: tmux
-    also exits 1 for a version mismatch or a socket it may not open, and the kill failed there too.
-    Never the server core's socket (`node-terminal`): its sessions are the ones being started.
-12. **`team resume`** for the resumable agents whose sessions are gone, with the list on stdin.
-13. **Join**, and show the invite code.
-
-Any failure from step 6 on, before `team bootstrap` succeeds, takes the mark back, and reopens the
-SSH project if step 8 had closed it: "The SSH project was reopened; nothing was changed." If that
-undo itself fails, the result says so instead: the project may still be closed and still carry the
-mark that stops its mirror, and reopening it from "Recently closed" (which warns, see below) clears
-it. A bootstrap that failed with no server code (the connection dropped, or it timed out) also says
-the host may have finished setting up anyway, and to run Share with team again. After a successful
-bootstrap the SSH project is **never** reopened, because the server core now writes the project's
-file and a reopened SSH project would be a second writer. Instead:
-
-- a session that is not confirmed gone may still be running, so nothing is resumed for it; the
-  result lists it under "Still running on SSH (not moved):". A kill command that fails outright
-  lists every terminal there;
-- a resume the server refuses is listed under "Not resumed:", with the server's reason;
-- a join that fails keeps the bookmark, which reconnects on its own. The result says "This computer
-  is joining the team; its tab opens when it connects." If the bookmark could not be seeded, the
-  join asks for the SAS like a pasted code.
-
-### `handedOffTo` and reopening
-
-The handover is recorded on this desktop only, in the project's workspace index entry
-(`handedOffTo`, never in the shared `project.json`), and it survives restarts. While it is set, this
-desktop never mirrors the project's file to the host, never reconciles it, never includes it in the
-15 s poll of connected SSH projects, never writes its board on a phone's behalf, and never pushes its
-project settings: the server core's canvas authority is that file's one writer now. A mark with no
-host is a handover that started and did not finish, and the same guard applies.
-
-Reopening the project from "Recently closed", with ⇧⌘T, or by opening the same host and folder as an
-SSH project again, warns first:
-
-> <name> was handed to team <team> on <host>. The server keeps its canvas and keeps running its
-> agents, even after it is unshared. Opening it here gives one canvas two editors that can overwrite
-> each other, and its agents would start the same conversations the server is running.
->
-> Open it here anyway? Its agents are not resumed here automatically.
-
-The warning offers no other way out on purpose: `team unshare` only stops sharing the project, and
-the server keeps it and its running agents, so neither the team tab (gone once it is unshared) nor
-the command gives the project back to this desktop.
-
-or, for a handover that did not finish:
-
-> Sharing <name> with a team did not finish. If the server already took it over, opening it here
-> gives one canvas two editors that can overwrite each other, and its agents would start the same
-> conversations the server is running.
->
-> Open it here anyway? Its agents are not resumed here automatically.
-
-**Open here anyway** takes the project back: the mark is cleared, and this desktop writes the file
-again. Its agent nodes then skip their automatic cold-resume ONCE: the share ended their SSH
-sessions, so each would otherwise type `claude --resume <id>` (or its agent's equivalent) over SSH
-while the server runs the same conversation, two processes appending to one transcript. Each such
-node says so ("Not resumed: this project was shared with a team, and its server may be running this
-conversation. Resume it here only once it has stopped there."), and resuming it stays your choice.
-The skip is held in memory, never written, so it cannot follow the node id to the team's tab, which
-holds the same ids.
-
-After a share, the closed SSH project and the team's tab hold the **same node ids** (they are the
-tmux session names, and the server keeps them). Every "go to node" (a notification, the sessions
-sidebar, ⌘K, a teammate's face, a rename from the board) goes to the project that owns the node in
-this order: an open project before a closed one, and one not handed off before one that was
-(`lib/nodeOwner.ts`). So it lands on the team's tab, never on the reopen warning. A closed team tab
-owns no node: with the team's tab closed, it goes to the SSH project, whose reopen warning asks first. Deleting the closed
-SSH project from "Recently closed" keeps the agent status of every node id another project still
-holds.
-
-### The owner's own join skips the SAS
-
-A pasted code makes you read a SAS to an owner ([The first connect](#the-first-connect)). Share with
-team does not. The client's auto-confirm reads one thing, the bookmark's `approvedAt` (for the host
-key the bookmark was recorded with; `hosted-join.ts`), and normally only a human's OK after a SAS
-comparison sets it. `shareTeam.seedBookmark` is the one writer that sets it without one: it writes a
-new bookmark with `approvedAt` (labelled `source: 'ssh'`), or, when a bookmark for the same host id
-and host key already exists, sets `approvedAt` on it and keeps its device token and its label
-(`source: 'code'` stays `code`). `source` is a label only; nothing reads it to decide.
-
-That is safe only because of what `seedBookmark` is given: the join code `team bootstrap` just
-returned over the project's own SSH channel, whose host key `known_hosts` already authenticated. The
-code names the relay key it was minted for (`decodeJoinCode` checks that the host id is the hash of
-that key), which is the assurance comparing the SAS digits by eye gives. Main enforces that input: it
-seeds only a code a successful `team bootstrap` returned during this app run (kept per project, in
-memory), and refuses any other code, however valid, so that join compares the SAS. The host approves
-its own half because your key is an owner in `team.json`. If the seed fails, the join asks for the
-SAS like a pasted code. Every other join, a pasted code or a
-teammate's, still compares the SAS.
-
-### Refusals
-
-| When | What the desktop says |
-|---|---|
-| The SSH connection is down | The menu item is disabled: "Connect this project first (its SSH connection is down)." |
-| An agent is working, blocked, or waiting on a question or an approval | "Wait for these agents to finish (or stop them), then share again.", with the agents listed |
-| A terminal runs on another host than the project's | "These terminals run on another host: <titles>. Close them or move them out of this project, then share again." |
-| A terminal was added or removed, or an agent became busy, while the share was being prepared | "The canvas changed while preparing the share. Nothing was changed; share again." (a busy agent gets the busy refusal) |
-| More than 200 terminals | "This project has more than 200 terminals; Share with team handles at most that many." |
-| The SSH login is root | "This SSH login is root. Share with team runs nodeterm-server as your own user, so log in to the project as a regular user and try again." |
-| The host has a root (system) install | "This host runs nodeterm-server as a system service (root). Share with team needs a per-user install; see docs/hosted-team-relay.md." |
-| The host is not Linux | "Share with team needs a Linux host (nodeterm-server runs on Linux)." |
-| The project folder is missing on the host | "The project folder does not exist on the host." |
-| The project folder is your home directory (a new SSH project starts at `~`) | "This project's folder is your home directory. Everyone in the team, Viewers included, could read every file in it. Move the project into its own folder, then share it." |
-| The project folder is `/` or contains your home directory | "This project's folder contains your home directory. Everyone in the team, Viewers included, could read every file in it. Move the project into its own folder, then share it." |
-| The host's home directory could not be read | "Could not read your home directory on the host, so Share with team cannot check that this project's folder is safe to share. Try again." |
-| git or curl is missing, and the installer has to run | "Installing nodeterm-server needs git and curl on the host (missing: …)." |
-| The folder path contains `'` or `\` | "The folder path contains a quote or backslash, which cannot be passed safely to every login shell." |
-| Hosting cannot start | "Could not share: " and the server's own sentence, e.g. "Hosting could not start: …" with the relay's reason, or "The nodeterm server is shutting down. Hosting was not started."; the SSH project is reopened. |
-
-**Root.** A root login is refused because the installer makes a system install for root, and the
-server core would then hand every Editor a root shell. A host that already runs a system install
-can still host a team by hand, as root ([Setup over SSH](#setup-over-ssh)). To share it from the
-desktop instead, remove the system install first (its service, its update timer and their unit files
-under `/etc/systemd/system/`) and share again, which installs a per-user server; nothing of root's
-team or data is carried over.
-
-### Agent hooks and discovery files on a shared host (a known gap)
-
-After a share, two nodeterm writers keep the same files under the same `$HOME`: the server core (it
-runs as your SSH login) and this desktop's `RemoteHooks` (`src/main/remote-ssh/remote-hooks.ts`)
-for any SSH project it still has on that host. This is accepted for v1 and stated in full here.
-
-**What they share.** Both point each agent's hook config (`~/.claude/settings.json`,
-`~/.gemini/settings.json`, `~/.codex/hooks.json`, …) at the same machine-wide script,
-`~/.nodeterm/agent-hooks/<agent>.sh` (`src/core/agents/hooks/install-helper.ts`
-`managedHookScriptPath`, `codex.ts`'s `scriptPath`). A config does not gain a second entry because
-`mergeManagedHook` strips every entry carrying our marker before it adds its own; under a version
-skew between the two, the last writer's event set is the one left. The script reads
-`$NODETERM_HOOK_ENDPOINT` when it runs, and every pane carries its own: the SSH project's sessions
-name the desktop's reverse-tunnel endpoint (`~/.nodeterm/hook-endpoint-<projectId>-<owner>.env`),
-the server core's name `<dataDir>/hook-endpoint.env`. Normally each session reports to its own
-core; when a session's endpoint is dead, the script's failover walks the other endpoint files on the
-host, so a desktop session whose tunnel is down can have its event delivered to the server's
-endpoint instead.
-
-**What collides.** The two writers do not write the same bytes:
-
-- **The hook script.** The server bakes a Codex thread-identity prelude into it, pointing at its own
-  data directory; `RemoteHooks` writes none (`REMOTE_IDENTITY_ROOT = null`).
-- **The discovery files.** At boot, by default, the server writes the context-link skill
-  (`~/.claude/skills/get-linked-context/SKILL.md`) and its marker blocks in `~/.codex/AGENTS.md`,
-  `~/.gemini/GEMINI.md` and opencode's `AGENTS.md`, all naming its own shim under
-  `<dataDir>/context-links/`; with server canvas control on, also the `manage-nodeterm-canvas` skill
-  (system and managed-account dirs) and its blocks, naming `<dataDir>/canvas-control/nodeterm.sh`.
-  Those shims bake in the same prelude. `RemoteHooks` writes the same files naming its neutral
-  `~/.nodeterm/context.sh` and `~/.nodeterm/nodeterm.sh`, which carry none.
-
-**When each one writes.** The server, each time it starts (the daily auto-update restarts it, unless
-that was turned off). The desktop rewrites the hook script whenever it sets up an SSH project on
-that host, which is on connect and again on every hook-tunnel repair; its agent-tools freshness
-check rewrites any discovery file that differs from its own on connect, on every tunnel repair, and
-hourly while a project on that host stays connected. The last writer wins.
-
-**Who is affected.** Only Codex nodes the server core runs in shared-identity mode, and only their
-tool shells: those run from Codex's shared app-server, carry `CODEX_THREAD_ID` and none of the
-`NODETERM_*` environment, and need the prelude to find their node. Against the desktop's copies,
-such a node's hooks report nothing (the script exits at its `NODETERM_NODE_ID` gate) and its shell
-calls to the canvas and context shims cannot say which node they come from. That is the state right
-after sharing to a server that was already running (the desktop connected after the server last
-started), and whenever the desktop re-asserts its copies later, until the server's next start. Every
-other pane, on either core, carries its own endpoint in its environment and works with either copy.
-
-## Roles
-
-Generated from `src/core/relay/access-policy.ts`. Owners and editors pass every check (Editor is
-shell access, so gating it would be theatre); Viewers and Commenters get **only** what `VIEW` /
-`COMMENT` list, each with its own argument check. Anything else, including every channel added
-later, is Editor-only until someone decides otherwise.
-
-| Capability | Viewer | Commenter | Editor | Owner |
-|---|---|---|---|---|
-| See the shared projects' canvas, presence and cursors (`workspace:load`, `presence:hello/cursor/focus/project`) | ✓ | ✓ | ✓ | ✓ |
-| Watch a terminal of a shared project that is **already running** | ✓ | ✓ | ✓ | ✓ |
-| Read files inside a shared project | ✓ | ✓ | ✓ | ✓ |
-| Read a shared project's git state (status, diffs, history, file versions) | only when the project is the top folder of its own repository | same as Viewer | ✓ | ✓ |
-| Read a shared project's board log | ✓ | ✓ | ✓ | ✓ |
-| Cursor chat (`presence:chat`), board-log comments (`board-log:append`) | — | ✓ | ✓ | ✓ |
-| Type into terminals, start terminals, write files, every git mutation, canvas edits, settings, credentials, logs, GitHub | — | — | ✓ | ✓ |
-| Approve or deny join requests, read the invite code, see pending requests | — | — | — | ✓ |
-
-`relay:hosted:self` (the caller's own role) is open to any member. The `relay:hosted:*` verbs are
-intercepted by `hosted-service.ts` before the table is consulted, and each judges the **caller's own
-session key** in the team store.
-
-**"Read" is not "safe": every viewer channel carries its own check.**
-
-| Channels | What a Viewer / Commenter may do |
-|---|---|
-| `pty:create` | Only for a node of a shared project. The options are rewritten to `persistKey`, `cols`, `rows` and `viewerId`, plus `joinOnly: true` and `sizeVote: false`. Everything else is stripped, including `sshRemote`, whose ssh args would run on the host during the existence probe. A join-only create that would spawn a new session answers `unavailable: 'join-only'`. |
-| `pty:resize` | Rewritten to "not looking" (`null, null`): a viewer's window never sizes the shared terminal. |
-| `pty:flow` | Resume only: a pause would freeze the shared process for everyone. |
-| `pty:kill` | Detaches the caller's own view; the session keeps running. |
-| `pty:capture`, `pty:read-scrollback`, `pty:pane-command` | Nodes of shared projects only. |
-| `pty:tmux-status` | Allowed. |
-| `fs:list`, `fs:read`, `fs:read-binary`, `fs:exists` | The path must be absolute and its **realpath** inside a shared project's cwd (also realpathed). A symlink planted inside the project that points out of it is outside. A shared project whose folder is the disk root, the home directory, or an ancestor of either or of this server's data directory is **not a root at all** (`core/relay/share-root.ts`, security audit F4): every file under it would be readable, `~/.ssh` included, so nothing under it is. Behind that, this server's data directory is refused wherever a path resolves into it (a symlink planted inside a project): "Viewers can't read this server's own data folder." It holds the host key, `team.json`, every terminal's scrollback snapshot and the unshared canvases. The same holds for a git cwd, and for the file of a `git:diff`. |
-| `git:status`, `git:repo-root`, `git:history` | The cwd is jailed like a file read, **and** the shared project that contains it must be the top folder of its own repository: a `.git` directory that holds `HEAD`, or a worktree's `.git` file. An empty `.git` directory, or a `.git` symlink to a folder that is not a repository, does not count: git skips it and uses the enclosing repository. Otherwise: "Git is available to viewers only in a project that is the top folder of its own repository, never in a subfolder of a larger one." A cwd jail alone does not bound git: `git status` and `git log` report the whole repository, and `git show <ref>:<path>` reads `<path>` from the repository's top level, so from a shared `repo/shared/` a Viewer could read `repo/secret/key.txt`. |
-| `git:diff` | The cwd (with the repository rule above) **and** the file are jailed; a pathspec starting with `:` is refused; an untracked diff (`git diff --no-index`, which diffs any file) needs a real path inside. The file is relative to the cwd, not the repository's top level. |
-| `git:show-file` | The cwd jailed, with the repository rule above; a ref starting with `-` is refused (it would become an option, and `--output=` writes a file). Any other revision is allowed. |
-| `agent:subagent-snapshot` | The response is trimmed to shared nodes. |
-| `board-log:read/subscribe/unsubscribe` (+ `append` for Commenters) | Shared projects only. A Commenter's `append` must be a comment (`kind: 'comment'`): an activity entry ("moved a card to Done") is Editor-only. The entry is reduced to a comment's own fields (`id`, `ts`, `author`, `kind`, `text`, `nodeId`), and appends are bounded per peer key (one every 2 s, 32 KiB a minute, `core/relay/append-budget.ts`): the log keeps one rotated generation (4 MiB), and a flood used to rotate the project's real history out of it (security audit F3). |
-
-**Which project a node is in** is read from the saved canvases (`WorkspaceStore.projectIdsForNode`).
-Node ids travel in git-shared project files, so one id can sit in several projects; it counts as
-shared only when **every** project holding it is shared, never by whichever comes first.
-
-**Outbound is deny-by-default too.** The core broadcasts to every attached client, so a non-editor
-receives only the events `VIEW_EVENTS` lists: `canvas:mut`, `workspace:external-change` /
-`server-change` and `project-trust:changed` for shared projects; `agent:status` and
-`agent:unread-clear` for shared nodes; `agent:subagent-activity` for subagents a shared node
-started; `context:update` for a shared node's agent session (by the payload's `nodeId`, else through
-the agent-status mirror's session → node record; an update it cannot attribute is dropped); the
-per-session pty channels, which only a session's subscribers receive; and
-`board-log:changed:<id>` / `project-setup:event:<id>` for shared projects.
-
-**Presence is rewritten per peer** (`createPresenceFilter`, security audit (a)): `presence:sync` and
-`presence:peer` carried every client's project, focused node, typing node, dino node and live cursor
-chat for every project on the core, which also told a peer the exact node ids of work it was never
-shared. A non-editor now sees only peers whose project is shared, with any node reference outside the
-shared projects nulled; a peer moving onto a shared project is announced with a `join` (its cursor
-chat from the other project cleared), moving off with a `leave`. Editors get the stream unchanged; a
-role change resends the whole list on the next presence event.
-
-**A terminal is judged by its node on every frame.** Terminal output and `pty:resync` (a repaint of
-the screen) reach a non-editor only while **every** project holding the session's node is shared.
-`pty:size`, `pty:exit`, `pty:closed` and `pty:recycled` are refused once the node is held by any
-project that is not shared (or by no project at all); for a session that has already ended they
-still pass, since all they carry is that fact.
-This is what makes `team unshare` stop a terminal a Viewer is already watching: the subscription
-itself outlives the unshare, but nothing more of that terminal is delivered to it.
-
-The renderer mirrors the two allowlists in `@shared/hosted-access.ts` (`bridge/hosted-gate.ts`
-answers a refused call locally, in the host's words), and the guard test pins the mirror equal to
-the host's tables. The mirror is convenience; the host is the boundary.
-
-## Joining and reconnecting (desktop)
-
-A join code runs `joinHostedTeam` in the main process:
-
-1. Decode and verify the code: the host id must derive from the host key, and the relay must be
-   `wss:` (or `ws:` to loopback). The same rule applies to the endpoint the API hands back.
-2. Load this desktop's peer key **before** any mint, so a locked keyring costs nothing.
-3. Get a device token: the bookmarked one, else **one** fresh `POST /v1/relay/device`. The device
-   id sent is `<machine id>:<hostId>`, one per team: the backend refuses to re-register a device id
-   for a second host on the free tier.
-4. Trade it for a client token (`POST /v1/relay/join`). A `401` on a kept token earns one re-mint;
-   a `403` earns none.
-5. Connect with the host key from the code pinned. The core relay client runs with **no pin store**;
-   the joiner-side pin is the bookmark's `approvedAt`.
-
-Bookmarks live in `<userData>/relay-bookmarks.json` (0600, one per `hostId`): the join code, the
-label, the device token, `approvedAt` and `source`. A bookmark auto-confirms only when `approvedAt`
-is set **and** the code carries exactly the key it was recorded for. A host that refuses the device
-(denied, removed, expired) withdraws `approvedAt`, so the next attempt shows the SAS again. The
-token is never sent to the renderer.
-
-A device token is never minted when it could not be kept. Before a mint, the bookmarks file must
-be readable and parseable and its directory writable; a token whose write still fails is kept in
-memory for the rest of the app run. A second join for the same team while one is still minting or
-joining answers `E_JOIN_BUSY`.
-
-**Reconnect, as built:**
-
-- At boot, every **approved** bookmark reconnects in the background. No greyed tab is persisted;
-  the tab appears once the connection is approved.
-- A live hosted tab whose connection dropped with no reason from the host reconnects in place. It
-  waits 1 s first, then tries at most 5 times (1, 2, 4, 8, 15 s, about 30 s in all), then stops
-  with one notice ("Couldn't reconnect to X. Click its tab to try again."). A click is a fresh
-  attempt. A boot reconnect that runs out says to paste the invite code instead.
-- Unattended attempts (boot and drop reconnects) retry `E_JOIN_NETWORK` on 1, 2, 4, 8, 15 s, then
-  every 60 s, and `E_JOIN_THROTTLED` no sooner than 60 s (or the Retry-After, capped at 10 minutes),
-  announced once per streak. Nothing else retries, and a pasted code never retries: it is told once.
-- Closing or deleting the tab cancels its team's attempt in any phase. At most one attempt and one
-  live connection exist per team.
-- A code pasted into a greyed tab's prompt must be for that tab's team. A code for another team is
-  refused there ("That invite code is for Y, not X. To join Y, paste the code in New Remote
-  Connection."), so one team is never mounted inside another team's tab.
-- **Forget hosted team: <name>** in the palette removes the bookmark and stops the reconnect. It
-  changes nothing on the host; the device stays a member until `team remove`.
-- A reconnect in place keeps the tab's last-seen nodes (the pre-existing re-fetch follow-up in
-  `docs/remote-sessions.md`).
-
-**What the joiner is told** (`@shared/relay-join-errors.ts` for the codes, `lib/hostedTeam.ts` for
-the sentences):
-
-| Code | Cause (main) | Retried unattended? | What the user sees |
-|---|---|---|---|
-| `E_JOIN_BAD_CODE` | The code does not decode or verify | No | "The invite code for X is not valid. Ask an owner for a fresh code." |
-| `E_JOIN_REFUSED` | `/device` refused (not 429 or 5xx), a freshly minted token rejected, or an unreadable/unwritable bookmarks file | No | "Could not join X: " + main's sentence (it names the file when that is the cause) |
-| `E_JOIN_RATE` | `/device` 429 without `scope:'ip'`: the free daily device-mint damper | No | "Too many join attempts for X today. Try again tomorrow." |
-| `E_JOIN_THROTTLED` | A 429 with `scope:'ip'` on `/device`, or any 429 on `/join`: the per-IP limiter (30 a minute) | Yes, ≥ 60 s | Unattended: "The nodeterm service is limiting requests from this network — retrying in a minute." (once per streak). A pasted code: "… Try again in a minute." |
-| `E_JOIN_NETWORK` | Fetch failure or timeout, a 5xx, a malformed reply, a relay endpoint the desktop will not dial, anything unexpected | Yes | A pasted code: "Could not reach X: …". An unattended attempt keeps retrying without a notice. |
-| `E_JOIN_REVOKED` | `/join` 403: the backend revoked this device | No | "This device's access to X was revoked. Remove the team and join again with a fresh invite code.", with a **Remove and rejoin** action |
-| `E_JOIN_KEY_LOCKED` | Loading this desktop's peer key failed: a locked keyring, or any other failure to read `remote-peer-key.json` | No | "Could not load this device's identity to join X: " + the loader's sentence (for a locked keyring, how to unlock) |
-| `E_JOIN_BUSY` | Another join of ours for the same team is still running | No | Nothing: the running attempt answers |
-
-Once connected, the host's own refusals arrive over the encrypted tunnel: "An owner declined the
-request.", "No owner answered the request in time." (a first join waits up to the host's 10-minute
-pending window) and "Your access to this team was removed by an owner.". While a mount is still
-unapproved after 2.5 s, the tab says "Waiting for an owner of X to approve this device…".
-
-## Hosted tabs
-
-A hosted team shows **one tab per shared project**, in the host's workspace order, all served by the
-team's one relay connection (`lib/hostedTabs.ts`, `lib/hostedTeamTabs.ts`). The tab's id **is** the
-host's project id: the relay api translates no ids, so a tab under any other id would ask the host
-about a project it does not know. A closed copy of a former tab under that id is replaced; any other
-project of yours that holds the id is skipped, never renamed.
-
-- **Share changes are live.** Whenever `sharedProjects` changes (`team share`, `team unshare`,
-  `team bootstrap`), the host sends `relay:hosted:shared-changed {projectIds}` to every connected
-  session it serves, Viewers included, and a device served as a Viewer because its approval could
-  not be written too. The desktop opens a tab for a newly shared project, with no new code and
-  no new approval, and closes the tab of an unshared one; nothing is deleted on the host. A tab that
-  a share event opens is added at the end of the tab bar.
-- **A tab you close stays closed** while its project stays shared, for the rest of the app run. Once
-  the host unshares it the dismissal is forgotten, so sharing it again opens it again. A closed team
-  tab is never reopened on this computer: once closed its relay connection is gone, and a reopen
-  would mount the host's sessions on this computer's core. "Recently closed" lists neither the tab
-  nor its closed sessions, and every other way back (⇧⌘T, a notification, ⌘K, a teammate's face)
-  is refused with "This team tab was closed on this computer. It opens again when you join the team
-  again (close its other tabs first), or when the team stops sharing the project and shares it
-  again." Those two are what bring it back: a reconnect of the team's other tabs keeps it dismissed.
-- **A team with nothing shared keeps one placeholder tab**, named after the team, so the team stays
-  visible and reconnectable. The first shared project replaces it.
-- **One connection, all tabs.** A dropped connection greys all of a team's tabs together. A reconnect
-  restores them all, reusing the greyed tabs by id (their nodes and their place in the tab bar
-  survive), and removes the ones whose project was unshared meanwhile.
-- When the tab you were looking at goes away, you land on another of the team's tabs.
-
-The role is read per connection, as before, so one role covers all of a team's tabs.
-
-## Owner approval
-
-- A device whose key is not in `team.json` becomes a **pending request**: `{pendingId, sas,
-  peerKeyB64, since}`. It is sent to connected **owners only**, never broadcast, so a viewer never
-  learns who is knocking. An owner who connects later is sent the ones still open, and pulls them
-  once more on mount (`relay:hosted:pending`), because that replay can land before the tab
-  subscribed.
-- At most **one** request per device key (a newer connection replaces the older one) and **16** at
-  once. A request expires after **10 minutes** or when the joiner's socket closes. Pending requests
-  live in memory, so a service restart drops them. Only a bookmarked (already approved) reconnect
-  retries on its own; a joiner who pasted a code reads "Could not open X: The relay connection
-  closed before it was approved." once and pastes it again.
-- Owners answer from a **desktop** hosted tab. The dialog queues requests (keyed by `pendingId`,
-  oldest first). Enter never approves, Escape denies only once the dialog is armed and never on a
-  held key, and focus lands on Deny. When two owners answer one request, a second Allow is refused
-  (the first one stands), but a **Deny beats an earlier Allow** until the request actually opens:
-  an Allow still waits for the joiner's own OK and for the pin write, and a Deny that lands in that
-  window refuses the device. An owner whose screen still showed a request that closed is told
-  "Another owner answered this request."
-- An approval is pinned only after **both** humans confirmed. A deny or expiry that lands while that
-  pin is being written wins: the write is skipped, or taken back. A key that gained a team entry
-  meanwhile (a `team add-owner` of the same key) keeps that entry: the approval writes nothing.
-- The CLI has **no** approve verb. `team status` lists pending requests by SAS and says to approve
-  from an owner's desktop. The only way the CLI admits a device is `team add-owner`, which makes it
-  an owner.
-
-## Shared canvas authority
-
-On the server that owns the team, the **canvas authority** (`src/core/canvas-authority.ts`) is the
-one writer of every shared project's canvas **content**: its nodes, bridges, ropes and board items
-(columns, cards, card metadata, labels, saved views). A client's edits reach it as `canvas:mut`
-ops; a Server Edition tab still sends whole-workspace saves too, but the content in them is
-overlaid with the authority's (input 2), and only a node too large to travel as an op is taken from
-them. The core's reflector places every op in one total order (`seq`); the authority hears each op
-right after that stamp, judges it with the same ordering rules every client
-uses (`src/shared/canvas-order.ts`: the highest `seq` wins per item, and a causal delete, see
-`docs/team-presence.md`), and applies it through the same reducer (`applyCanvasOp`,
-`src/shared/canvas-content.ts`).
-
-**What is governed.** Every project in `team.json`'s `sharedProjects`, and nothing else. A project
-that is not shared, a server with no team, and a server that found another one on its data directory
-(it creates no authority) are saved as before; so is every desktop's canvas. A shared project's other
-fields (name, colour, icon, layouts, the board's `github` mapping and `pullLinks`) are not governed:
-whole-workspace saves still write them.
-
-**Its four inputs:**
-
-1. **Ops**: from Editors' hosted tabs, from the server's own browser tabs, and from server canvas
-   control, which diffs everything a verb changed and casts each op before it saves (`castAndSave`,
-   `src/server/headless-node-factory.ts`). A tab also casts what it writes into a governed project
-   it is not showing (a ⌘⇧T or "Recently closed" reopen, a cold open, an off-canvas node or link, a
-   rename, move, duplicate or close from the sessions sidebar): those writes go to its projects
-   store, not its canvas, so the store hands each one to the publish hook
-   (`src/renderer/canvas/stored-publish.ts`). Without the cast the next overlaid save would drop
-   them, and a sidebar close would end the session while the node stayed on disk.
-2. **Saves.** Before a whole-workspace save is written, a governed project's content is replaced by
-   the authority's (`overlaySave`). The board is overlaid field by field: its items (columns, cards,
-   metadata, labels, views) come from the authority, `github` and `pullLinks` from the save. This
-   machine's exec fields (`shell`, `ssh.extraArgs`, and a held launch, `pendingLaunch`) are carried
-   over from the save's copy of each node, since the authority's own state holds none. That carry
-   is the ONLY way a launch reaches disk on a governed project: the reflector hands the authority
-   every op without its launch, so an armed `--after` node, and server canvas control's
-   claim/clear of its launch (`savePatches`), land in the index's machine-local `localExec`
-   through the save that follows the cast. A stale copy cannot write content back, with one
-   exception, the oversized node below.
-3. **Loads**, overlaid the same way (`overlayLoad`), so a client that loads sees every op the
-   authority applied, written to disk or not.
-4. **Outside edits.** A `git pull` or hand edit of a governed `.nodeterm/project.json`, seen by the
-   server's file watcher, is adopted: the authority re-applies the ops it has not written yet on top,
-   publishes the difference as `canvas:mut` ops (untrusted: its state holds no launch, so the ops
-   speak for none and every owner tab keeps an armed node's `pendingLaunch`; vouched, a pull that only
-   moved an `--after` node would cancel its launch), and broadcasts no `workspace:external-change`, so no
-   client gets the Reload / Keep mine bar (`src/server/workspace-external-watch.ts`). The edit's other
-   fields (name, colour, icon, layouts, the permission default, the capability flags, the board's
-   `github` and `pullLinks`) follow right after the ops, as the persisted project on
-   `workspace:server-change`, the channel server canvas control uses. The browser merges it without
-   a bar, so a tab that still held the old values saves the pulled ones instead of writing its own
-   back.
-
-**Writing.** A governed project is written 1 s after its last op, and at most 5 s after the first op
-not yet written, through the store's atomic content write (`WorkspaceStore.writeProjectContent`: it
-bumps `rev` like a save, and the file is byte-identical to a save's apart from `rev` and `savedAt`).
-A failed write keeps every op and retries
-after 1 s, 2 s, 4 s and so on, capped at 30 s. The journal says so once when a failure streak
-begins and once when a write lands again, not on every retry. Both server shutdown paths write what
-is pending before they exit, so a crash loses only what was not written yet: normally at most the
-last 5 s.
-Before the authority stops, the shutdown ends the browser connections and waits for the saves
-already queued (`WorkspaceStore.idle`): a save that ran after the authority was detached would be
-written un-overlaid, over its final write.
-Viewers can watch a terminal an Editor opened once its node is written, because node membership is
-read from the saved canvas.
-
-**When it adopts.** At boot, once `team.json` is loaded, every shared project is read, so an outside
-edit that lands before any op still has a baseline to compare with. `team share` adopts the project;
-`team unshare` writes what is pending, then lets it go (it is saved the old way again). The server's
-browser tabs are told the new governed set (`canvas:authority-changed`). A shared project whose file
-cannot be read stays governed, so its clients keep publishing, but the authority writes nothing for
-it and saves of it pass through unchanged until it can be read. The journal says so once:
-"[canvas-authority] project <id> is shared, but its content could not be read …". `team share` does
-not check the id, so a shared id that is not a project on this core logs the same line. When an
-outside edit makes the file readable again (a pull that resolves conflict markers), the authority
-adopts the edited file as its first baseline, so it has no difference to publish as ops: the project
-is sent whole on `workspace:external-change` instead, as for an ungoverned project.
-
-**Publishing when alone.** A client normally casts nothing while no teammate is attached. On a
-governed project that would lose every edit, so a client publishes whenever the project is governed:
-a Server Edition browser tab asks its core (`canvas:authority`), publishes for every project until
-the first answer arrives, and asks again on reconnect; a hosted relay tab treats every project it
-holds as governed. The desktop answers that it governs nothing, so a desktop publishes exactly as
-before.
-
-**Relay peers cannot save the host's workspace.** A `workspace:save` from a hosted relay peer is
-refused for every role, owners included, with `E_ROLE`: "A hosted team cannot save the host's
-workspace over the relay; edits travel as canvas operations". A whole-workspace save from a peer is a
-stale copy of every canvas it holds. No desktop flow sends one: the desktop's canvas saves go to its
-own local core.
-
-**The oversized-node exception.** A node too large to travel as an op (its upsert op, serialized, is
-longer than `MUTATION_MAX_BYTES`: `JSON.stringify(op).length` over 256,000, about 250 KB; in
-practice a sticky note with a pasted document in it) can only reach the core inside a save, so a
-save may contribute that node. It sits outside the total order; its limits are listed
-below.
-
-**Bridges grant reads.** On the Server Edition, which agent sessions may read each other's context
-(Context Link) is derived from the saved `bridges` of every canvas (`src/server/context-link.ts`). A
-link an Editor draws in a hosted tab is now saved, so it lets the two agents it joins read each
-other's conversation on the host. An Editor already has a shell there, so this is no new power, but
-it is a new way to use it.
-
-### Known limits
-
-- **A project's other fields are last writer wins.** Name, colour, icon, layouts, the permission
-  default, the capability flags and the board's `github`/`pullLinks` are not ops. A pulled change to
-  them reaches every browser tab (`workspace:server-change`), but two tabs editing one of them at the
-  same time still overwrite each other on save, as before the authority. A desktop joined over the
-  relay does not save the host's workspace at all.
-- **The share-time window.** An edit a client made just before `team share` (not yet cast because it
-  was alone, or cast but not yet saved) is not in what the authority reads from disk, and that
-  client's next save is overlaid, so the edit can be lost from disk. It stays on that client's screen
-  until it reloads. The window is short: a client saves 800 ms after its last change.
-- **Oversized nodes.** A node too large to travel as an op is taken from saves, with three
-  consequences. A client's save issued before that client applied a `remove` of such a node still
-  carries it, so the node is written back and stays until someone removes it again (the other
-  clients see it only after they reload). An outside edit of such a node reaches no client (the op
-  is refused as too large), and the next client save can put the client's older copy back. Two
-  clients holding different copies of one such node replace each other's on every save.
-- **Board edits reach only the active tab's core.** A client casts only to the core its active tab
-  is on. An edit on the Omni board to a lane of a project on another core (a hosted lane while a
-  local tab is active, or the reverse) is not cast, so on a hosted core it is not written either.
-- **Node order is not synced.** The sessions sidebar's order is the node list's order, and no op
-  carries an order change, so on a governed project a reorder stays on the screen that made it: the
-  file keeps the authority's order (the order it read, with nodes it hears about later appended).
-  What IS guaranteed is parent-first: the reducer re-sorts with the shared `groupsFirst`
-  (`src/shared/node-order.ts`) whenever an op appends a node or changes its `parentId`, so every
-  frame the authority writes precedes its descendants, as a normal save's does. That is the
-  downgrade contract (a build that predates nested frames still hydrates the file parent-first). A
-  file that was already out of that order when the authority read it keeps it until one of those
-  ops touches it.
-- **Load-time repairs are not cast.** What a client derives while it loads a project (a missing
-  `--after` dependency rope it heals, a legacy node migrated to its current shape) becomes that
-  client's baseline and is never cast, so on a governed project it never reaches disk: every load
-  derives it again. The repairs are deterministic, so this costs nothing visible, but a repair that
-  must persist on a shared project has to be cast.
-
-## Status and troubleshooting
-
-`team status --json` returns:
-
-| Field | Meaning |
-|---|---|
-| `enabled` | A scheduler is running (hosting is on). |
-| `off` | `null` while hosting is on; otherwise `{reason}`: `no-team` (run `team init`), `no-host-key`, `host-key-unreadable` (with `detail`, the loader's sentence), or `stopped`. |
-| `scheduler.state` | `running`, `stopped`, or `backend-refused`: a 402/403 from `/v1/relay/host-token`, or a 403 `pop_required`/`pop_invalid` (the relay refused this host's key proof) on two mints in a row, each with a fresh challenge. Minting stops until the service restarts or `team rotate-key` runs; `team init` does not restart it. |
-| `scheduler.lastError` | The most recent failure **since the relay leg was last proven to work**, not a current fault: `network`, `network (<status>)`, `rate-limited (429)`, `refused (402)` / `refused (403)`, `bad-response`, `mint failed: …`, `relay closed the idle listener`, `open failed: …`, `mint budget`, `key proof refused once (<kind>) — retrying with a fresh challenge` (the first key-proof refusal; `<kind>` is `pop_invalid` or `pop_required`), or, with `backend-refused`, "The relay refused this host's key proof — update nodeterm, or run `team rotate-key` if the key was replaced." It clears when an idle listener holds its registration to its refresh, or when a peer completes a handshake. |
-| `scheduler.mintsLastHour` | Host tokens minted in the last (rolling) hour. The scheduler never mints more than **200** in an hour (counted per running service, so a restart starts over); the backend's free limit is 240. |
-| `scheduler.idle` / `scheduler.bridged` | Idle listeners (the target is one) / sessions joined or awaiting approval. |
-| `peers[]` | `{label, role, connected}`. No keys: find them in `team.json`. |
-| `pending[]` | `{pendingId, sas, peerKeyB64, since}`. |
-
-The human `team status` reads `state`, `idle` and `lastError` together:
-
-| Line | Means |
-|---|---|
-| `Hosting: OFF — …` | `off.reason`, spelled out. For `host-key-unreadable` it is the loader's sentence. |
-| `Hosting: STOPPED — the nodeterm API refused to issue relay tokens (…)` | `backend-refused`. Restart the service once the backend side is fixed. |
-| `Hosting: STOPPED — the nodeterm API refused to issue relay tokens.`, then the key-proof sentence on a line of its own, then `Hosting stays off until nodeterm is updated or the key is rotated.` | `backend-refused` after two key-proof refusals in a row. See "Hosting refused by the relay's key proof" below. |
-| `Last error:` (or the `Earlier failure …` line) reading `key proof refused once (<kind>) — retrying with a fresh challenge` | One key-proof refusal. The next mint asks for a fresh challenge; a second refusal in a row stops hosting. |
-| `Hosting: ON — listening for teammates.` | An idle listener is registered. An "Earlier failure" line under it is history, not a fault. |
-| `Hosting: ON, but not reachable yet — retrying. Last error: …` | No idle listener and a recent failure: minting or the relay is failing, with backoff. |
-| `Hosting: ON — opening a listener.` | Starting up. |
-
-**The scheduler's rules**, since they explain most of what `status` shows:
-
-- Keep **one** idle listener registered. Refresh it 30 s before its token expires (measured on the
-  server's clock from the response's `Date` header), never sooner than 15 s. With the relay's
-  120 s host tokens that is one mint per 90 s, about 40 an hour while idle, plus one per peer that
-  completes a handshake (its listener is replaced).
-- Back off 1, 2, 4, 8, then every 15 s on failure. The backoff resets only on **proof the relay leg
-  works** (an idle listener held to its refresh, or a completed handshake), or on a fresh start.
-  **Never on a successful mint**: when the API is up and the relay is down every mint succeeds and
-  every socket dies, and resetting on the mint re-minted at round-trip speed (relay log,
-  2026-09-27).
-- A 429 waits at least 60 s (longer if `Retry-After` says so).
-- Every mint first asks the backend for a challenge and carries a proof that this process holds the
-  host key. A challenge that fails for any reason but 404/405 mints nothing and backs off. See
-  [Host key proof of possession](#host-key-proof-of-possession).
-
-**Common situations:**
-
-- **`host-key-unreadable`.** Hosting stays off and the key is **not** replaced (a new key would
-  invalidate every bookmark). Restore `host-key.json` from a backup and run `team init` (no restart
-  needed). Or, on purpose, run `team rotate-key` **and then `team init`**: a rotation on a service
-  that is not hosting (which an unreadable key means) leaves hosting off, and the CLI says so. Then
-  hand out new join codes.
-- **A corrupt `team.json`** is set aside as `team.json.corrupt-<ms>` and hosting starts **closed**:
-  no members, so nobody auto-reconnects. Recover with `team add-owner`. A file listing one key twice
-  counts as corrupt.
-- **`team.json` edited by hand while the service runs** is not re-read until the service restarts;
-  the next CLI write replaces it with the service's copy. Use the CLI.
-- **Two servers on one data directory:** the second one finds the admin socket answering, or loses
-  the race to bind it when both start at once, and **does not host** (it logs "Hosted team relay: NOT started — another nodeterm server is already
-  running on this data directory …").
-- **"The nodeterm server is not running (no admin socket …)"**: the service is down, runs with
-  another data directory (pass `--data-dir`), or predates this feature and needs a restart after
-  updating.
-- **"Permission denied on …admin.sock"**: run `team` as the service's unix user.
-- **The installer's daily auto-update** (unless installed with `NODETERM_NO_AUTOUPDATE=1`) rebuilds
-  and restarts the service: live tabs drop and reconnect, and pending requests are lost.
-- **Windows:** the admin channel is a unix socket, so both ends refuse by name. A team cannot be
-  created on a Windows Server Edition in v1.
-- **Hosting refused by the relay's key proof, or knocked offline by a join code** (see
-  [Host key proof of possession](#host-key-proof-of-possession) and [Threat notes](#threat-notes)).
-
-  *Refused by the key proof.* `team status` says `Hosting: STOPPED` and prints "The relay refused
-  this host's key proof — update nodeterm, or run `team rotate-key` if the key was replaced." on a
-  line of its own. The backend refused this host's proof on two mints in a row, each with a fresh
-  challenge; a single refusal only retries. The service log names the kind (`pop_invalid` or
-  `pop_required`):
-
-  - `pop_invalid`: the backend checked the proof and it failed. A single one can be a `POP_SECRET`
-    rotation, or two backend instances with different secrets, landing between a challenge and its
-    mint. Two in a row point at the backend (every instance must carry the same `POP_SECRET`) or at
-    a nodeterm bug: update nodeterm, and if it persists, run `team rotate-key` and hand out new codes.
-  - `pop_required`: the host proved its key once, so the backend latched it, and it is now refused a
-    mint that carries no proof. The current nodeterm does not stop on that: it mints without a proof
-    only when the challenge route answers 404/405, and reads `pop_required` there as a backend coming
-    back mid-redeploy. So a latched host that stops on it runs an **older nodeterm**, which never
-    proves; its `team status` shows `refused (403)` instead (a downgrade, or a copy of this data
-    directory under an older build). Update nodeterm. `team rotate-key` and new codes also bring it
-    back, because a new key is not latched, but only until `POP_REQUIRED_AFTER`.
-
-  `team rotate-key` restarts hosting in place, and so does the service restart that comes with an
-  update.
-
-  *Knocked offline by a join code.* With a PoP-enabled backend, a host that has proven its key has
-  its host-token budget keyed by that proof, so a code holder cannot spend it. What a code holder
-  can still spend is the **16 pending join slots** and the team's **10 daily device mints**:
-  teammates read "Too many join attempts for this team today. Try again tomorrow.", or, while 16
-  requests are waiting, "An owner declined the request." A host that has never proven (an older nodeterm, or a backend with
-  `POP_SECRET` unset) is exposed to all of R44, and `team status` may show `rate-limited (429)`.
-  Either way, give the host a new device id **and** a new key, then new codes:
+与团队分享为您读取此密钥; 在 v1 中, UI 中没有其它显示它 。
+
+文件是桌面首次主机“Team Access”邀请, 连接到另一个
+桌面的配对代码(New Remote Connection),加入主机团队或与团队运行Share. 配对
+a ** 手机** 不创建它;使用不同的密钥文件(`remote-host-key.json`) (中文(简体) ). 只有在
+文件真的不存在, 运行`team init`联合国`team info`对于一个后代代码,并粘贴一次(见
+[第一个连接] (#the-first-connection)); 加入时会花费一个团队共享设备薄荷.
+当你的桌面要求你读一个代码给一个所有者,`team status --json`将设备列表于`pending`联合国`peerKeyB64`和`sas`钥匙`sas`匹配您的快捷键, 按
+在提示上取消( 结束请求 Office) , 运行`team bootstrap`(或`team add-owner`与那个
+键,然后再次粘贴代码。 当密钥成为所有者时, 请求仍未总的说来
+升级后,它将等待10分钟。
+
+第一个连接
+
+在桌面上,选择 ** 新远程连接 ** (dock 或 QQK) 并粘贴`nodeterm://join?code=…`代码。 东道主已经信任一个主人的钥匙 所以它批准自己的一半
+没有任何人。 您的桌面还没有关于这个主机的记录, 所以它要求一次,与 SAS,"阅读"
+此代码为所有者“ ; 主机上没有人比较它( 主机密钥本身会被对照
+输入密码,按好 桌面将批准记录在它的书签上, 以及每个
+之后的连接会打开而不提示 。 与团队共享, 不使用此提示 ; 见
+[车主自己加盟跳过SAS](#车主自持-join-skips-the-s楠).
+
+请队友
+
+拥有者托管的标签有** Copy 团队邀请代码** 在命令调色板中;`team info`打印
+同一个代码。 连接代码只包含公共材料( 中继端点、 主机 ID、 主摈、 主机公钥)
+设备 ID, 标签 。 泄露的代码无法让任何人加入,因为每个设备的所有人仍然认可。
+它可以** 将主机下线, 并去除成员 谁泄露它不停止:
+见[恐怖记 (#威胁记).
+
+队友将其粘贴到新远程连接中, 并读取它显示的 SAS 给一个所有者(一个呼叫)
+或聊天。 拥有者的桌面显示“ 设备想要加入” , 使用相同的 SAS, 设备密钥
+指纹(密钥的前8个字符)和一个默认为**Viewer**的角色拾取器. 允许
+一旦加入者按下“确定”, 则授予选中的角色 。
+
+□ 与桌面上的团队共享
+
+** 与团队分享... ** 将桌面 ** SSH 项目** 变成同一主机上的主机团队,并带有此功能
+桌面为所有者。 它在工程标签的QQ菜单和会话侧边栏的项目菜单中
+(只有SSH项目),在QQK中作为"共享<名称>与团队",用于活动者. 虽然项目
+SSH 连接在下方的两个菜单项被禁用, 原因是“ 先连接此工程 ”
+(its SSH 连接已关闭)",而QQ行显示这个理由,运行时什么都不做.
+
+代码 :`src/renderer/lib/shareSshTeam.ts`(命令),`components/ShareTeamDialog.tsx`, (中文).`src/main/remote-ssh/share-team.ts`(单位:千美元)`shareTeam`IPC 动词,,,`src/core/remote-ssh/share-team-remote.ts`(每个命令运行在主机上,生成 shell)
+在真实中测试`/bin/sh`维基百科中的相关条目: 維基共享資源中相关的原始文献: 維基物種中相关的原始文献: 維基物種中相关的數據`src/core/relay/team-bootstrap.ts`和`team-resume.ts`。 。 。
+
+做什麽?
+
+1. 确保节点服务器作为您的SSH登录用户安装和运行在主机上. 这个
+安装它,当你确认, 当它不见了,太老了,不知道`team bootstrap`,或者没有
+答话 一个已准备好的服务器永远不会重新安装;它只是被探测。
+2. 以这个桌面为主人机设立托管团队
+([`team bootstrap`(#什么 -团队 -bootstrap -does).
+3. 将工程移至服务器核心并共享.
+4. 将终端交给服务器核心在履行。
+5. 以所有者身份加入团队:SSH项目关闭,团队的分页取代.
+6. 显示队友的邀请代码。
+
+队友从自己的桌面上加入代码
+([邀请 你自己的队友](#邀请-队友))),在电脑关机时继续工作.
+
+确定
+
+在按下** 份额** 之前,没有什么变化。 对话("共享 < name > with a team")说:
+
+- 主机和登录(`user@host`(三)
+- 安装器将做什么, 当它必须运行时 : “ 节点服务器将安装在主机上 :
+大约600 MB,从源头构建,作为一个系统化的-用户服务,每天更新自己"(或那个).
+它将被更新,或重新安装并重新启动。 更新团队已经存在的服务器
+添加"更新重启服务器;与之连接的队友被短暂断开";
+- **“开发者在<host>上获得一个“用户”的外壳,并且能够使自己成为拥有者;查看者不能”。 ** 这个
+服务器核心以您的 SSH 登录方式运行, 所以编辑器的终端和用户一样是 shell, 而 shell
+可以运行`team add-owner`(见[威胁注 (#威胁注));
+- 三个列表: "这些代理在服务器上继续:","这些终端运行的东西
+将停止:"和"这些特工不会恢复——用手恢复:".
+
+安装器的输出流进入对话框; 构建需要很多分钟, 桌面等待
+30个 桌面在运行前将安装器下载到临时文件, 绝不管道它
+输入`bash`: 无`pipefail`,一个失败的下载管道,一个退出 0 的空脚本,它将
+读作成功的安装。 ** 取消** 停止安装并结束该共享 。 不管怎么样
+安装器已经在主机上停留, 而工程尚未被触及  我爱它 。
+
+QQ 继续哪些终端
+
+项目的每个终端都会被移交: 它在这个桌面的远程 tmux 套接字上的会话
+(单位:千美元)`nodeterm-rmt`)结束,节点在服务器核心的项目副本中存在.
+
+- **当其代理人被收回时,代理人继续谈话 2 。`RESUMABLE_AGENTS`) 及其分类
+或或(或或或(或或或或(或或或或(或或或或(咗) 或或或或(或或或(或或或或或(或或或或(或或或或(或或或或或(或或或(或或或(或或或(或或或或各种各样(或或或或或(或或或或或((或或或或或或或或或(((((或或或或或或(((((或或或或或或((((( 74.((程序(程序(程序(程序(程序程序(程序(程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序(程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序(程序(程序程序(程序程序程序程序程序程序程序程序程序((((程序程序程序程序(程序程序程序程序( 我真(程序程序程序程序程序程序程序(((程序程序程序程序(程序(程序程序(程序程序(程序程序(程序程序程序程序程序(程序(程序程序(程序程序(                      咗                                                 各种各样                                                   74.                                                                                           我真                                        `--resume`(单位:千美元)`claude --resume <id>`, (中文).`codex resume <id>`,...),在项目许可模式下,在核心的 tmux 套接字上,在其中
+每个队友都有状态
+- ** 有些特工没有恢复**,确认名单各有其理由:
+(服务器核心无法将这个桌面的账户目录映射到它自己的账户),
+"还没有恢复谈话"(从未报告过会话ID),"这个特工不能是...
+(例如,海关代理)。 从球队的标签上用手来恢复它们. 主机标签
+从来没有恢复 代理本身。
+-** 普通终点站的流程停止。 ** 这份确认单上列出每个人的面板在运行
+比贝壳。 它的节点会留下; 下次编辑器打开它时, 它将会是服务器上的一个新 shell
+核心键。
+
+交接,顺序
+
+命令是安全财产。 在服务器接收项目前没有终端结束 。 无代理
+在其旧会话可能仍在运行时在服务器上启动:一个对话的两个进程
+将笔录互留。 而一旦服务器拥有项目文件,这个桌面就永远不会写出来
+再来一次
+
+1. ** 在接触宿主之前,首先提出答复。 ** 一个特工在工作,在等待一个
+即时许可,或持有问题或批准,无人回答(答复国)`working`, (中文).`blocked`或`waiting`; 一个代码批准提示和一个打开的 AskUser 问题`waiting`,一个完成的转弯是`done`)拒绝分享:"等待这些特工完成积极合作(或
+停止他们,然后再次分享", 与特工名单。 用手在平原上发射的毒剂
+终端也算数( 状态商店知道), 尽管只有一个作为代理创建的节点
+已恢复。 一个连接在另一个主机的终端 而不是项目拒绝, 命名每个,
+因为交接会"停止"在项目主机上(在没有会话的地方),并留下它
+运行在哪里。 200多个终端也被拒绝。
+2. **Probe**,一个生成了对项目控制Master的指令:操作系统与登录、git和
+卷曲,哪个单位运行节点服务器,用哪个二与社会版本,它是否知道`team bootstrap`,它是否回答, 家目录和项目的真实路径
+文件夹,以及每个桌面的远程窗格正在运行的内容。 拒绝在此终止( 见
+[背书] (#背书). 主保持这个探测器,并在以后的每一步前重新阅读它的计划:
+只安装一个不拒绝的计划, 靴子和恢复只用于准备的。
+3. ** 确认。 ** 取消任何更改 。
+4. ** 谈判中** 只有在需要时,然后再次调查。 服务器现在谈判中必须准备好, 否则共享停止
+没有改变。 安装完0后 答题会得到3个探测器 2s
+分开, 因为重新启动的服务可能无法回答`team status`即时. ** 于2008年1月1日至12月31日期间撤销。
+安装此共享结束( 对话框将焦点放在自己上, 而不是放在取消上, 所以一个偏差 )
+输入不会停止长时间安装:没有第二个探测器,没有保存、标记或关闭的任何信息,以及
+结果说"安装被取消了,所以没有共享. 主机可能会保留一部分
+安装了节点服务器;下一次安装将替换它".
+5. ** 拯救帆布,再读一遍。 ** 安装需要很多时间。 如果代理成为
+同时繁忙,或者一个终端被添加或删除,共享的停止没有改变(
+上面忙着拒绝,或者"画布在准备股份时改变了. 没有改变;共享
+”)),",". 其余的交接工作就是这个
+6. ** 项目移交,正在进行** (`handedOffTo`还没有主机),并保存,所以没有
+后保存在这个桌面上将工程映射到主机中.
+7. ** 将待处理的镜像写成并读出东道主的`project.json`回来。 ** 每个节点
+工程,现在再读一遍(刻度、音符、帧),必须在里面,因为文件是
+服务器采纳 。 如果缺少一个,则份额停止:"主机上的画布没有更新(N.
+节点缺失). 没有改变;
+8. ** 关闭SSH项目**,无损:它移动到"最近关闭",及其tmux会议
+继续跑
+9. **`team bootstrap`** 作为登录用户,文件夹的真实路径来自主的探测器(The
+渲染器名称无文件夹).
+10. ** 记录移交情况**:`handedOffTo`现在给团队命名( N)`hostId`)和项目编号在
+服务器。
+11. ** 会议结束所发挥的作用。 ** 一个生成的命令杀死所发挥的节点
+桌面的远程套接字`nodeterm-rmt`,精确目标`=nt-<id>`),然后询问 tmux 是否
+每个都不见了。 一个会话只有在 tmux 本身说它不存在时才会算作已消失: tmux
+也因为版本不匹配或套接字可能无法打开而退出 1 , 并且此值也失败 。
+永远不要服务器核心的套接字( N)`node-terminal`:它的届会是开始的。
+中煞, ,`team resume`** 届会结束的复职人员,名单在Stdin。
+13. ** Join**,并忆出邀请码。
+
+媳妇,从第六步开始的失败`team bootstrap`成功,收回标记,并重新打开
+如果第8步关闭了SSH项目:"SSH项目重新开放;没有改变". 如果是这样的话
+撤销自己失败,结果却说:项目可能仍然关闭,仍然携带
+以圆镜示戒,然后,从《古兰经》中揭开,
+这个 一个没有服务器代码的靴子陷阱(连接被丢弃,或者它超时)也说:
+主机可能已经设置完毕, 并再次运行共享与团队。 成功过后
+SSH项目从未重新打开过, 因为服务器核心现在写着项目
+文件和重开的SSH项目将是第二个作者。 相反:
+
+- 未确认已消失的会议可能仍在进行,因此没有恢复会议;
+结果将它列在“仍在 SSH 上运行( 未移动 ) ” 下 。 一个完全失败的杀戮命令
+列出那里的每个终端;
+- 服务器拒绝的复数列在“不恢复:”下,有服务器的理由;
+- 一个无法保存书签的加盟 书签可以自己重新连接 结果说"这台电脑
+将加入团队;其标签在连接时打开". 如果书签无法播种,
+加入要求 SAS 像一个粘贴代码。
+
+###`handedOffTo`重新打开
+
+移交只记录在这个桌面上, 在工程的工作空间索引条目中
+(单位:千美元)`handedOffTo`,从共享`project.json`)),它能存活下来重启. 摆好了,这个
+桌面从不将工程文件映射到主机,从不调节,从不包含在
+对相连的SSH项目进行了15次民意测验,从未在手机上写过它的板 sẽ不推
+工程设置: 服务器核心的画布权威是文件现在是一个写入器. 标记教益
+主机是开始和没有完成的交接,同一守护程序 我听说了
+
+重新打开“ 最近关闭的” 项目, 使用 QQT, 或者打开相同的主机和文件夹 。
+SSH项目再次,首先警告:
+
+> < name > 被交给<host>上的团队 > 。 服务器保留其画布并持续运行
+> 代理人,即使在未分享之后。 在这里打开可以覆盖两个编目
+> 彼此, 其代理将启动服务器运行的相同对话 。
+> 翻译:
+。 。 。 它的特工不会自动恢复
+
+警告没有其他方式可以故意离开:`team unshare`只停止共享项目,
+服务器保留它及其运行的代理,所以团队标签(一旦未共享就不再)或
+命令将工程返回到此桌面。
+
+或,对于尚未完成的移交:
+
+> 共享 < 姓名> 与团队未完成 。 如果服务器已经接管, 打开这里
+> 给一个画布两个可以相互覆盖的编辑器,其代理将启动相同的
+> 正在运行服务器的对话 。
+> 翻译:
+打开它,反正? 它的特工不会在这里自动恢复
+
+** 无论如何在此打开** 收回工程: 标记已清除, 此桌面写入文件
+再来一次 它的代理节点然后跳过它们的自动冷还原 ONCE:股份结束了他们的SSH
+届会,因此每次会议将按其他方式进行`claude --resume <id>`超过SSH(或其代理人的等值)
+在服务器运行相同对话时,有两个进程附加到一个记录。 每一个这样的
+节点是这样说的 ("没有恢复 : 此工程与团队共享, 而它的服务器可能正在运行此程序 。
+谈话。 只有在泻药停在那里之后 才恢复这里" 恢复这里就由你决定
+跳跃被保存在记忆中,从来没有写,所以它不能跟随节点ID到球队的标签,
+持有同样的身份证明。
+
+经过一股后,关闭的SSH项目和团队的标签持有**同名节点IDs**(他们是
+tmux 会话名称,由服务器保存). 每个“去节点”(通知,会话)
+边栏,QQK,队友的面孔,棋盘上的重命名)前往拥有在其中的节点的项目
+此命令:一个在关闭之前的开放项目,一个在关闭之前没有移交的项目。
+(单位:千美元)`lib/nodeOwner.ts`) (中文(简体) ). 因此,它降落在球队的标签, 从来没有在重启的警告。 一个关闭的团队标签
+拥有节点:随着球队的标签被关闭,它会进入SSH项目,其重开的警告先问. 删除已关闭
+SSH 来自“ 最近关闭” 的项目保持了每个节点的代理状态 ID 另一个项目的代理状态
+别动
+
+* 主人自己的参赛者跳过SAS
+
+一个粘贴的代码使你读到一个SAS给一个所有者([第一个连接](#第一个连接)). 与
+团队没有。 客户的自动确认 读一件事,书签的`approvedAt`(为东道主提供)
+键,书签用;`hosted-join.ts`),通常只有人类在SAS之后还好
+比较它。`shareTeam.seedBookmark`是一位作家,没有一位作者:
+新书签`approvedAt`(贴标签)`source: 'ssh'`),或当同一主机代号的书签
+和主机密钥已经存在, 设置`approvedAt`并保留其设备标志和标签
+(单位:千美元)`source: 'code'`留下来`code`) (中文(简体) ).`source`仅是一个标签;没有阅读它来决定。
+
+这是安全的,因为什么`seedBookmark`给出: 联合代码`team bootstrap`刚刚
+返回 SSH 频道, 其主机密钥`known_hosts`已经认证 。 那个
+代号为它被刻制的中继键( )`decodeJoinCode`检查主机 id 是散列
+这是用眼睛比较SAS数字的保证 主要执行该输入:
+种子只有代码成功`team bootstrap`在此应用程序运行期间返回( 每个工程, 以
+),并拒绝任何其他代码,无论多么有效,因此加入比较SAS. 主办方同意
+它自己的一半 因为你的钥匙是所有者`team.json`如果种子失败,参赛者要求
+SAS就像一个粘贴的代码。 每一个加入,一个粘贴代码或一个
+队友的,仍然比较 SAS。
+
+拒绝
+
+当... 当... 当桌面说...
+|,|也.
+QQ SSH 连接已下调 QQ 菜单项禁用:"先关闭此项目(its SSH连接已下架)". QQ
+一个特工正在工作,被封锁,或等待绽放问题或批准,“等待这些特工完成(或阻止他们),然后再次分享。”
+QQ  Pennsylvania 终端运行在另一个主机上,而不是藜麦项目"这些终端运行在另一个主机上:<titles>. 关闭或搬出这个项目,
+QQ 终端被添加或移除,或者代理商变得忙 哈哈,而该共享正在准备中 QQ"在准备共享时画布改变了. 没有改变,再次分享。" (一个忙碌的经纪人得到忙碌的拒绝)
+200多个终端 "这个项目有200多个终端; 与团队的手柄分享最多这么多。"
+QQ SSH 登录为 root QQ" 此SSH 登录为 root. 发扬团队以自己的用户身份运行节点服务器,因此登录到项目中作为常规用户,再试一次". QQ.
+QQ 主机有一个root(系统)安装QQ"这个主机作为系统服务(root)运行节点-服务器. 与团队共享需要每个用户安装;见docs/托管-team-relay.md". QQ.
+及早发布 QQ 主机不是Linux QQ "与团队共享需要Linux主机(nodeterm-server运行于Linux)". QQ
+QQ 项目文件夹在主机上缺失 QQ "项目文件夹不存在在主机上" QQ
+QQ 项目文件夹是您的主目录( 一个新的 SSH 项目开始于`~`)QQ"这个项目的文件夹是您的家目录. 团队中的每个人,包括观众,都可以阅读其中的每个文件. 将项目移动到自己的文件夹中,然后分享它。"
+++ 项目文件夹是`/`或包含您的主目录“ 此工程的文件夹包含您的主目录 。 团队中的每个人,包括观众,都可以阅读其中的每个文件. 将项目移动到自己的文件夹中,然后分享它。"
+QQ 主机主机主机目录无法读取QQ"Could not read your home 目录在主机上,因此与团队共享无法检查此项目文件夹是否安全共享. 再来一次
+QQ git或卷曲缺失,安装者必须运行QQ"在节点服务器中需要Git和卷曲在主机上"(缺失:...).
+QQ 文件夹路径包含`'`或`\`QQ"文件夹路径包含一个引号或反弹,无法安全传递到每个登录 shell" QQ
+QQ 主机无法启动 QQ "Could not share:" 和服务器自己的咨商句, 例如“ Hosting 无法启动 : ... ” 和继电器的理由, 或者“ 节点服务器正在关闭 。 主机尚未启动";SSH项目重新开放. |
+
+页:1 root 登录被拒绝,因为安装器会为root安装一个系统,而
+然后服务器核心会把根 shell 交给每个编辑器 。 已经运行系统安装的主机
+仍然可以手控一个团队,作为root([Setup over SSH](#setup-over-sh)). 分享给
+桌面取而代之,先移除系统安装(其服务、更新定时器及其单位文件)
+下级`/etc/systemd/system/`)和再次共享,它安装了每个用户的服务器;没有root的
+团队或数据被结转。
+
+共享主机上的代理钩和发现文件(已知漏洞)
+
+共享后, 两个节点作者将相同的文件保存在同一下`$HOME`: 服务器核心( 它)
+运行为您的 SSH 登录) 和此桌面`RemoteHooks`(单位:千美元)`src/main/remote-ssh/remote-hooks.ts`页:1
+对于SSH的任何项目 它仍然有在那个主持人。 现接受v1,并全部在此说明。
+
+** 他们分享的东西。 ** 都指向每个代理商的钩状配置(`~/.claude/settings.json`, (中文).`~/.gemini/settings.json`, (中文).`~/.codex/hooks.json`,.)在同一个全机脚本,`~/.nodeterm/agent-hooks/<agent>.sh`(单位:千美元)`src/core/agents/hooks/install-helper.ts`
+`managedHookScriptPath`, (中文).`codex.ts`因为`scriptPath`) (中文(简体) ). 配置没有获得第二个条目,因为`mergeManagedHook`将每个带有我们标记的条目剥离,然后添加自己的标记;在版本下
+介以便向二之间,最后的作家事件设定是左侧的. 脚本读了`$NODETERM_HOOK_ENDPOINT`当它运行时,每个窗格都带有自己的:SSH项目的会议
+命名桌面的反隧道端点( N)`~/.nodeterm/hook-endpoint-<projectId>-<owner>.env`), (中文(简体) ).
+服务器核心的名称`<dataDir>/hook-endpoint.env`通常,每届会议向其本身报告
+核心; 当一个会话的结束点已死时, 脚本的故障翻过该会话上的其他结束点文件
+主机,所以一个下方隧道的桌面会话可以将其事件交付给服务器
+结束点代替。
+
+* 何谓碰撞。 ** 两位作者不写相同的字节:
+
+- 钩脚本 服务器在其中烤出一个 Codex 线程识别前奏, 指着它自己的
+数据目录;`RemoteHooks`无`REMOTE_IDENTITY_ROOT = null`) (中文(简体) ).
+- 发现文件 在启动时, 服务器默认会写入上下文链接技能
+(单位:千美元)`~/.claude/skills/get-linked-context/SKILL.md`及其标记区块`~/.codex/AGENTS.md`, (中文).`~/.gemini/GEMINI.md`打开代码`AGENTS.md`,所有命名它自己的shimunder`<dataDir>/context-links/`; 使用服务器帆布控制,也可以使用`manage-nodeterm-canvas`技能
+(系统和管理下的账户)及其区块,命名`<dataDir>/canvas-control/nodeterm.sh`。 。 。
+同样的前奏`RemoteHooks`写同样文件,命名其中性`~/.nodeterm/context.sh`和`~/.nodeterm/nodeterm.sh`,没有。
+
+** 每个人写时。 ** 服务器,每次启动(碧玉每天自动更新重新启动,除非
+关闭。 桌面每次设置 SSH 工程时都会重写勾钩脚本
+该主机,它连接 并再次在每一个钩洞修复; 它的代理工具新鲜
+检查重写任何在连接、每条隧道修复上 与它不同的发现文件,
+当主机上的项目保持连接时 每小时一次 最后一位作家获胜.
+
+** 谁受影响。 ** 只有代码节点 服务器核心运行 在共租模式, 并且只有他们的
+工具贝壳:从 Codex 共享的应用程序服务器运行、携带`CODEX_THREAD_ID`没有`NODETERM_*`环境, 需要前奏 找到它们的节点。 根据桌面的复制件,
+这样节点的钩子没有报告(脚本退出它)`NODETERM_NODE_ID`及其壳体
+呼叫画布和背景shims 无法说出它们来自哪个节点。 这是国家的权利
+共享到已运行的服务器后( 在服务器上连接的桌面)
+))),并且每当桌面稍后重新提供副本时,直到服务器的下一个开始. 每个
+其他的面板,在两个核心上,都带有方面的努力环境的终点,并且与两个复制件一起工作。
+
+□ 角色
+
+从`src/core/relay/access-policy.ts`。所有者和编辑通过每次检查(编辑器是
+外壳访问,所以它会是剧场; 查看者和评论者只得到** **什么`VIEW`页:1`COMMENT`列表中,每个选项都有自己的参数检查。 其他的,包括每个频道
+以后,只有编辑,直到有人另作决定。
+
+* * 能力 * * 查看 * 评论 * * 编辑 * * 拥有者 * *
+|,|也.
+见共享项目的画布、存在和光标(`workspace:load`, (中文).`presence:hello/cursor/focus/project`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}你觉得呢?
+观看一个共享项目的终端 已经运行 \ \ \ \ \ \ \ \ \ \ \ \ \
+在共享项目内读取文件
+QQ 读取一个共享工程的 git 状态( 状态, diffs, 历史, 文件版本) QQ , 只有当项目是它自己的仓库的顶端文件夹时 QQ 和 Viewer 相同 QQ QQ QQ QQ 时 。
+阅读一个共享项目的董事会日志
+QQ 光标聊天( C)`presence:chat`)是个好选项。`board-log:append`) - | | |
+QQ 键入终端,启动终端,写入文件,每个git突变,画布编辑,设置,证书,日志 GitHub QQ       
+=================================================================================================兼任==============================================================================
+
+`relay:hosted:self`(呼叫者 我们会向任何成员开放) 那个`relay:hosted:*`动词是
+被拦截者`hosted-service.ts`在查阅表格之前,每一名法官都对打听者本人的
+会话键** 在团队商店。
+
+**"读书"不是"安全":每个收视频道都携带自己的支票. **
+
+* 频道 * * 查看者/评论者可能做的 * *
+|,|也.
+|`pty:create`只为共享项目的节点. 选项重写为`persistKey`, (中文).`cols`, (中文).`rows`和`viewerId`外加时`joinOnly: true`页:1`sizeVote: false`其它一切被剥离,包括:`sshRemote`在存在探测器中, 它们的恒星会运行在宿主身上。 仅连接生成新会话答案的创建`unavailable: 'join-only'`。 。 。 。
+|`pty:resize`将“不看”改写为“不看”。`null, null`:一个查看器的窗口从不大小共享终端. |
+|`pty:flow`只恢复:暂停会冻结每个人共享的进程。 |
+|`pty:kill`QQ 解析呼叫者自己的视图; 会话持续运行. |
+|`pty:capture`, (中文).`pty:read-scrollback`, (中文).`pty:pane-command`只有共享项目的节点。
+|`pty:tmux-status`允许。
+|`fs:list`, (中文).`fs:read`, (中文).`fs:read-binary`, (中文).`fs:exists`路径必须是绝对的,在共享项目的cwd(也是recorpathed)内 **窘境。 在项目内部植入的联结 指出它的是外部。 一个共享的项目,其文件夹是磁盘根 我觉得你的家目录,或者这个服务器的数据目录的祖先是** 根本不是根**(`core/relay/share-root.ts`,安全审计F4):其下的所有文件都可以读取,`~/.ssh`包含在内,所以它没有下面。 在此之后,无论一个路径在其中解决的地方都会拒绝这个服务器的数据目录(一个项目内植入的符号链接):"维维尔无法读取这个服务器自己的数据文件夹". 它拿着主机钥匙`team.json`每个终端的回滚快照和未共享的画布 对于一个git cwd, 和一个文件,`git:diff`。 。 。 。
+|`git:status`, (中文).`git:repo-root`, (中文).`git:history`cwd像一个读取的文件一样被囚禁, ** 和 ** 包含它的共享项目必须是它自己的寄存器的顶端文件夹: a`.git`持有的目录`HEAD`或工作树`.git`文档。 一个空的`.git`目录,或`.git`symlink 到一个不是寄存器的文件夹, 不计数 : git 跳过它并使用附件寄存器 。 否则:"Git只在作为自己寄存器的顶级文件夹的项目中提供给观众,从不在更大的文件夹的子文件夹中". 光是监狱就无拘无束:`git status`和`git log`报告整个存储器,以及`git show <ref>:<path>`读取`<path>`从存储器的顶层, 所以从共享`repo/shared/`查看器可以读取`repo/secret/key.txt`。 。 。 。
+|`git:diff`cwd(上面有寄存器规则) ** 和 **瓷器被禁锢; 路径图从`:`拒绝; 未跟踪的 diff (`git diff --no-index`,该路径将显示任何文件)需要内部真正的路径。 文件相对cwd,而不是寄存器的顶级. QQ
+|并为此,`git:show-file`Cwd被关进监狱,上面有寄存器规则;一个裁判从`-`被拒绝(将成为一种选择,以及`--output=`写一个文件). 允许任何其他修改。 |
+|`agent:subagent-snapshot`QQ 响应被修剪为共享节点 。 @ info
+|`board-log:read/subscribe/unsubscribe`(+ 数)`append`QQ 共享项目。 注释`append`必须是评论(`kind: 'comment'`:活动条目("移动卡到Done")是只编辑器. 条目缩小为注释本身的字段( Q) :`id`, ,( 荫影)`ts`, ,( 荫影)`author`, ,( 荫影)`kind`, ,( 荫影)`text`, ,( 荫影)`nodeId`),附件按对等键(每2秒1个,每分钟32个基B,`core/relay/append-budget.ts`:日志保持一个旋转生成(4 MiB),以及用来旋转项目真实历史的洪水(安全审计F3). |
+
+** 从保存的画布中读取一个节点在**中的哪个项目(`WorkspaceStore.projectIdsForNode`) (中文(简体) ).
+节点 ids 在 git- shared 项目文件中旅行, 所以一个 id 可以坐在几个项目中; 它算作
+只有在**所有**项目持有时才共享,从不由任何先出现者共享。
+
+** 外延也是逐项违约。 ** 核心广播给每个客户端, 所以一个非编辑
+只接收事件`VIEW_EVENTS`列表 :`canvas:mut`, (中文).`workspace:external-change`页:1`server-change`和`project-trust:changed`用于共享项目;`agent:status`联合国`agent:unread-clear`用于共享节点;`agent:subagent-activity`子剂共享节点
+开始;`context:update`(按有效载荷计算)`nodeId`,则通过
+代理-状态镜像的会话 ~ 节点记录; 无法属性的更新被删除 ;
+每个会期的pty频道,只有会议订户收到;`board-log:changed:<id>`页:1`project-setup:event:<id>`用于共享项目。
+
+** 每对同行重写存在** (`createPresenceFilter`,安全审计(a):`presence:sync`和`presence:peer`载有每个客户端的工程, 焦点节点, 输入节点, dino节点和活光标
+为核心上的每个项目聊天, 也告诉同行工作的确切 天啊!
+共享。 非编辑者现在只看到项目共享的同行,在项目外有任何节点参考
+共享项目已失效; 移动到共享项目的对等点将宣布`join`(其光标)
+与另一个将之清除的项目进行聊天,`leave`。编辑器得到的溪流不变;a
+角色更改在下一个存在事件上重新发送整个列表。
+
+** 终端由每个帧的节点判断。 ** 终端输出和`pty:resync`(重新油漆
+屏幕)只到达一个非编辑器,而** ** 每一个持有会话节点的项目都是共享的。`pty:size`, (中文).`pty:exit`, (中文).`pty:closed`和`pty:recycled`一旦节点被任何
+无法共享(或根本没有项目)的项目; 已经结束的会话
+仍然通过,因为所有他们桦附的事实。
+这就是为什么`team unshare`停止终端 查看器已经在监视:列有订阅
+它本身比不共享的寿命长, 但没有什么更多的终端交付给它。
+
+渲染器反射两个允许列表`@shared/hosted-access.ts`(单位:千美元)`bridge/hosted-gate.ts`用主机的话来说,在本地回答一个被拒绝的呼叫,而警卫测试将镜像钉上等于
+主持人的桌子。 镜是方便;宿主是边界.
+
+□ 连接和重连接(桌面)
+
+连接代码运行`joinHostedTeam`在主要进程中:
+
+是否可以解码和验证密码:主机ID必须来自主机密钥,中继必须是: 1.`wss:`(或`ws:`)),以回转. 同样的规则也适用于API手背的端点.
+2. 在** 任何薄提供技术咨询之前装入此桌面的对等密钥, 所以锁定的密钥环成本不高 。
+3. 获得设备代号:书签代号,否则**1**新鲜`POST /v1/relay/device`设备
+ID发送是`<machine id>:<hostId>`后端拒绝重新登记设备编号
+在自由阶梯上的第二个主机。
+4. 将其换成客户代币(`POST /v1/relay/join`A级`401`在一个固定的纪念物上,可以赚到一个再薄荷;
+(单位:千美元)`403`没有收入。
+5. 与编码钉上的主机密钥连接。 核心中继客户端为**无针店**;
+书签是书签的`approvedAt`。 。 。
+
+书签`<userData>/relay-bookmarks.json`(0600美元,每笔1美元)`hostId`: 联合代码,
+标签,设备符号,`approvedAt`和`source`。只有在`approvedAt`设置了****,** 代码中正好载有它记录的钥匙。 拒绝设备的主机
+(拒绝、删除、过期)`approvedAt`,所以下一次尝试再次显示 SAS。 那个
+指示牌从不发给制造者。
+
+设备符号无法保存时, 从未刻制 。 在薄荷之前,书签文件必须
+可读和可解析及其目录可写; 其书写仍然失败的符号被保存在
+其余应用程序运行的内存 。 在同一支球队中加入第二支球队时 的数目还在下降
+加入答案`E_JOIN_BUSY`。 。 。
+
+** 重新连接,如:
+
+- 在靴子,每一个**批准**书签 重新连接在背景。 没有灰色标签;
+标签在连接获得批准后显示。
+—— 没错,一个直播主机标签,从主机的重新连接中毫无理由的连接下降. 这个
+先等1秒,然后最多试5次(1、2、4、8、15秒,总共约30秒),然后停止
+用一个通知(“Couldn't reconnect to X. 点击它的标签再试一次”). 点击是新鲜的
+尝试。 重新连接的靴子说要粘贴邀请密码
+- 未处理的尝试(启动和重新连接)`E_JOIN_NETWORK`在1,2,4,8,15秒,然后,
+每60秒,以及`E_JOIN_THROTTLED`不得早于60秒(或重试后蔷薇,封顶10分钟),
+每场比赛公布一次 没有其他的重复, 一个粘贴的代码从不重复: 它被告知一次。
+- 关闭或删除标签将取消其团队在任何阶段的尝试。 最多一次尝试和一次尝试
+每个团队都有直播连接。
+- 贴在灰色标签的代码 必须是该标签的团队。 另一个团队的代码是
+拒绝("邀请代码是Y的,而不是X. 要加入 Y, 在新远程粘贴代码
+)),因此一队从不挂在另一队的标签内.
+- ** 忘记主机组:<在调色板中的名称>删除书签并停止重新连接。 这个
+更改主机上的任何内容; 设备保留一个成员直到`team remove`。 。 。 。
+-`docs/remote-sessions.md`) (中文(简体) ).
+
+** 参赛者被告知什么** (`@shared/relay-join-errors.ts`对于代码,`lib/hostedTeam.ts`(单位:千美元)
+判决:
+
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}=================================================================== -=================================================================================================================================================================== 用户所看到的 QQ
+重新审查.
+|`E_JOIN_BAD_CODE`QQ 代码不解码或校验QQ 否"X的邀请代码无效. 问房主要新鲜的代码。
+|`E_JOIN_REFUSED`|`/device`拒绝(不是429 或 5xx) , 被拒绝的新铸币符, 或无法读取/ 无法读取的书签文件 # # # # # # # # # # # 无法加入 X : " + 主句( 它在成为原因时命名文件) # # # # #
+|`E_JOIN_RATE`|`/device`429个无`scope:'ip'`:免费的每日设备-薄荷坝工QQ没有QQ"今天太多人加入尝试X. 明天再试一次
+|`E_JOIN_THROTTLED`A 429号机`scope:'ip'`打开`/device`,或任何429开`/join`:每IP限制器(每分钟30分钟) QQ是的,###60s没有注意:"节点服务商定限制来自这个网络的请求——在一分钟内重试"(每连试一次). 一个粘贴的代码:"...再试一分钟"。
+|`E_JOIN_NETWORK`QQ 获取失败或超时, 一个 5xx, 一个错误的回复, 一个转发端点 桌面不会拨号, 任何出乎意料的 QQ 是 QQ A 粘贴代码 : “ 无法到达 X:... ” 。 无人看管的尝试在无通知的情况下不断重试。
+|`E_JOIN_REVOKED`|`/join`403:后端取消了此设备QQ没有QQ"此设备对X的访问被取消了. 移除队伍,再次加入 新的邀请代码", 并有一个 ** 退出和重新加入** 行动QQ
+|`E_JOIN_KEY_LOCKED`QQ 装入此桌面的对等键失败: 锁定的密钥环, 或任何其他读取失败`remote-peer-key.json`QQ 不“ 无法装入此设备的身份加入 X: " + 加载器的句子( 对于一个锁定的密钥环, 如何解锁) QQ
+|`E_JOIN_BUSY`我们为同一支队伍而加入的另一支队伍仍在运行中,
+
+一旦连接起来,东道主自己的拒绝就到达加密隧道上空:"一个主人拒绝了.
+,"没有所有者及时答复了请求"(第一个加入等待主机的10分钟).
+等待窗口)和"你进入这支队伍被一个主人取消了". 当一个山仍然
+2.5s之后未获批准,标签上写着"等待X的拥有者批准这个设备......的例子".
+
+□ 主机标签
+
+主办团队在主办单位的工作空间顺序中,每个共享项目显示**一个标签**,全部由
+团队的一个中继连接( Q)`lib/hostedTabs.ts`, (中文(简体) ).`lib/hostedTeamTabs.ts`) (中文(简体) ). 标签的编号**是**
+主机的项目 id: 中继 api 翻译无 ids, 所以在任何其他 id 下的一个标签会询问主机
+关于一个它不知道的项目 替换该 ID 在关于前标签的封闭副本;任何其他
+您所持有的 ID 的项目被跳过, 从未重新命名 。
+
+- ** 份额变化为直播。 ** 无论何时`sharedProjects`变动(`team share`, (中文).`team unshare`, (中文).`team bootstrap`),主机发送`relay:hosted:shared-changed {projectIds}`连接到每个连接
+包括查看者在内的会议,以及一个设备作为查看者,因为它的批准可以
+没有被写入。 桌面打开一个新共享项目的标签, 没有新代码和
+没有新的批准,并关闭未共享的标签;主机上没有删除任何内容。 一个标签
+标签栏末端添加了打开的共享事件。
+- ** 一个标签,你关闭 保持关闭** 而项目保持共享, 其余的应用运行。 一次
+主人解除了它 解雇被遗忘, 所以分享它再次打开它。 一个封闭的团队
+选项卡在此计算机上永远不会重新打开:一旦关闭其中继连接,则重新打开
+可以在电脑核心上挂载主机的会话 “ 最近关闭的” 未列出标签
+或闭会, 和任何其他回路(QQT, 通知,QQK, 队友的脸)
+拒绝使用“这个团队标签被关闭在这台计算机上。 加入球队后又打开了
+重复(先关闭其他标签),或当团队停止共享项目并共享时
+再来一次" 这两张是它带回来的: 重新连接球队的其他标签 保持它解除。
+-** 一个没有共享的团队保留一个占位符**, 以团队命名,所以团队留下
+可见且可重联. 第一个共享项目取代了它.
+- 一个连接,所有标签。 一个空的连接 灰色所有一个团队的标签在一起。 重新连接
+以 id 重用灰色标签( 其节点及其在标签栏中的位置)
+并删除项目未分摊的项目。
+- 当你看的标签走了,你降落 在另一个球队的标签。
+
+该角色和以前一样,每个连接读取,所以一个角色覆盖了一个团队的所有标签.
+
+□ 业主批准
+
+- 钥匙不在的装置`team.json`成为**等待请求**: 等待,sas,
+perKeyB64,自}`. 它发送到连接的**所有者** 从来没有广播,所以一个观众从来没有
+学会了敲门 后期接通的车主 被送去还开着的车 然后拉起来
+再次挂载( O)`relay:hosted:pending`),因为重播可以在制表符前降落
+订阅。
+- 最多******个请求,每个设备密钥(较新的连接取代旧的),**16**个请求。
+曾经 请求在 ** 10 分钟后** 或加入者的套接字关闭时过期 。 待处理的请求
+生活在内存中,所以一个服务重启会将其丢弃对实现. 只有书签( 已经批准) 重新连接
+自行重试;粘贴代码的加入器为"Could not open X:继电器连接".
+在批准之前就关闭了" 再贴一次
+- 所有者从**台式机**主机标签中回答。 对话框队列请求(按键)`pendingId`, (中文).
+第一位). 绝不批准, Escape 只在对话框有武装且从未打开时才拒绝
+并集中土地于拒绝。 当两个所有者回答一个请求时, 拒绝第二个允许
+(第一个站着),但一个**Deny比一个更早的允许**直到请求实际打开:
+继续等待加入者自己的 OK 和针头写, 和一个拒绝登陆
+窗口拒绝设备。 屏幕上还显示一个迥然关闭的请求的主人
+"另一个主人回答了这个要求".
+- 只有在** 人类确认后才能批准。 否认或到期的土地,同时
+pin 正在被写入胜负: 写入被跳过, 或者被收回 。 获得团队参赛权的钥匙
+同时(a)`team add-owner`同一密钥)保留该条目:批准书写无.
+- CLI没有****批准动词。`team status`请求批准
+从所有者的桌面。 CLI承认设备的唯一方法就是`team add-owner`,这就是它
+一个主人。
+
+□ 共享画布权限
+
+在拥有团队的服务器上,**canvas权威**(`src/core/canvas-authority.ts`这是
+每个共享项目的画布**内容**:其节点、桥梁、绳索和板件
+(栏,牌,牌元数据,标签,保存视图). 客户端的编辑到达它作为`canvas:mut`操作; 服务器版标签仍然发送全工作空间保存, 但其中的内容是
+上面有当局的(输入2),只有一个节点太大,无法旅行,因为行动是从
+他们。 核心的反射器将每个操作按一个总顺序排列(`seq`); 当局听取每一项行动
+盖章后,用同样的顺序来判断每个客户
+使用量(`src/shared/canvas-order.ts`页:1`seq`每个项目胜负,以及因果删除,参见`docs/team-presence.md`),并通过同一还原器应用(`applyCanvasOp`, (中文).`src/shared/canvas-content.ts`) (中文(简体) ).
+
+**  60 适用什么。 ** 每个项目 60`team.json`因为`sharedProjects`没有别的了 一个项目
+未共享的服务器, 没有团队的服务器, 以及在其数据目录中找到另一个服务器的服务器
+(它没有 我们有权力) 保存像以前一样; 每个桌面的画布也是如此 。 一个共享项目的另一个
+字 你需要在字段(名称、颜色、图标、布局、`github`制图和`pullLinks`(d) 下述情况不适用:
+整个工作空间仍然保存它们。
+
+** 这是四项投入:**
+
+1. **Ops**:从编辑器主机标签,从服务器自己的浏览器标签,从服务器帆布
+控件,它使动词改变,在保存前投放每个操作(`castAndSave`, (中文).`src/server/headless-node-factory.ts`) (中文(简体) ). 标签还将它所写的内容投放到一个受管理的项目中通过以下选项:
+它没有显示(一个QQT或“最近关闭的”重新打开,一个寒冷的打开,一个关闭的canvas节点或链接,a)
+从会话侧边栏重命名、移动、复制或关闭 : 写到其工程
+商店,不是它的画布,所以商店把每个都交给出版的钩子
+(单位:千美元)`src/renderer/canvas/stored-publish.ts`) (中文(简体) ). 没有铸币局的下一张封面 储蓄就会下降
+当节点停留在磁盘上时,会结束会话。
+2. ** 储蓄。 ** 在全工作空间保存被写入之前,一个被管理的项目的内容将被替换为
+当局性别平等问题`overlaySave`) (中文(简体) ). 棋 70. 棋盘按字段排列:
+元数据、标签、视图)来自当局,`github`和`pullLinks`从拯救。 这个
+机器的执行字段( R)`shell`, , 你不会有事的`ssh.extraArgs`以及一个坚固的星宿,`pendingLaunch`) 携带
+从保存的 各节点的副本, 因为当局自己的状态 没有。 那个
+在受管项目上发射的唯一方式是:反射者手握权威
+每一次行动,没有发射, 所以武装`--after`节点和服务器帆布控制器
+声称/同意发射`savePatches`),该指数中的土地-当地`localExec`以跟随铸像的经典盟誓, 陈旧的复制件不能回写内容, 带一个
+例外,下面的超大小节点。
+3. ** 损失**,覆盖方式相同(`overlayLoad`),所以一个客户端会看到每个操作
+权限已应用,是否写入磁盘。
+4. ** 外部编辑。 ** A`git pull`或手编辑一个被管理者`.nodeterm/project.json`,可见于
+服务器的文件监视器, 被采纳: 权威重新应用它还没有写在顶端的操作,
+将差异公布为`canvas:mut`行动(不信任:其状态没有发射,所以行动
+说不说,每个老板都管一个武装节点的`pendingLaunch`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}有保证的拉
+移动一个`--after`鹫峰节点将取消其发射),不播出`workspace:external-change`,所以没有
+客户端获得重装/ 保留矿井栏( E)`src/server/workspace-external-watch.ts`) (中文(简体) ). 编辑的另一个
+字段(名称、颜色、图标、布局、默认权限、能力旗、棋盘)`github`和`pullLinks`紧接着行动,因为持续的项目在`workspace:server-change`,用于频道服务器帆布控制。 浏览器没有合并
+栏,所以仍然保留旧值的标签可以保存拖动的值,而不是自己写
+回来
+
+** 写。 ** 受管项目在上次行动之后写成1 s,最多在第一次行动之后写成5 s
+未写,通过商店的原子内容写作(`WorkspaceStore.writeProjectContent`: 这
+凸起`rev`像一个保存, 文件的字节和保存是相同的`rev`和`savedAt`) (中文(简体) ).
+失败的写入保留了每个操作和重试
+在1秒,2秒,4秒等之后,封顶为30秒. 日记上说,一旦失败
+开始和一次当一个写土地 再次,不是每次重试。 两个服务器关闭路径都写什么
+因此坠机只损失了尚未写到的东西:通常最多
+最后5节
+在权威停止前,关闭结束浏览器连接并等待保存
+已排队( E)`WorkspaceStore.idle`一种在权力被揭开之后运行的储蓄,
+写着没有封面的 写着最后的
+查看者可以存在着一个终端,一个编辑器一旦写出就打开,因为节点成员是
+从保存的画布中读取。
+
+** 在通过时。 ** 在靴子上,一次`team.json`已经装入, 每个共享的工程都读取, 所以是一个外部
+编辑任何行动之前的着陆 还有一个基线可以比较`team share`采用该项目;`team unshare`写完待办的,就放手吧。 服务器的
+浏览器标签被告诉了新规范的集( E)`canvas:authority-changed`) (中文(简体) ). 其文件的共享项目
+不能被读取 继续被管理, 所以它的客户端继续出版, 但权威写什么
+或或(或或或或(或或或(或或或(或或或或或或或或(或或或或(或或或或或 70.(或或或或或或或(或或或(或或或或或或或或或或或或(或或或(或或或或或(或或或(或或或dorf,或或或或或或(或或或或或或或(或或或或或(或或或或或或(程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序(程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序(程序程序程序(程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序程序(程序程序程序(程序程序(程序程序程序程序(程序程序(程序程序(程序程序(程序程序程序(程序程序程序程序((程序程序程序程序程序程序程序(程序(((程序程序程序程序程序程序程序(程序程序程序程序程序(程序程序(程序程序(程序程序程序程序程序程序程序程序程序 人 家 家 人 、 人 人 家 、 人 人 、 人 人 人 、 人 人 70. 、 人 人 人 人 、 人 人 人 家 、 人 人 家 、 人 人 人 人 、 人 dorf 人 、 人 人 人 人 、 人 人 人 、 人 人 人 人 人 、 人 家 人 、 人 家 人 、 人 、 人 人 、 人 人 、 人 人 、 、 、 、 、 、 、 、 、 人 、 、 、 人 、 、 、 、 、 、 、 、 、 、 、 、 、 人 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 、 
+"[canvas-authority]项目"id"是共享的,但其内容无法读取....`team share`已经
+不检查 ID, 所以共享 ID 不属于此核心日志上的项目 。 当
+外部编辑后, 文件可以重新读取( 用于解决冲突标记的拉) , 权威
+采用编辑后的文件作为其第一个基准,因此作为操作发布没有区别:项目
+发送全程`workspace:external-change`换句话说,对于一个无人管理的项目来说,
+
+** 單單的時候 客户通常不投,而沒有隊隊隊隊隊.. 一个
+将失去每次编辑的受管项目,所以每当项目被管束时,客户端都会发布:
+a 服务器版浏览器标签询问其核心( )`canvas:authority`,为每个项目出版 vodka
+第一个答案到达,然后在重新连接时再次询问;一个主机中继标签处理每个工程
+保持原样 桌面解答它不会管理任何东西, 因此桌面发布的内容是
+从前
+
+** 中继对等点无法保存主机的工作空间。 ** A`workspace:save`从主机中继端端是
+包括所有者在内的每个角色都被拒绝`E_ROLE`:"主机团队无法保存主机的
+中继器上的工作空间;编辑为帆布操作". 从对等点中保存的整个工作空间是
+每张帆布的存档副本 没有桌面流量发送一个: 桌面的帆布保存到它的
+-  地方                                     的                       的 的 的 的    的 的  的的  的 的的 的的    的的     的的的 的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的 的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的的單的的的的的的
+
+** 超大小的节点例外。 ** 节点太大,无法作为行动进行旅行(其上升式行动,序列化,是
+超过`MUTATION_MAX_BYTES`编号 :`JSON.stringify(op).length`256 000以上,约250KB;
+练习带有粘贴文档的粘贴符)只能到达保存中的核心,所以
+保存可以贡献该节点。得不错。 它坐落在总顺序之外;其得不错
+见下文。
+
+** 奖学金读作。 ** 在服务器版上, 哪些代理会话可能读取对方的背景
+(Context拣选)来自保存的`bridges`每张画布中`src/server/context-link.ts`A级
+链接编辑器在主机标签中绘制的图像现在已被保存, 因此它允许它加入的两个代理符分别读取
+对方在主持人上的对话. 编辑器已经有一个外壳, 所以这不是新的电源,但是
+这是一种新的使用方式。
+
+* 已知限制
+
+- **一个项目的其他领域是最后一个作者获胜。 ** 名称、 颜色、 图标、 布局、 权限
+默认、 能力旗和棋盘`github`页:1`pullLinks`不是行动。 调用到
+它们可以到达每个浏览器标签(`workspace:server-change`),但两个标签编辑其中之一
+同样的时间仍然覆盖 彼此在储蓄, 像在当局之前。 桌面连接在
+中继完全不会保存主机的工作空间 。
+- ** 分享时间窗口。 ** 编辑刚刚制作的客户端`team share`(尚未投都需要)
+或铸造而未保存),不是权威所记录的,
+客户端的下一个保存被覆盖,因此编辑可以从磁盘中丢失. 放在客户端的屏幕上
+直到它重新装弹。 窗口短:客户端在上次更改后会节省800 ms.
+- ** 超大节点。 ** 节点太大,无法旅行 因为行动从节省,能否有三个
+后果。 客户端申请前发布的保存`remove`这样的节点仍然
+带着它,所以节点被写回,并停留到有人再次移除它(另一个)
+客户仅在重新装货后才看到. 这类节点的外部编辑没有达到客户端(操作
+),而下一个客户端保存可以将客户端的旧副本放回。 两个
+客户持有不同的副本 一个这样的节点 取代彼此的 在每个储蓄。
+-===- ============== -============================================================================== 客户端只投放到核心中其活动标签
+开始 在 Omni 板上编辑到另一个核心上的项目的车道(主机车道,而
+本地标签是激活的,或者反面的)不是铸造的,所以在一个主机核心上它也不是写入的.
+- ** 节点顺序没有同步。 ** 会话边栏的顺序是节点列表的顺序,没有操作
+带有更改命令,因此在被管理的项目上,在屏幕上保留了更改命令:
+file 维护当局的命令(它读到的命令,有它听到的节点关于后来的附件).
+IS保证的首先是父母: 减少者与共享的`groupsFirst`(单位:千美元)`src/shared/node-order.ts`当一个操作附件给予了节点或更改其节点时`parentId`,所以每个
+就像正常的保存一样 权威写在后代之前 这是
+降级合同(一个建置,即先前的嵌套框架仍使文件父体先水合)。 A级
+档案,当当局读到它保存到其中之一时,它已经脱离命令。
+行动接近它。
+- ** 定期修理没有进行。 ** 客户端在加载项目时获得什么( 缺少)`--after`它愈合的依赖性绳子,一个遗留的节点迁移到目前的形状)变成:
+客户端的基线且从未被铸造过, 因此在一个被规范的工程上, 它从未到达磁盘: 每个负载
+再次获得它。 修复是决定性的,所以这 成本没有明显的,只是修理
+必须坚持实施共同项目。
+
+□ 状态和解决问题
+
+`team status --json`返回:
+
+===================================================================================================龛====
+|,|也.
+|`enabled`QQ 排程器正在运行( 主机正在运行 ) 。 @ info
+|`off`|`null`当主机打开时; 否则`{reason}`编号 :`no-team`(运行)`team init`), (中文(简体) ).`no-host-key`,则`host-key-unreadable`(与`detail`,或的目的`stopped`· · · · ·
+|`scheduler.state`|`running`, (中文(简体) ).`stopped`,或`backend-refused`: 402/403,从`/v1/relay/host-token`,或一个403`pop_required`页:1`pop_invalid`(英文) 连续两首,每首有新挑战 President(英语) secretary of secretary. 薄荷停止直至服务重新启动或`team rotate-key`运行;`team init`不重新启动它。QQ
+|`scheduler.lastError`最近的一次失败** 自从上次证明接力腿有效**总的说来,`network`, (中文).`network (<status>)`, (中文).`rate-limited (429)`, (中文).`refused (402)`页:1`refused (403)`, (中文).`bad-response`, (中文).`mint failed: …`, (中文).`relay closed the idle listener`, (中文).`open failed: …`, (中文).`mint budget`, (中文).`key proof refused once (<kind>) — retrying with a fresh challenge`(第一次防钥匙拒绝;`<kind>`这是`pop_invalid`或`pop_required`)或,与`backend-refused`,"中继器拒绝了这个主机的密钥证明——更新节点,或运行`team rotate-key`如果钥匙被替换". 它澄清了闲置的焰耳听者何时保持其刷新注册,或当可行的同伴完成握手. |
+|`scheduler.mintsLastHour`QQ 主机标志在最后一个(滚动)小时内铸造. 调度器在一个小时内永远不会薄荷超过**200**(计算每一次运行服务,所以重新开始);后端的自由限制为240. QQ
+|`scheduler.idle`页:1`scheduler.bridged`++Idle收听器(目标为1)/会话加入或等待批准. +++
+|`peers[]`|`{label, role, connected}`。没有密钥:在`team.json`。 。 。
+|`pending[]`|`{pendingId, sas, peerKeyB64, since}`。 。 。 。
+
+人类`team status`读取`state`, (中文).`idle`和`lastError`组合:
+
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}所以你应该知道
+|,|也.
+|`Hosting: OFF — …`|`off.reason`,拼写。 用于`host-key-unreadable`这是装填器的句子。
+|`Hosting: STOPPED — the nodeterm API refused to issue relay tokens (…)`|`backend-refused`。一旦后端被固定,便重新启动服务。 |
+|`Hosting: STOPPED — the nodeterm API refused to issue relay tokens.`,然后在它自己的一行上的密钥句子,然后`Hosting stays off until nodeterm is updated or the key is rotated.`|`backend-refused`在连续两次密钥拒绝之后。 参见下文"Hosting被继电器密钥证明拒绝". QQ.
+|`Last error:`(或`Earlier failure …`读取`key proof refused once (<kind>) — retrying with a fresh challenge`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}一个绝密的拒绝 下薄荷要求重新挑战;连续第二次拒绝停止托管. |
+|`Hosting: ON — listening for teammates.`QQ 一个闲置的听众注册。 在它下面的"耳机故障"是历史,不是错驰。 |
+|`Hosting: ON, but not reachable yet — retrying. Last error: …`QQ 没有闲置的收听器和最近的失败: 薄荷或继电器正在失败, 有备份 。 |
+|`Hosting: ON — opening a listener.`开始
+
+计程员的规则**, 因为他们解释什么`status`显示 :
+
+- 保持** ** 闲置听众登记。 在符号到期前刷新30秒(按
+服务器的时钟从响应`Date`从15秒开始 用继电器
+120个主机标志 每90秒1个薄荷 空闲时约每小时40个 加上每对对等星
+完成握手(其听众被替换).
+- 后退1,2,4,8 然后每15秒一次失败。 后置重置只安装在** 防弹腿上
+作品**(闲置的听众保持其新鲜感,或完成握手),或重新开始。
+绝不是成功的薄荷:当API上升,继电器下降,每雏薄荷成功,
+每个套接字都会死,然后在薄荷上重置,以往返速度重置(中继日志,
+(原始内容存档于2026-09-27).
+- 429至少等待60秒(如果`Retry-After`说吧).
+- 每一个薄荷首先向后端询问一个挑战,并附有一个证明,即这个过程具有
+主机密钥。 但404/405薄荷却一无所获, 见
+[控股钥匙证明] (#host-key防控占有).
+
+** 共同情况:**
+
+- ****`host-key-unreadable`.** 主机停止运行,钥匙被**不**替换(新钥匙将
+无效每个书签). 恢复`host-key.json`从备份中运行`team init`(不重新启动)
+页:1 或者,故意跑开`team rotate-key`** 然后开始`team init`**:服务轮换
+而CLI也这么说。 礛
+发布新的加入代码。
+- 一个腐败者`team.json`** 以`team.json.corrupt-<ms>`和托管开始 ** 关闭 **:
+没有会员,所以没有自动连接。 用`team add-owner`。列出两次密钥的文件
+以腐败论
+- ****`team.json`在服务运行时手动编辑** 在服务重新启动前不重读;
+接下来的 CLI 书写将替换为服务的副本 。 使用CLI系统.
+- ** 在一个数据目录上有两个服务器:** 第二个服务器发现管理员套接字应答,或丢失
+当两者同时启动时, 并绑定它。 ** 不主机 ** (它日志为“ Hosted team search: Not started —— 另一个节点服务器已经
+运行于此数据 我给你的
+- **"节点服务器没有运行(没有管理套接字......)"**:服务下降,运行与
+另一个数据目录(通过)`--data-dir`),或在此特性之前,需要于
+更新。
+- **"拒绝... admin.sock"**:运行`team`作为服务的 unix 用户。
+- ** 安装者每日自动更新**(除非安装有`NODETERM_NO_AUTOUPDATE=1`重建项目
+并重新启动服务: 实时标签下放并重新连接, 待处理的请求丢失 。
+- ** Windows:** 管理员通道是一个unix套接字,所以两端都按名称拒绝. 团队不能是
+在 v1 的 Windows 服务器版上创建 。
+- ** 被中继器的密钥证明拒绝,或被联号断线**(见
+[拥有的 host 密钥证明] (#host-key-prevention-of-possession)和[危险记 (#威胁记)].
+
+* 为关键证据所引用。`team status`说`Hosting: STOPPED`并打印“中继器被拒绝”
+此主机的关键证据—— 更新节点, 或运行`team rotate-key`如果钥匙被替换的话..."
+它的线。 后端拒绝了这个主机在连续两枚薄荷上的证据,每枚都有新鲜的.
+;一次拒绝只重复。 服务日志将类型命名( I)`pop_invalid`或`pop_required`:
+
+- 怎么样?`pop_invalid`:后端检查了证据,结果失败. 一个人可以是一个`POP_SECRET`旋转,或两个有不同秘密的后端实例,在挑战与挑战之间着陆
+薄荷(原变种). 后端的一排两个点( 每个实例必须带相同`POP_SECRET`或时
+节点错误: 更新节点错误, 如果持续, 运行`team rotate-key`并发布新的代码。
+- 怎么样?`pop_required`:主机一次证明了它的密钥,所以后端扣住了它,现在它被拒绝了
+薄荷有经验的 当前的节点不停止: 它没有证据会薄荷
+只有挑战路线回答404/405,并读到`pop_required`有个后端
+中调后调 因此,一个固定的主机停止 它运行一个** 旧节点**,它从来没有
+证明;其`team status`显示`refused (403)`相反( 降级, 或此数据的复制件)
+旧建筑下的目录). 更新节点 。`team rotate-key`新的代码也带来了
+回来,因为新密钥不是被绑的,而是直到`POP_REQUIRED_AFTER`。 。 。
+
+  `team rotate-key`重新启动托管, 并重新启动附带一个
+更新。
+
+* 被联署代码击落* 有了PoP启用的后端,一个已经证明了它的关键的宿主已经
+它的主控预算 以该证明为键, 所以代码持有人不能花它。 什么密码持有人
+仍然可以花的是**16的等待加盟槽**和球队的**10日设备薄荷**:
+队友读到"今天太多人加入这个团队的尝试. 明天再试一次,或者说,16年
+请求正在等待 "一个主人拒绝了请求" 从未被证实的东道主(一个更古老的节点,或者一个后期的)`POP_SECRET`(未设置)暴露于所有R44,以及`team status`可能显示`rate-limited (429)`。 。 。
+无论哪种方式,给主机一个新的设备 id **和 ** 一个新的密钥,然后新的代码:
 
   ```bash
   systemctl --user stop nodeterm-server        # `systemctl stop …` for a root install
@@ -918,454 +870,419 @@ The human `team status` reads `state`, `idle` and `lastError` together:
   node $APP team info                          # the new join code
   ```
 
-  The device id is a random id in `<dataDir>/device-id`; the service reads it on first use and keeps
-  it for the life of the process, so replace it while the service is stopped. Hosting creates a new
-  one when it next mints. The only other thing on the server that depends on that file is a stored
-  Pro license (`<dataDir>/license.json`), which is bound to the id it was minted for and stops
-  validating. `team rotate-key` gives the team a new address, so every bookmark and old code stops
-  working. Members stay in `team.json`: each teammate pastes the new code once and presses OK on
-  its prompt (the host approves a known key on its own), and each such rejoin spends one of the new
-  device id's 10 daily device mints. Remove the member who leaked the code (`team remove`) if you
-  have not.
-- **Removing a teammate.** Approved devices are pinned with an **empty label**, and `team status`
-  shows no keys. Find the key in `<dataDir>/relay/team.json` (match `addedAt`, or the 8-character
-  fingerprint the approval dialog showed), then `team remove <key>`.
-- **Changing a role.** There is no verb in v1. `team add-owner` promotes a key to owner; for any
-  other change, `team remove` the key and approve the device again with the new role.
+设备 ID 是任意 ID 在`<dataDir>/device-id`; 服务在第一次使用时阅读并保存
+用于整个过程的寿命,所以在停止服务时替换它。 主机创建新
+下一粒薄荷糖的时候 服务器上唯一一个依赖于文件的东西是存储
+专业执照`<dataDir>/license.json`)它与id相连,它被铸造并停止
+正在验证中。`team rotate-key`给团队一个新的地址, 所以每个书签和旧代码停止
+工作时 会员留在`team.json`: 每个队友粘贴新代码一次, 按“ 确定”
+它的提示(主机自行批准一个已知的密钥),每个这样的复会会花费一个新的
+设备代号为每日10个设备薄荷。 移除泄露密码的成员(`team remove`) )如果您认为
+没有。
+- **删除一个队友。 ** 所批准的装置贴有**空标签**,以及`team status`没有显示密钥。 在其中查找密钥`<dataDir>/relay/team.json`(比对)`addedAt`,或8个字符
+然后指纹显示批准对话框),`team remove <key>`。 。 。
+- ** 改变角色。 ** v1中没有动词.`team add-owner`向所有者推广密钥; 用于任意
+其他变动,`team remove`文档中 键 并再次批准该设备 与新角色。
 
-## Threat notes
+□ 威胁说明
 
-- **The root of trust is the core's unix user.** Anyone who can run as it can read `host-key.json`
-  and `team.json` and reach the admin socket, so they can make themselves owner. The socket's
-  filesystem permissions are the whole gate (0600 in a 0700 directory); there is no admin token to
-  leak into a pane's environment, but there is also no boundary inside one unix account.
-- **Editor means shell access** as the core's unix user, and so, in practice, owner: an Editor's
-  terminal runs as that user and can run `team add-owner`. The approval dialog says Editor is "the
-  same as SSH access".
-- **A Viewer sees terminal output** and can read **every file** under a shared project's folder,
-  including `.env` files and `.git`, except this server's own data directory. The approval dialog says so for the Viewer role: "Can read every
-  file in the shared project's folder, .env files included, and watch its terminals and anything
-  printed in them. Its git history too, when the folder is a repository of its own."
-- **Sharing a repository shares its whole history.** When a shared project is the top folder of its
-  own repository, `git:show-file` takes any revision, so a Viewer can read every branch, tag, stash
-  and past commit of it, including files deleted since. A worktree shares its main repository's
-  object store and refs, so sharing a worktree's folder exposes the whole repository's history
-  (the main checkout's stash included), not only that checkout. A project that is a subfolder of a
-  larger repository gets no git at all for Viewers and Commenters.
-- **Nothing is served before mutual approval.** A pre-approval request answers `E_UNAUTHORIZED`
-  and never reaches a handler. Frames that arrive between approval and open (while the pin is
-  written) are held (at most 256), then served through the same checks.
-- **A leaked join code cannot let anyone in**: every device still needs an owner's approval. At most
-  16 requests wait at once, one per device key, each for 10 minutes; the 17th is refused.
-- **A join code no longer takes hosting offline, once the host has proven its key** (ruling R44).
-  The code carries the host's device id and public key (`hosted-service.ts` `info()`), and those
-  were all `POST /v1/relay/host-token` asked for. A backend with `POP_SECRET` set now asks for a
-  proof that the caller holds the host's secret key: a challenge from `POST /v1/relay/challenge`,
-  answered with an HMAC keyed by an X25519 shared secret (`relay-pop.ts`). The first valid proof
-  **latches** the host, and from then on a mint without one is refused `403 pop_required`; after
-  `POP_REQUIRED_AFTER` (default `2027-01-01T00:00:00Z`) every host must prove, latched or not. The
-  full mechanism is under [Host key proof of possession](#host-key-proof-of-possession). For a
-  latched host, it closes two of the four things a code holder, a teammate you removed included,
-  could do:
-  - **Spend the host's hourly host-token budget.** Closed: a proven mint is charged to the proven
-    host in a budget window of its own, and an unproven mint for a latched host is refused before
-    it reaches that budget.
-  - **Register decoy listeners under the team's address.** Closed: a code holder can no longer mint
-    a host token for a latched host. The relay broker also admits only pairing tokens
-    (`typ: 'pair'`), closes a listener no peer has joined at its token's `exp + 30 s`, and keeps at
-    most 8 pending listeners per host, evicting the oldest, so a decoy minted before the latch is
-    gone within 150 s of its mint, and a stale set of them can never keep the host's fresh listener
-    out.
+- ** 信任根是核心的unix用户。 ** 任何人谁能跑,只要它能读`host-key.json`和`team.json`并到达管理员的插座,以便他们成为主人。 那个插座
+文件系统权限是整扇门( 0700 目录中的0600); 没有管理符
+2. 获得和,获得,获得和,获得和,获得,和和,获得和,获得,和,和,和和,,和,和,,,,和和,,和,,和,和,和和,,和,,,和,,和和,,和和,,和和,,,和,,和和,,,,,和,和,和,,和,,和,,和,,和,,和和,,,,,和和ش,和,,,和和,,,,,,,和,,和,和,,,和和,,和,,,,和和,和,和,,和和,,,和和,,,,,和,和,,,,,,,,和,,,,,和,,,,,,,,,,,和和和,,,和和,,,,,,,,,,,,,,和,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+- **编辑器表示 shell access** 作为核心的unix用户,因此,在实践中,所有者:一个编辑器
+终端以用户身份运行,并可以运行`team add-owner`。批准对话框称编辑器是“
+与SSH访问相同".
+- ** 查看器看到终端输出** 可以在共享项目文件夹下读取**所有文件**,
+包括`.env`文档和`.git`,但此服务器自己的数据目录除外。 批准对话框对查看器角色这样说:"可以读每个
+共享项目文件夹中的文件, 包括 env 文件, 并监视其终端和任何东西
+印在他们身上 当文件夹是自己的仓库时,
+- ** 共享一个存放处共享其全部历史。 ** 当共享项目是其顶端文件夹时
+自己的仓库,`git:show-file`接受任何修改, 因此查看器可以读取每个分支、 标记、 隐藏
+和过去的承诺,包括从此删除的文件。 一个工作树分享它的主仓库
+对象存储和参考,所以共享工作树的文件夹会暴露整个仓库的历史
+(包括主退票的藏品),不仅包括退票. 作为子文件夹的项目
+更大的寄存器对查看者和评论者完全没有 git 。
+- ** 在相互批准之前,未提供任何服务。 ** 预先批准请求的答案`E_UNAUTHORIZED`永远无法到达一个操作者。 在批准和开放之间到达的框架(而针是)
+(最多256份),再通过同样的检查。
+- ** 泄露的加入守则不能让任何人加入**:每个装置仍然需要业主的批准。 最多
+16项请求一时等待,每个设备密钥一个,每个10分钟;17号被拒绝.
+- ** 一旦主机证明了它的密钥**(Ruling R44),加码不再取消托管。
+代码带有主机的设备ID和公钥(`hosted-service.ts` `info()`)和这些
+曾经是所有`POST /v1/relay/host-token`问. 一个后端`POP_SECRET`设置现在要求
+证明呼叫者持有主机的秘密密钥:来自`POST /v1/relay/challenge`, (中文).
+用一个X25519 共享密钥键的 HMAC 回答(`relay-pop.ts`) (中文(简体) ). 第一个有效证据
+从那时起,没有薄荷糖就被拒绝了`403 pop_required`; 之后`POP_REQUIRED_AFTER`(默认)`2027-01-01T00:00:00Z`)每个宿主必须证明,被绑或不绑. 那个
+(#host-key-proof-posession)听听, 对于a
+它关闭了四个东西中的两个 一个代码持有人,一个队友 你删除包括,
+可以做到这一点:
+- ** 花费东道主每小时的预算。 ** 关闭:已证实的薄荷被装入已证实的薄荷
+在它自己的预算窗口中 可是没有证明的薄荷薄荷
+它达到了预算。
+- ** 在团队地址下注册的诱饵听众。 ** 关闭 : 密码持有者不能再薄荷
+用于挂载主机的主机符 。 中继经纪人也只接受配对符
+(单位:千美元)`typ: 'pair'`),关闭一个收听器,没有对等方在其符号上加入`exp + 30 s`,并保持到
+每个主机有8名待收听者 驱逐最年长者 所以在锁门之前就铸造了诱饵
+在它的薄荷的150秒以内, 和坚固的一组 永远无法保持东道主的新听众
+出来。
 
-  Two stay open, because the routes behind them take no proof:
-  - **Open join requests with throwaway device keys** until the 16 pending slots are full.
-  - **Spend the team's 10 daily device mints** (`POST /v1/relay/device`, keyed by the host device
-    id), so a new teammate reads "Too many join attempts … today".
+两人保持开放,因为他们背后的路线没有证据:
+- ** 打开带丢弃设备密钥的合并请求**,直到16个待补的空档全部满ic.
+- ** 花费小组每天10枚装置薄荷** (`POST /v1/relay/device`,由主机设备键入
+id),所以一位新队友读到"太多的加入尝试... 今天".
 
-  And one gap before the latch: until a host has proven once, and before the cutoff, a code holder
-  can still mint legacy host tokens for it and register up to 8 listeners under its address,
-  evicting the host's own idle listener through the cap. A current nodeterm proves on its first mint
-  against a PoP-enabled backend, so the gap closes the first time the host mints after the backend
-  enables PoP; it stays open for a host running an older nodeterm, and for every host while
-  `POP_SECRET` is unset. `team remove` does not stop the open items, and `team rotate-key` alone
-  does not either: the device mints are keyed by the device id, not the address. Recovery is
-  "Hosting refused by the relay's key proof, or knocked offline by a join code" under
-  [Status and troubleshooting](#status-and-troubleshooting).
-- **A pinned device key is a long-lived credential**, like an SSH key: a stolen laptop gets in
-  until `team remove`. A removed key's live sessions are cut and told `removed`, and until the kill
-  lands a session with no team entry is served nothing.
-- **Mid-session key swap** cuts the session on both ends.
-- **No forward secrecy.** The session key is derived from the two static keys plus per-session
-  nonces exchanged in the handshake (`e2ee.ts`), so whoever later obtains either secret key can
-  decrypt a recorded session. This predates the hosted relay.
-- **The host key is never silently regenerated.** Only `team rotate-key` replaces it.
+在锁链之前有一个缺口: 直到一个主机证明一次, 在断线之前,一个密码持有人
+还可以为它保留寄存器 并在它的地址 我们知道有8位听众
+通过盖子驱逐主持人自己的闲散听众. 当前节点在它的第一个薄荷上证明
+相对于一个 PoP 启用的后端, 因此漏洞会关闭后端之后的首次主机薄荷
+启用 PoP; 为运行旧节点的主机和每个主机打开它`POP_SECRET`未设置。`team remove`不停止打开的物品,以及`team rotate-key`一个人
+也不是:设备薄荷由设备 ID 键,而不是地址除其它外。 恢复为
+被接力的密钥证明拒绝, 或被联合代码关闭
+[状态和故障清除] (#状态和故障清除).
+- **一个固定设备密钥是长寿证书**,就像SSH密钥:被盗笔记本电脑进入
+直至`team remove`。一个被删除的密钥的直播会话被剪切并告知`removed`直到杀死
+没有球队参赛的场面 却一无所获
+- ** Mid-session 密钥交换** 将会议分成两端。
+- ** 不预先保密。 ** 会话密钥来自两个静态密钥加每次会话
+在握手时交换的非笔数(`e2ee.ts`)),所以无论后来谁获得任何一种徘徊的秘密钥匙都可以.
+解密录制的会话 。 这早于主机中继器.
+- ** 主机密钥从未默默生成。 ** 仅`team rotate-key`替换它。
 
-## Host key proof of possession
+□ 主控密钥证据
 
-The fix for R44 (see [Threat notes](#threat-notes)). It covers the Server Edition's hosted mint, the
-desktop phone relay's mint, and the desktop's host-mode push. (The push webhook's management routes
-prove the same key through a protocol of their own; see below.) It is enforced by nodeterm-server;
-this repository holds the client half.
+R44的固定(见[危险记 (#威胁记)). 它覆盖服务器版的主机薄荷,
+桌面手机继电器的薄荷,以及桌面主机-模式推. (推动Webhook的管理路线)
+通过自己的协议来证明同样的密钥; 见下文。 ) 由节点服务器执行;
+此寄存器持有客户端的一半 。
 
-**The exchange.**
+** 中出现的情况。
 
-1. `POST /v1/relay/challenge {hostPublicKeyB64, purpose}`, where `purpose` is `host-token` or
-   `push`. The backend answers `{challenge, serverPublicKeyB64, exp}`: a challenge sealed with its
-   `POP_SECRET` (host id, purpose, a random nonce, a 60 s expiry) and a one-off X25519 public key
-   derived from that nonce. Nothing is stored per challenge.
-2. The client computes the X25519 shared secret of the host's secret key and that one-off key, and
-   sends `popChallenge` and `popProof`: an HMAC-SHA256, keyed by that shared secret, over the
-   challenge, the purpose, a subject and the host public key. The subject is the mint's `deviceId`
-   (`''` when the desktop mints with a Pro entitlement), or the host device id for push.
-3. The backend recomputes it. It refuses a challenge more than 5 s past its expiry, a nonce it has
-   already accepted, and an all-zero shared secret, and answers any proof that does not verify with
-   `403 {"error":"pop_invalid"}`.
+1. 联合国`POST /v1/relay/challenge {hostPublicKeyB64, purpose}`时,`purpose`这是`host-token`或`push`后端答案。`{challenge, serverPublicKeyB64, exp}`: 挑战与其`POP_SECRET`(主机代号,目的,随机非ce,60s过期)和一次性X25519公用钥匙.
+来源于该非ce。 每场挑战都没有储存
+2. 客户端计算X25519共享的宿主秘密密钥和一次性密钥,以及
+( )`popChallenge`和`popProof`一个HMAC -SHA256, 由这个共同的秘密键,在
+挑战、目的、主题和主控公钥。 问题是薄荷糖`deviceId`(单位:千美元)`''`当桌面薄荷带有Pro权限时),或主机设备id用于推.
+3. 后端重新计算. 它拒绝超过5秒的质疑 超过过期,它有
+以及一个零共享的秘密 回答任何无法用`403 {"error":"pop_invalid"}`。 。 。
 
-`src/core/relay/relay-pop.ts` is the only place the client computes this proof (for the host-token
-mint and push host-auth), and it also refuses an all-zero shared secret (a low-order server key gives
-every caller the same secret). The bytes are pinned by `src/core/relay/relay-pop-vector.json`, which
-nodeterm-server carries byte for byte as `test/fixtures/relay-pop-vector.json`. A protocol change
-changes both.
+`src/core/relay/relay-pop.ts`为女性客户端计算此证明的唯一地点( 对于主机
+薄荷并按住主机-自动),它也拒绝一个全零共享的秘密(低排序的服务器密钥给予
+每一个召唤者,都是同样的秘密。 字节由`src/core/relay/relay-pop-vector.json`,哪个
+节点服务器为字节携带字节`test/fixtures/relay-pop-vector.json`。修改协议
+两者都有变化。
 
-The push webhook's management routes (minting, reading and revoking a webhook token) also prove
-possession of the host key, through a separate and independent protocol: `webhookProof` in
-`src/core/push-webhook.ts`, with its own challenge route (`/v1/push/webhook/challenge`), its own
-context string and its own wire contract (nodeterm-server's `src/lib/host-proof.ts`). It shares
-nothing with this proof but the key. Do not route it through `relay-pop.ts`, and do not assume the
-all-zero refusal above covers it.
+够了 推推的 Webhook 管理路线(细心、阅读和撤销一个webhook 标志)也证明
+通过单独独立的协议,拥有主机密钥:`webhookProof`与社会`src/core/push-webhook.ts`,拥有自己的挑战路线(`/v1/push/webhook/challenge`),其本身
+上下文字符串及其自己的线条合同(节点-服务器)`src/lib/host-proof.ts`) (中文(简体) ). 它共享
+除了钥匙,没有指纹 不要通过它`relay-pop.ts`,而不假定
+上面的拒绝是零的
 
-**The latch and the cutoff.** The first valid proof for a host **latches** it (the backend records
-its host id). From then on, a request for that host without a proof is refused
-`403 {"error":"pop_required"}`. A host that has never proven stays on the legacy path until
-`POP_REQUIRED_AFTER` (default `2027-01-01T00:00:00Z`); after that, every host must prove. With
-`POP_SECRET` unset or shorter than 32 characters, the backend logs `[api] POP_SECRET unset or
-shorter than 32 characters — relay proof-of-possession is DISABLED` at boot, registers neither
-`/v1/relay/challenge` nor `/v1/push/host-auth`, and serves every host the legacy way, latched or
-not. It never fails to boot over it.
+** 锁链和断线。 ** 一个主机的首个有效证明**latches**它(后端记录)
+(原始内容存档于2018-09-25). Its host id. 从那时起,一个没有证据的宿主的请求被拒绝了`403 {"error":"pop_required"}`一个从未被证实的宿主,直到`POP_REQUIRED_AFTER`(默认)`2027-01-01T00:00:00Z`));之后,每个主机必须证明. 与`POP_SECRET`未设置或短于32个字符,后端日志 `[api] POP SECRET unset 或
+短于32个字符 -- -- 中继拥有的证明在启动时即已解析,登记也不进行`/v1/relay/challenge`也没有`/v1/push/host-auth`,为每个宿主服务 遗留的方式, 纹饰或
+没有 它从不放弃它。
 
-**What a proof buys.**
+** 证据能买多少。 **
 
-- `POST /v1/relay/host-token`: a proven mint is charged to the proven host id, in an hourly window
-  of its own (240 an hour, the same size as the legacy window, which stays keyed by the `deviceId`
-  sent). A caller who knows only the device id, or the host id printed in every join code, cannot
-  spend it.
-- `POST /v1/push/host-auth {hostDeviceId, hostPublicKeyB64, popChallenge, popProof}` (purpose
-  `push`, subject the host device id): once the backend has checked that the host has a live
-  pairing (else `403 forbidden`), a valid proof latches the host too and earns a `hostAuth` session
-  good for 15 minutes. Host-mode `POST /v1/push/notify` and `/v1/push/live-update` carry it. A
-  latched host's post without one is refused `pop_required`, and one with an expired or foreign
-  session `pop_invalid`. Both checks run after the pairing check and before the send budget, so a
-  refused post spends nothing.
-- Each route has its own per-IP limit: `/v1/relay/challenge` 120 a minute (so the challenge a
-  proven mint needs never spends the 30-a-minute bucket `/v1/relay/host-token` uses),
-  `/v1/push/host-auth` 30 a minute.
+- 怎么样?`POST /v1/relay/host-token`:经过证明的薄荷在每小时的窗口中向经过证明的主机代号充电
+它本身的(每小时240个,大小与遗留的窗口相同),该窗口一直按着`deviceId`(已发送). 被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被制定一个拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被的被拒绝的被拒绝的被的被拒绝的被的被的被的被拒绝的被的被的被的被的拒绝的被的被的被的被的被的被的被的被的被的被的被的被的被的拒绝的被的被的被的被的被的被的被的被的被被的被的被的被的被的被的被的被的被的被的被的被的被的被的被的被的被的被的被
+○[[ spend- spend- spend- spend- spend-.-.-.- it-.- it-.-.- it-.- it-.-.- it- it- it- it- it- it- it- it- it-轿- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it- it-.-.-.-.-.-.-.- it-------------------------------------------------厕--
+- 怎么样?`POST /v1/push/host-auth {hostDeviceId, hostPublicKeyB64, popChallenge, popProof}`(目的)`push`,对主机设备 id 进行:一旦后端检查了主机有直播
+配对( 以`403 forbidden`, , , 有效的 被认定 , , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , , 钱 , 钱 , , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , , 钱 , 钱 , 钱 , 钱 邱 , 钱 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , 钱 , , 钱 , , , , , 钱  你先 , , , , 钱 , , , , , , , 钱 , , , , , , , , ,  , , , , , , , , , , , , `hostAuth`届会
+15分钟就好 主机模式`POST /v1/push/notify`页:1`/v1/push/live-update`拿着 页:1
+连主播的帖子都没有被拒绝`pop_required`,并有一个过期或外国
+届会`pop_invalid`两种检查都是在配对检查之后和发送预算之前进行的,所以
+拒绝的帖子一文不值
+- 每条路线都有自己的IP限制:`/v1/relay/challenge`120分钟(即挑战塞族人)
+证明薄荷从不花30分钟的桶`/v1/relay/host-token`使用,`/v1/push/host-auth`30分钟。
 
-**The relay broker.** nodeterm-server's relay broker admits only pairing tokens (`typ: 'pair'`),
-closes a host listener no peer has joined at its token's `exp + 30 s`, keeps at most 8 pending
-listeners per host (a new one evicts the oldest), and never expires or evicts a bridged socket. A
-real host keeps one idle listener and replaces it 30 s before its token expires, so it meets
-neither limit.
+** 中继经纪人。 ** 节点服务员中继经纪人只这一观点只承认配对标志(`typ: 'pair'`), (中文(简体) ).
+关闭一个主机收听器, 没有对等者在其符号上加入`exp + 30 s`,最多8个待决
+每个主机的听众(一个新主机驱逐最老的),永远不要过期或驱逐桥接套接字. A. 页:1
+真主机保留一个闲置的收听器,并在其符号到期前替换它 30 s,所以它满足
+既不限制
 
-**What the clients do.** One rule runs through all three: only a challenge answered **404 or 405**
-means "this backend predates the proof", and only then does a request go out unproven. Any other
-challenge failure is transient: the request is not sent, and the caller backs off. An unproven
-request from a latched host is refused, and for a mint that refusal would stop hosting.
+** 客户做什么。 ** 一条规则贯穿所有三项:只有挑战得到回答**404或405**
+意思是"这个后端比证明早",只有到那时,请求才会被提出来未经证明. 任何其他
+质疑失败是短暂的:请求没有发送,呼叫者退后. 未证实
+拒绝一个固定主机的请求,如果一个薄荷,拒绝将停止托管。
 
-There is one exception, and only push has it: a challenge answered 200 followed by
-`/v1/push/host-auth` answering 404 is also read as a backend without the proof, so the post goes out
-unproven and that verdict is cached for 10 minutes. One backend registers both routes or neither, so
-this answer comes only from a redeploy window. Push stops nothing, and the backend gates the
-unproven post regardless: a latched host's post is refused, which forgets the verdict, and the host
-proves again.
+只有一个例外,只有推动才有:一个挑战被回答,然后是200个。`/v1/push/host-auth`回答404 也读作没有证据的后端,所以帖子出局
+未证实的 判决被缓存10分钟。 一个后端对两个路由都进行记录,所以
+此答案仅来自调用窗口 。 推无止境 后端的门
+未证实的帖子不管:一个被撕毁的东道主帖子被拒绝,它忘记了判决,和东道主
+再次证明。
 
-- **Server Edition hosted mint** (`host-token.ts`, `hosted-scheduler.ts`). The challenge, the mint
-  and the mint's body read share one 8 s timer. A challenge answered 429 waits at least 60 s
-  (`rate-limited (429)`); a 2xx that is not a usable challenge, or a server key the proof cannot
-  use, is `bad-response`; anything else is `network` or `network (<status>)`. A `pop_required`
-  answer to the one unproven mint (after a 404/405 challenge) is read as `network (403)`, not as a
-  refusal: a reverse proxy answers 404 while the backend redeploys, and the mint that follows can
-  land on the fresh backend. A **key-proof refusal** (`pop_invalid`, or `pop_required` on a proven
-  mint) stops hosting only when it is the **second in a row**, each with a fresh challenge. The
-  first only backs off and retries, because a `POP_SECRET` rotation, or two backend instances with
-  different secrets, inside one challenge-then-mint pair can refuse an honest host once. A transient failure
-  between the two does not reset the count; only a successful mint or a restart does. After the
-  first, `team status` shows `key proof refused once (<kind>) — retrying with a fresh challenge`;
-  after the second, hosting is `backend-refused` and `team status` prints "The relay refused this
-  host's key proof — update nodeterm, or run `team rotate-key` if the key was replaced." on a line
-  of its own. Both are logged with their kind (a warning, then an error).
-- **Desktop phone relay** (`src/main/remote/standing-host.ts`). The same challenge, proof and
-  404/405 rule, and the same "second refusal in a row" rule. The first refusal is logged and phone
-  access retries with its reconnect backoff. The second stops phone access and shows one dialog,
-  titled "Remote access stopped", that reads "The relay refused this computer's key proof — update
-  nodeterm; if it persists after updating, contact support." followed by "Phone access is off. Turn
-  it back on in Settings → Phone after updating." The desktop's text never mentions
-  `team rotate-key`, which exists only in the Server Edition.
-- **Desktop host-mode push** (`src/core/push-notify.ts`). Push stops nothing: a batch that cannot
-  be proven is dropped, like a network error, and the phone still has the agent-status mirror.
-  - The `hostAuth` session is good for 15 minutes on the server, and the client proves again after
-    10 minutes on its own clock, or at once if that clock has stepped back since (a cached session
-    or old-backend verdict with a negative age is expired). notify and live-update each hold their
-    own.
-  - A backend without the proof (challenge 404/405, or no host-auth route) is remembered for 10
-    minutes. While that backend accepts the host's posts, the proof costs one challenge per 10
-    minutes (plus the host-auth post, when the challenge answered 200) rather than one per batch.
-    A post it refuses with a 403 forgets the verdict (see below), and an old backend refuses every
-    post from a host with no live pairing (`403 forbidden`). While it does, **every batch** costs
-    the challenge plus the post: one request more per batch than before the proof existed, and
-    live-update can flush once a second. That case ends once the backend runs with the proof on
-    (`POP_SECRET` set): its host-auth refuses such a host `forbidden` instead, which is backed off like any
-    other failed proof, and no post goes out.
-  - Failed proofs back off 0, 5, 15, then 60 s between attempts, since every attempt spends the
-    per-IP challenge budget the mint needs too. A hold further out than 60 s can only be a clock
-    that stepped back, and is ignored.
-  - Overlapping flushes share one proof in flight. The challenge and the host-auth post share one
-    8 s timer. A proof that throws is dropped and backed off like any other failure.
-  - A proven post answered `403 pop_invalid`/`pop_required` forgets the session, and the next batch
-    proves again. An unproven post answered 403 forgets the "old backend" verdict. When that verdict
-    was already on file from an earlier batch, the likely cause is that the host latched since
-    (through the phone relay's mint, or the other push stream): the batch proves at once and, if that
-    yields a session, is re-posted **once** with it; otherwise it is dropped. A verdict fetched in the
-    same batch is not fetched again, so an old backend that refuses this host costs two requests per
-    batch (the challenge and the post), not three. That is still one more than before the proof
-    existed (see the bullet on a backend without the proof).
-  - The Server Edition pushes only in granted mode (per-grant bearer tokens, no host identity), so
-    there is nothing to prove there.
+- ** 服务版主机薄荷**(`host-token.ts`, (中文).`hosted-scheduler.ts`) (中文(简体) ). 挑战,薄荷
+和薄荷体读 分享一个8s计时器。 回答一个挑战 429 等待至少 60 s
+(单位:千美元)`rate-limited (429)`;以便为 2xx 无法使用的挑战,或服务器键 证明不能
+使用,为`bad-response`; 其他东西是`network`或`network (<status>)`A级`pop_required`对一份未经ان证的薄荷(在404/405项挑战之后)的答复被理解为`network (403)`,而不是作为一个
+拒绝: 反向代理在后端重新部署时回答 404, 以及下面的薄荷可以
+降落在新的后端。 不可扣钥匙的拒绝**(`pop_invalid`,或`pop_required`证明
+薄荷)只有在连续**秒**时才停止主机,每架都有新的挑战. 这个
+先退后再试,因为...`POP_SECRET`旋转,或两个后端实例
+不同的秘密,在一个挑战- 当时的薄荷对 可以拒绝诚实的东道主一次。 短暂的失败
+二者之间不重设计数;只有成功的薄荷或重新启动。 之后
+首先,`team status`显示`key proof refused once (<kind>) — retrying with a fresh challenge`· ;
+第二场之后,主机是`backend-refused`和`team status`指纹 "中继器拒绝了这一点
+主机的密钥证明——更新节点,或运行`team rotate-key`如果钥匙被替换了" 在一条线上
+自己来的 二者都是依同类而记录的。
+- **台式电话中继器**(`src/main/remote/standing-host.ts`) (中文(简体) ). 同样的挑战、证据和
+404/405规则,以及同样的"连续第二次拒绝"规则. 第一次拒绝是记录和电话
+使用其重新连接备份进行访问重试。 第二个停止电话访问 并显示一个对话框,
+名为“停止访问”的字眼为“中继器拒绝了这台计算机的关键证据——更新”
+nodeterm;如果在更新后持续,则联系支持",之后是"Phone访问关闭. 转身
+它在设置 ~ 更新后的电话。" 桌面文本从未提及`team rotate-key`,仅存在于服务器版。
+- ** Desktop主机-模式推**(`src/core/push-notify.ts`) (中文(简体) ). 推力什么也阻止不了: 批量不能
+被证明是被丢弃的,就像网络错误一样,手机仍然有代理状态镜像.
+- 那个`hostAuth`在服务器上进行15分钟的会话是好的,客户端在之后再次证明
+10分钟在自己的时钟上,或者如果该时钟自该时钟后退(缓存会话)即刻
+或负龄的旧后端判决过期)。 通知和实时更新
+属于自己的。
+- 一个没有证据的后端(质疑404/405,或没有宿主-空路)被记为10
+几分钟 虽然后端接受东道主的帖子,但证明每10个要一个挑战
+分钟(加上主机-自动的帖子,当挑战回答200),而不是每批一次.
+一个403的帖子拒绝 忘了判决(见下文) 一个旧的后端拒绝
+从一个没有活对齐的宿主发来的帖子。`403 forbidden`) (中文(简体) ). 虽然如此,但每批**费用
+挑战加帖子:每批要求比证据存在前多一份,
+现场直播可以冲一次 一旦后端有证据 案子就结束了
+(单位:千美元)`POP_SECRET`设置 : 其主机 我不要这样的主机`forbidden`反之,它像任何一个
+其它失败的证据,没有出帖。
+- 失败证明0,5,15,然后60s畸形 尝试之间,因为每一个尝试花费
+每个IP挑战预算 薄荷也需要。 超过60秒就只能是时钟了
+却被忽略了
+- 重叠的冲浪分享一个在飞行中的证据。 挑战与东道主与东道主共享一席之地
+8s计时器. 像其他失败一样 丢弃和退后的证据
+- 一份经过证明的帖子得到答复`403 pop_invalid`页:1`pop_required`忘记会话和下一批
+再次证明。 未证实的帖子回答403 忘记"老后台"判决. 当判决时
+可能的原因是主机自
+(通过电话中继器的薄荷,或者其他推力流):批次一次证明,如果证明的话.
+以一个会话为单位,在其中重新登出。 判决结果
+同一批次没有再次获取, 所以一个拒绝这个主机的旧后端 成本为每台两次
+批次(挑战和员额),而不是三个。 这比证据之前还多
+存在(见后端没有证据的子弹)。
+- 服务器版只以授予模式(每个无记名签名,没有主机身份)推动,所以
+没有什么可以证明的。
 
-**Rollout.** Clients and backend may ship in either order: a client that finds no challenge route
-mints and pushes as before, and a backend with the proof on serves a host that has never proven the
-legacy way until the cutoff. The backend goes first anyway, because the proof protects nothing
-until it is on:
+** 滚蛋。 ** 客户端和后端可以按任一顺序发运: 找不到质疑路径的客户端
+薄荷和推力都和以前一样 加上证据的后端为从未证明过
+传承 一直到截断。 反正 后端是第一 因为证据保护不了任何东西
+直到它打开:
 
-1. Deploy nodeterm-server.
-2. The operator (@eneskirca) sets `POP_SECRET` in Dokploy: at least 32 characters, the same on
-   every backend instance. `POP_REQUIRED_AFTER` is optional (an ISO date; one that does not parse is
-   logged and the default is used).
-3. Check that the boot log does **not** say `relay proof-of-possession is DISABLED`.
-4. Ship the clients. A host latches the first time it mints (or pushes) with a current nodeterm.
+1. 部署节点服务器。
+2. 运营商 (@enestirca) 设置`POP_SECRET`在Dokploy中:至少32个字符,相同
+每一个后端实例。`POP_REQUIRED_AFTER`可选( ISO 日期; 不分析的日期是
+登录并使用默认值).
+3. 检查靴子记录是否确实**不**说`relay proof-of-possession is DISABLED`。 。 。 。
+4. 运送客户。 一个掺有当前节点的宿主节点是它第一次用薄荷(或推)薄荷.
 
-Rotating `POP_SECRET` voids every challenge and `hostAuth` session in flight: a mint in that window
-is refused once and retried, and push proves again on its next batch.
+旋转`POP_SECRET`排除一切挑战`hostAuth`飞行时的会话: 窗口 96.
+拒绝一次,再试一次,然后在下一批中再次证明推力。
 
-**Residuals.**
+** 答复。 **
 
-- Before a host has proven once, and before the cutoff, a code holder can still mint legacy host
-  tokens for it and evict its idle listener through the cap (see [Threat notes](#threat-notes)).
-- The team's 10 daily device mints and the 16 pending join slots are still open to a code holder.
-- The backend remembers accepted nonces per process, so with several backend instances, or across
-  a restart, one proof could be accepted once per process inside its challenge's 65 s. Replaying it
-  still takes the proof itself, which only the TLS endpoint sees.
-- A NUL character in `hostDeviceId` is now refused with a 400 on the push routes. Other request
-  fields that reach a database query may still answer 500 for one; a sweep of the rest of the
-  backend is a nodeterm-server follow-up.
-- A desktop whose timers run more than about 60 s late (sleep, App Nap) has its idle listener
-  expired by the relay: the refresh runs 30 s before the token expires and the relay closes an idle
-  listener 30 s after. It recovers through the reconnect backoff. A Server Edition in the same
-  state logs `relay closed the idle listener` and backs off the same way.
-- After the desktop stops on a key-proof refusal, the Settings switch still reads on, so turning
-  phone access back on means switching it off and on, or restarting the app (an update restarts
-  it). The stop also ends any phone session in progress.
+- 在主机被证明一次之前 在断线之前 密码持有者仍可以 薄荷遗留主机
+和它。 。 。 。
+——球队每日10个设备薄荷和16个待加的插槽仍开放给密码持有人.
+- 后端记得每个进程都接受非切,因此有多个后端实例,或交叉
+一个重启,一个证据可以被接受 一旦每个进程 在其挑战的65s。 重播时
+仍取证据本身,只有TLS终点看到.
+- 一个 NUL 字符在`hostDeviceId`现在有400人被拒签了 其他请求
+字段中,到达数据库查询的字段仍然可以回答500;
+后端是一个节点服务器后续.
+- 一个计时器晚点运行超过60秒的桌面(睡眠,App Nap)有闲置的收听器
+被继电器过期: 刷新在符号到期前运行 30 秒, 继电器关闭闲置
+30秒后监听 它通过重新连接的备份恢复. 相同的服务器版
+状态日志`relay closed the idle listener`和退后一样的方式。
+- 桌面在拒用密钥时停止后, 设置开关仍然在读, 所以打开
+电话访问返回意味着关闭和打开,或重新启动应用程序(更新重新启动)
+) (英语). 该站也结束了任何在进行中的电话会话.
 
-**Surfaces.** Desktop: the phone relay mint and host-mode push prove. Server Edition: the hosted
-mint proves; its push is granted mode and has nothing to prove. Mobile: not applicable. The phone
-is never a relay host, mints no host tokens and sends no host-mode push; its device and join tokens
-are unchanged.
+** 粉脸。 ** 桌面:电话中继薄荷和主机-模式推推证明. 服务器版: 主机
+薄荷能证明;它的推力被授予模式,并且没有任何证据. 移动:不适用。 电话
+绝不是中继主机, 薄荷不会是主机的代号, 也不会发送主机- mo 我要你按下; 其设备并加入代号
+不变。
 
-## Limitations (v1)
+□限制(v1)
 
-- **The facepile does not show peers working elsewhere.** A non-editor's presence is filtered to
-  peers on its shared projects (security audit (a), see [Roles](#roles)), so a teammate on an unshared
-  project does not appear in its facepile at all, not even as "elsewhere".
-- **A context meter needs an attributable session.** `context:update` reaches a non-editor only for a
-  session the host's agent-status mirror attributes to a shared node; a session the mirror has not
-  seen a hook event for since the host started shows no meter to a Viewer until it does.
-- **A Viewer can still pause a shared terminal indirectly.** `pty:flow` pauses are refused, but a
-  relay peer whose socket backlog passes 1 MB takes Stage 2's socket-backpressure ticket, which
-  pauses the shared pty for every subscriber until that backlog drains below 256 KB or the peer
-  leaves. Past 8 MB its output is dropped (redrawn later) and the pause is handed back
-  (`ui-sink-registry.ts`).
-- **Shared canvas edits:** see [Known limits](#known-limits) under Shared canvas authority.
-- **The issue summary modal's "Agent runs" on a relay tab** (`GitHubIssueSummaryModal` →
-  `BoardLogPanel`) still pairs the LOCAL api with the relay project's id: `KanbanView` renders under
-  App's local provider, and unlike the card modal this modal is not wrapped in
-  `ProjectSessionScope`, so the history is read from this machine's core, not the host's. It is
-  pre-existing; a follow-up.
-- **No git for Viewers in a subfolder of a larger repository.** Viewers and Commenters get the git
-  panel only for a project that is the top folder of its own repository (or a worktree's). A
-  monorepo subfolder shows its files but refuses every git read (see [Roles](#roles)).
-- **A Viewer's git status can name files in the server's data folder.** When the shared root is a
-  repository that contains the data folder, untracked and not ignored (a dotfiles repository at
-  `$HOME`, for example), `git:status` lists the FILE NAMES inside it. Their contents stay refused.
-- **Viewers watch only what is already running.** A terminal must be live on the host (a tmux
-  session, or a session a client holds open). An SSH-project node is watchable only while the host
-  core holds it live, because `sshRemote` is stripped from a viewer's create.
-- **The role is read once per connection in the renderer.** A promotion or demotion reaches the tab's
-  UI only after a reconnect. The host enforces the current role on every message regardless.
-- **Viewer affordances are offered and then refused:** kanban card moves and column edits (they
-  snap back), the add-node menus (the host refuses the terminal), Source Control and Explorer writes,
-  and the board-log comment box for Viewers. Typing is blocked (`disableStdin`) and nodes cannot be
-  dragged.
-- **Owners approve only from a desktop hosted tab.** A Server Edition browser tab has no hosted api,
-  and the CLI cannot approve.
-- **A `pinFailed` session cannot be removed with `team remove`.** When both humans approved but the
-  pin write failed, the session is served as a Viewer with no team entry, so `team remove` answers
-  "No team member has that key." Restart the service: every session is cut, members reconnect on
-  their own, and that device becomes a pending request again. (`team rotate-key` also works, but
-  invalidates every join code.)
-- **A board-log comment's author is what the commenter's tab says.** The entry is written with the
-  author the client sent (its presence name and color), so a Commenter can post a comment under
-  another member's name. The host checks the project, that it is a comment, its shape and its rate,
-  not who wrote it.
-- **Approved devices have no label** in `team.json` and `team status`, and there is no relabel verb.
-- **Device mints are shared by the team.** The backend's free device-mint damper (10 per 24 h) is
-  keyed by the **host's** device id, so every joiner of one team draws from one budget. A device
-  mint that times out after the backend committed it mints again on the next attempt (the endpoint
-  is not idempotent).
-- **The 17th concurrent join request** (and an older request replaced by a newer one from the same
-  device) is refused with the same `denied` reason an owner's decline sends, so that joiner reads
-  "An owner declined the request."
-- **Tabs are not persisted.** After an app restart a team's tabs come back when its boot reconnect
-  is approved, never as greyed placeholders.
-- **Share with team does not resume managed-account agents.** The server core cannot map this
-  desktop's account directory to an account of its own, so those agents are listed for a manual
-  resume.
-- **A root SSH login cannot share** (see [Refusals](#refusals)): the server core would run as root.
-- **Server Edition browser tabs do not see a newly adopted project until they reload.**
-  `team bootstrap` saves and announces the project, but the browser's merge (`replaceProject`)
-  ignores a project id it does not already hold. Hosted desktop tabs are told by
-  `relay:hosted:shared-changed` and open it at once.
-- **The installed server's idle reaper now also sees this desktop's other sessions on that host.**
-  Every nodeterm-server sweeps both the `node-terminal` and the `nodeterm-rmt` sockets
-  (`docs/SERVER.md`, "Session budget"), so once a server is installed there, the detached sessions
-  of this desktop's OTHER SSH projects on that host fall under the same rules: never an attached
-  one, never one active within the grace window (6 h by default), and only under memory pressure or
-  past the detached-session cap. A reaped session cold-restores the next time it is opened.
-- **Processes in plain terminals stop at the handover.** Only agents continue; the confirm lists
-  every plain terminal that is running something.
-- **A connection that drops while `team bootstrap` runs** leaves the desktop unable to tell whether
-  the server took the project, so it reopens the SSH project (and says the host may have finished
-  anyway), but the server may already hold and share it. Run Share with team again:
-  `team bootstrap` is idempotent, so the second run finishes the job with the same adopted project,
-  not a second one.
+- ** 脸孔没有显示同行在别处工作。 ** 非编辑者的存在被过滤到
+共享列述项目的同行(安全审计(a),见[Roles在联合国主持下),因此未共享的团队成员
+项目根本不出现在它的面孔里, 甚至不作为"其他地方"。
+- ** 上下文计量表需要一个可归属的会话。 **`context:update`仅针对非编辑
+会话主机对共享节点的代理状态镜像属性;会话镜像没有
+已看到一个钩子事件, 因为主机开始 显示一个查看器 那个表直到它显示。
+- ** 查看器仍然可以间接暂停共享终端。 **`pty:flow`暂停被拒绝,但是
+中继端,其套接字积压通过 1 MB 需要阶段 2 的套接字后压票,该
+暂停每个订阅者的共享 pty , 直至积压排出低于 256 KB 或对等点
+叶子 过去 8 MB 其输出被丢弃( 稍后重排) , 暂停被还原
+(单位:千美元)`ui-sink-registry.ts`) (中文(简体) ).
+- ** 共享画布编辑:** 在共享画布的授权下,参见[已知限制](#已知限制).
+- ** 中继制表的简易模式“代理运行”** (`GitHubIssueSummaryModal`→`BoardLogPanel`)仍然将LOCAL api与中继工程的id配对:`KanbanView`执行
+App的本地供应商, 和卡片模式不同, 这种模式没有包在`ProjectSessionScope`,所以历史是从这个机器的核心读来的,而不是宿主的. 没错
+; 后续行动。
+- ** 大型寄存器的子文件夹中不包含查看器。 ** 查看器和评论器获得 git
+面板只针对一个属于自身寄存器顶端文件夹(或工作树)的项目。 A 怎麼了?
+monorepo 子文件夹显示其文件, 但拒绝每个 git 读取( 见 [Roles] (# roles)) 。
+- ** 查看器的 git 状态可以在服务器的数据文件夹中命名文件. ** 当共享根是一个
+包含数据文件夹、未跟踪和不忽略的寄存器(dotfiles寄存器在`$HOME`例如,`git:status`列出里面的 FILE 名称。 其内容被拒。
+-**维耶尔只看已经运行的东西。** 终端必须在主机上直播( tmux)
+届会,或客户端举行的届会。 一个 SSH 项目节点只在主机时可以监视
+核心让它活下来 因为`sshRemote`从观众的创造中剥离
+- ** 该角色在渲染器中每连接一次。 ** 升级或降级到标签
+UI在重新连接后才会使用. 主机在每条消息上执行当前的角色,无论怎样.
+- ** 提供购买价,然后拒绝:** kanban卡移动和列编辑(它们)
+source Control and Explorer write, 页面存档备份,存于互联网档案馆, p.
+和查看器的棋盘-日志注释框。 打字被屏蔽( N)`disableStdin`)和节点不能是
+拖着
+- ** Owners只从桌面主机标签核准。 ** 服务器编辑浏览器标签没有主机 api,
+国家行动倡议不能批准。
+- **A. 妇女`pinFailed`无法删除会话`team remove`.** 当双方同意,但
+pin 写入失败, 会话作为查看器, 没有团队条目, 所以`team remove`回复
+"没有队员有钥匙" 重新启动服务: 每场会话都被剪切, 成员重新连接到
+他们自己的,而这个设备又成为了等待处理的请求。 (`team rotate-key`也行,不过
+取消每个关联代码。 )
+-** 一个board-log评论的作者是评论员的标签所写的.** 该条目与
+作者客户端发送( 其存在名称和颜色) , 因此注释器可以在
+另一个成员的名字。 主机检查项目, 这是一个评论,它的形状和速度,
+不是谁写的
+- ** 经核准的设备没有标签**`team.json`和`team status`,没有重新标记动词。
+-** Device薄荷由团队分享。 ** 后端的免费设备薄荷坝(每24小时 10)是
+由 **host 的 ** 设备 ID 键入,所以一个团队的每个加入者都从一个预算中提取. 一个设备
+后端承诺之后的薄荷再次在下一次尝试中(终点)
+并非专有。
+- ** 第17次同时提出的合并请求**(以及由同一请求中较新的请求取代的旧请求)
+设备)以同样方式被拒绝`denied`说明所有者衰落的原因 所以加入者会读
+"一个主人拒绝了请求".
+- ** 未持续进行。 ** 应用程序重新启动后, 团队的标签会重新连接
+绝不是灰色的占位濑
+- ** 与团队分享不恢复管理下的账户代理人。 ** 服务器核心无法映射此功能
+桌面账户目录到自己的账户,因此这些代理被列出为手册
+续会。
+- ** A root SSH 登录不能共享**(参见 [Refusals] (# refusals)):服务器核心将作为root运行.
+- ** Server版浏览器标签在重新装入之前不会看到新通过的工程。 **`team bootstrap`保存并宣布项目, 但浏览器的合并( S)`replaceProject`页:1
+e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. e. 接著看,接著看,接`relay:hosted:shared-changed`立刻打开
+- ** 已安装服务器的闲置收割者现在也在主机上看到这个桌面的其他会话。 **
+每个节点服务器都扫描`node-terminal`页:1`nodeterm-rmt`套接字
+(单位:千美元)`docs/SERVER.md`,“会议预算”),因此,一旦安装了服务器, caseviews
+此桌面上的其他 SSH 项目属于相同的规则范围: 从不附加
+一,从不活跃于宽视窗内(默认为6小时),只在内存压力下或
+过了脱开的会话盖。 下次开机时会冷冻地恢复
+- ** 在交接时停靠普通码头的手续。 ** 只有特工继续;确认名单
+每个普通终端 运行的东西。
+- ** 连接在`team bootstrap`运行** 使得桌面无法判断是否
+服务器拿走了项目, 因此它重新打开 SSH 项目( 并说主机可能已经完成)
+无论如何,但服务器可能已经持有并共享它. 再次与团队共享运行 :`team bootstrap`所以第二 真的吗?
+不是第二个
 
-## Surfaces
+□ 表面
 
-- **Desktop:** full. It joins by code, reconnects from bookmarks, an owner's hosted tab approves
-  requests and copies the invite code, and Share with team turns an SSH project into a hosted team
-  (macOS, Linux and Windows desktops; the host must be Linux). A Viewer's tab gets the read-only
-  banner, a read-only canvas and read-only terminals (canvas node and kanban card modal).
-- **Server Edition:** the **host**, managed with the `team` CLI over SSH. Its browser clients are
-  not hosted peers; the access policy never applies to them, and they cannot call `relay:hosted:*`
-  (those verbs are intercepted inside the relay session and never registered on the platform). A
-  join code pasted into a browser tab gets one "not supported in the browser build" notice. Share
-  with team does not apply (the Server Edition has no SSH projects, and its `shareTeam` rejects with
-  `E_UNSUPPORTED`), but `team bootstrap` and `team resume` work from a shell on the host.
-- **Mobile:** N/A for v1. The phone still speaks the legacy relay dialect. The host it would join
-  now exists in core (a standing listener on the tunnel dialect); the phone side needs the
-  tunnel-dialect migration (`docs/ios-protocol-migration.md`) and a join flow modelled on
-  `hosted-join.ts`. Nothing here has run against a phone. That is a follow-up for `nodeterm-ios`.
-  Share with team is N/A there as well: the phone neither hosts nor joins a hosted team.
+- 装满了 它通过代码加入,从书签重新连接,一个所有者托管的标签批准
+请求和复制邀请代码,与团队共享将SSH项目转换为托管团队
+(macOS,Linux和Windows桌面;主机必须是Linux). 查看器标签只读
+横幅、只读画布和只读终端(canvas节点和kanban卡模式)。
+- ** 服务版:** 主机**,管理与`team`CLI过SSH。 它的浏览器客户端是
+非主机同伴; 访问政策从未对他们适用, 他们不能调用`relay:hosted:*`(这些动词在中继会话内被拦截,从未在平台上注册). A级
+加入编码粘贴到浏览器标签中,得到一个"在浏览器构建中不支持"的通知. 份额
+组不应用(服务器版没有 SSH 工程,其`shareTeam`拒绝方式`E_UNSUPPORTED`不过`team bootstrap`和`team resume`由主机上的壳体工作。
+- **机动车:**v1的编号/A。 手机仍会说传承中继方言. 它会加入的东道主
+现在存在于核心中(隧道方言上的一个站着的听众);电话方面需要
+隧道对射迁移(`docs/ios-protocol-migration.md`)和以`hosted-join.ts`这儿没有电话 这是后续`nodeterm-ios`。 。 。
+与团队共享的还有那里N/A:电话既不是主机,也不加入主机团队.
 
-## Device checklist
+□ 设备核对表
 
-Owed before recommending the feature. Run the core on a Linux host under a sub-user, with the owner
-on a Mac and a second desktop as a teammate. Record `team status --json` at each step.
+在推荐这个功能之前就输了. 在子用户下运行 Lin 有什么核心吗 ?
+在Mac和第二个桌面上作为队友。 记录`team status --json`在每一个步骤。按照联合国的判断,
 
-1. **Mac lid closed.** With the owner's Mac lid closed, an Editor teammate keeps typing, and can quit
-   and relaunch the app and reconnect with no prompt on either side.
-2. **Mints over one day.** Sample `scheduler.mintsLastHour` hourly for 24 h. Expected about 40 in an
-   idle hour plus one per teammate connection; pass at 60 or less in an ordinary hour, and never
-   `lastError: mint budget` (the 200 cap).
-3. **Viewer refusals.** As a Viewer: the banner says "You're a Viewer in X — terminals are read-only.
-   Ask an owner for Editor access."; typing into a terminal does nothing; nodes do not drag; an
-   editor-node save and a Source Control commit are refused with "Viewers can't do that here. Ask an
-   owner for Editor access." (record where each surface shows it); a kanban card move snaps back.
-4. **Service restart.** `systemctl --user restart nodeterm-server`: every teammate's tab greys and
-   comes back on its own within about 30 s, with no dialog. If the service takes longer, each tab
-   needs one click.
-5. **Removal.** `team remove <key>` on a connected teammate: their tab says "X: Your access to this
-   team was removed by an owner.", and their next attempt is a new join request.
-6. **Owner offline, new device.** With no owner connected, a new device pastes the code and presses
-   OK on its SAS prompt. About 2.5 s later it shows "Waiting for an owner of X to approve this
-   device…" (the notice starts only after that OK), `team status` lists the request, and after 10
-   minutes the joiner reads "Could not open X: No owner answered the request in time."
-7. **Corrupt host key.** Corrupt `host-key.json` and restart: the journal says "Hosted team relay:
-   OFF — the host key could not be read", `team status` says why, `team init` refuses, and the key
-   file is left as it was.
-8. **Long session.** A teammate stays connected for over an hour without the tab greying. The host
-   never refreshes a bridged session, and nodeterm-server's relay broker never expires or evicts a
-   bridged socket (it closes only a listener no peer has joined, at its token's `exp + 30 s`). This
-   item confirms that against the deployed relay.
-9. **Viewer size.** A Viewer with a small window does not shrink the Editor's terminal.
-10. **Two owners.** With two owners connected, one approves a request; the other owner's dialog
-    closes with "Another owner answered this request."
-11. **Device-key path on a real Mac.** On a packaged Mac build, after the desktop has joined a hosted
-    team or used a Team Access invite or pairing code (phone pairing does not count), the key file
-    is `~/Library/Application Support/node-terminal/remote-peer-key.json` (the command under "Your
-    desktop's device key" prints the key), and
-    `ls ~/Library/Application\ Support/*/remote-peer-key.json` finds no other copy.
-12. **Edits persist with no browser attached.** With the service headless and no Server Edition tab
-    open, an Editor adds a node, moves another, draws a link and moves a card in a shared project.
-    Wait 5 s, then `systemctl --user restart nodeterm-server`: after the reconnect every edit is
-    still there, and in the project's `.nodeterm/project.json`.
-13. **A `git pull` during a drag.** While a teammate drags a node of a shared project, pull (or hand
-    edit) that project's `.nodeterm/project.json` on the host with a change to another node. No
-    client shows the Reload / Keep mine bar, the pulled change appears on every client, and the
-    teammate's node stays where they dropped it.
-14. **Two cards at once.** Two teammates move two different cards of one shared board at the same
-    moment. Both moves stay, on both screens and after a service restart.
-15. **A Windows joiner.** A teammate on a Windows desktop joins, moves a card and adds a column; both
-    are still there after a service restart.
-16. **Key proof against production.** With nodeterm-server deployed and `POP_SECRET` set (its boot
-    log does not say `relay proof-of-possession is DISABLED`):
-    1. The hosted core's first mint carries `popChallenge`/`popProof`, and `team status` stays
-       running (`Hosting: ON — listening for teammates.`, no key-proof line).
-    2. A second machine joins with the code.
-    3. A host-token request without a proof for that host now answers `403 pop_required`. Take the
-       join code's `hostDeviceId` and `hostPublicKeyB64` from `node $APP team info --json`, then:
+1. ** 电脑盖关闭。 ** 随着主人的Mac盖子关闭,一个编辑队友继续打字,可以退出
+并重新启动应用 并重新连接, 两边都没有迅速。
+2. ** 超过一天的矿物。 ** 样本`scheduler.mintsLastHour`24小时,预计约40小时
+空闲时间加每个队友一个连接;在正常时间60岁或不到60岁时通过,从不`lastError: mint budget`(200盖).
+3. ** 证人拒绝。 ** 作为查看器:横幅上写着"你是X的查看器——终端只读.
+要求所有者访问编辑器。” ; 输入终端不起作用; 节点不拖动; a
+编辑器节点保存和源控任务被拒绝使用"Viewers不能在这里这样做. 问
+编辑器访问的拥有者 ” (记录每个表面显示它的地方); kanban 牌会向后移动 。
+4. ** 服务重新开始。 **`systemctl --user restart nodeterm-server`:每个队友的标签灰色和
+大约30秒之内,没有对话。 如果服务需要更长的时间, 每个标签
+需要一击。
+5. ** 驱逐。 **`team remove <key>`在一个相连的队友上:他们的标签写着"X:你访问这个
+他们的下一个尝试是新的联合请求。
+6. **奥纳离线,新装置。 ** 没有连接所有者, 新设备会粘贴代码并按下
+好的,在SAS的即时。 大约2.5秒后,它显示 "等待一个X的拥有者批准这个
+设备..." (通知从那之后开始),`team status`列出请求,并在 10 之后
+分钟 加入者读到"Could not open X:没有所有者及时回答请求".
+7. ** 更正主机密钥。 ** 腐败`host-key.json`并重新启动:日记上写着:"Hosted team reض:
+关闭——主机密钥无法读取”,`team status`说为什么,`team init`拒绝,键
+文件是原样的。
+8. ** 年度会议。 ** 一个队友保持一个多小时的连接 没有标签灰色。 东道主
+被拒绝的 拒绝 被拒绝的 被拒绝的 拒绝 被拒绝的 拒绝 被拒绝的 事实是 被拒绝的 拒绝 被拒绝的 拒绝的 拒绝 的 拒绝 被拒绝的 拒绝 被拒绝的 拒绝 被拒绝的 拒绝 被拒绝的 拒绝 被拒绝的 拒绝 的 拒绝 的 拒绝在上述的 拒绝 的 拒绝 被 的 拒绝的 拒绝 的 拒绝 的 拒绝 的 拒绝 被 的 拒绝 的 被 的 拒绝 的 拒绝 的 拒绝 的 的 拒绝 的 拒绝的 拒绝的 的 的 拒绝 的 的 的 的 的 的 的 的  的 的 的  的 的  的 的 拒绝 的 的 的  的 的 的 的 的 的 的 的 的 的  你到底的 的  的 的 的 的 的 的 的 的 的 的 的  你就是的 的 的 的 
+桥接套接字( 它只关闭一个没有加入对等点的听众, 按其符号)`exp + 30 s`) (中文(简体) ). 这个
+物品 安全理事会在部署的中继器上证实这一点。
+9. ** 车辆尺寸。 ** 带有小窗口的查看器不会缩小编辑器的终端.
+10. ** 两个业主。 ** 连接两个所有者, 一个批准请求; 另一个所有者对话框
+关闭与"另一个主人回答了这个要求".
+11. **真正的Mac上的Device键路径。 ** 在被包装的Mac 构建上, 在桌面加入主机后
+组或使用 Team Access 邀请码或配对码(电话配对不计数),密钥文件
+这是`~/Library/Application Support/node-terminal/remote-peer-key.json`(命令下"你的"
+桌面设备密钥“打印该密钥”, 快去`ls ~/Library/Application\ Support/*/remote-peer-key.json`找不到其他副本。
+12. ** 编辑持续存在,没有附带浏览器。 ** 没有服务头和服务器版标签
+打开,编辑器会添加一个节点,移动另一个节点,绘制链接并在共享项目中移动一个卡片。
+等五点`systemctl --user restart nodeterm-server`: 在重新连接后, 每次编辑都是
+还在,项目里`.nodeterm/project.json`。 。 。
+13. **A可行的`git pull`拖动期间** 当队友拖动共享项目的节点时,拉(或手)
+编辑)`.nodeterm/project.json`在主机上加换到另一个节点。 没有
+客户端显示重装 / 保留矿井栏, 在每个客户端显示已拉动的更改, 以及
+队友的节点 留在他们放弃的地方。
+14. ** 两张牌一次。 ** 两个队友移动两个不同的牌 一个共享板在同一处
+等会儿 两个动作都停留在屏幕上,并在服务重启后.
+15. **A 视窗连接器。 ** Windows桌面上的队友会加入,移动一张牌并添加一个列;两者均
+正在恢复服务后仍然在那里。
+16 拒绝为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为顽为为为为为为为为为为为为为眷为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为能够在为为为为为为为为为为为为为为为为为为为为为为为为 也许我为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为为 和`POP_SECRET`设置( 启动)
+日志不表示`relay proof-of-possession is DISABLED`:
+1. 主机核心的第一个薄荷载体`popChallenge`页:1`popProof`,以及`team status`留下来
+运行( R)`Hosting: ON — listening for teammates.`,没有密钥防线)。
+2. 第二台机器与密码结合。
+3. 没有证明主机的宿主请求现在得到答复`403 pop_required`打开
+加入代码`hostDeviceId`和`hostPublicKeyB64`从`node $APP team info --json`,则:
 
        ```bash
        curl -sS -w ' %{http_code}\n' -X POST https://api.nodeterm.dev/v1/relay/host-token \
          -H 'content-type: application/json' \
          -d '{"deviceId":"<hostDeviceId>","hostPublicKeyB64":"<hostPublicKeyB64>"}'
        # {"error":"pop_required"} 403
-       ```
-17. **Share from a Mac, onto a fresh host.** On a Linux host with no nodeterm-server, an SSH project
-    with one idle Claude node and one plain terminal running a dev server, opened from a Mac. Share
-    with team: the confirm names the host and login, says what will be installed, carries the
-    security sentence, and lists the Claude node under "These agents continue on the server:" and
-    the dev server under "These terminals are running something that will stop:". The installer's
-    output streams, the result shows the invite code, the SSH tab is replaced by the team's tab with
-    no SAS prompt, and `team status --json` lists the Mac as an owner. On the host,
-    `tmux -L nodeterm-rmt ls` no longer lists the project's `nt-<id>` sessions.
-18. **Share from Windows, onto an installed host.** The same from a Windows desktop, onto a host
-    whose per-user nodeterm-server is already running: the confirm has no install line, no
-    installer runs, and the result and the tab are as in item 17. Run each desktop against the other
-    kind of host once too.
-19. **A teammate joins with the code.** A second desktop pastes the result's invite code into New
-    Remote Connection, reads its SAS to the owner, and is approved; it sees the shared project's tab
-    with its nodes, and can watch the resumed agent.
-20. **A resumed agent continues its conversation.** On the team's tab, the Claude node from item 17
-    shows its earlier conversation, answers a follow-up that depends on it, and its status badge
-    moves on both desktops. Its session is on the server core's socket (`tmux -L node-terminal ls`
-    lists `nt-<id>`), and no second `claude` for that conversation runs on the host.
-21. **A second project appears live.** With the teammate from item 19 connected, share a second SSH
-    project on the same host: the result shows the same invite code, and the teammate gets a second
-    tab without reconnecting. `team unshare <projectId>` of it closes that tab on their side.
-22. **Reopening the old SSH project warns.** From "Recently closed", with ⇧⌘T, and by opening the
-    same host and folder as an SSH project again: each warns, naming the team and the host. Cancel
-    leaves it closed; "Open here anyway" opens it, and its later saves reach the host's
-    `.nodeterm/project.json` again. Its Claude node does not resume on its own: it shows the
-    "Not resumed" banner, and no second `claude` for that conversation starts on the host.
-23. **A home folder is refused.** An SSH project left at `~` (the dialog's starting folder): Share
-    with team refuses it before anything is installed ("This project's folder is your home
-    directory…"). On the host, `team bootstrap --adopt ~ --json` answers `E_BAD_CWD`.
-24. **Cancel during the install.** On a fresh host, press Cancel while the installer streams: the
-    result says the install was cancelled, the SSH project stays open and unmarked, its terminals
-    keep running, and nothing is bootstrapped.
-25. **Going to a shared node lands on the team's tab.** After item 17, a completion notification of
-    the resumed agent, its sessions-sidebar row, ⌘K and a teammate's face all open the team's tab
-    with the node focused, never the reopen warning of the closed SSH project. Close the team's tab:
-    it is not listed under "Recently closed" (nor are its closed sessions), ⇧⌘T on a node deleted in
-    it shows the closed-tab notice and opens nothing, and a notification for the shared node now
-    shows the SSH project's reopen warning. No `nt-<id>` session appears on this computer's own
-    tmux socket at any point.
+       ```17. ** 从Mac分到新宿主。 ** 在带有节点服务器的 Linux 主机上, 一个 SSH 项目
+一个闲置的Claude节点和一个运行dev服务器的普通终端, 好了,先生们。 份额
+与团队:确认主机和登录名称,说明将安装什么,携带
+安全句,并将克劳德节点列在"这些代理在服务器上继续:"和
+Dev 服务器在“这些终端正在运行一些会停止的东西:”下。 安装器
+输出流 , 由 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基  那么 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 基 
+没有 SAS 提示,和`team status --json`将Mac列为所有者。 在东道主,`tmux -L nodeterm-rmt ls`不再列出项目的`nt-<id>`届会。
+18. ** 从Windows分到已安装的主机。 ** 从 Windows 桌面到主机的相同
+已运行 那我们的用户节点服务器 : 确认没有安装线, 没有
+安装器运行,结果和标签与项目17相同. 将每个桌面对齐运行
+那种主人也曾经。
+19. **一名队友加入代码。 ** 第二个桌面将结果的邀请代码粘贴到 New
+远程连接, 将其 SAS 读给所有者, 并获得批准; 它看到共享工程的标签
+和它的节点,并可以监视恢复的代理。
+20. ** 一名恢复工作的代理人继续谈话。 ** 在球队的标签,克劳德节点 从项目17
+显示其先前的对话,回答一个取决于它的后续, 及其状态徽章
+在两个桌面上移动。 它的会话位于服务器核心的套接字上( Q)`tmux -L node-terminal ls`列表`nt-<id>`),无秒`claude`因为那个谈话在主持人身上进行
+21. ** 第二个项目似乎在现场。 ** 与19项的队友连接, 分享第二个SSH
+同一主机上的项目:结果显示相同的邀请码,队友获得第二秒
+选项卡,不重新连接。`team unshare <projectId>`它关闭了 对了,他们一边的标签。
+22. ** 重开旧的SSH项目警告。 ** 从"最近关闭",与QQT, 通过打开
+又与SSH项目相同的主机和文件夹:每个警告,命名团队和主机. 取消
+让它关闭; "无论如何在这里打开" 打开它, 它的后期保存到达主机的`.nodeterm/project.json`再来一次 它的Claude节点并不单独恢复:它显示
+"不恢复"的旗帜,没有第二`claude`谈话从主持人开始
+23. ** 主文件夹被拒绝。 ** 一个 SSH 工程`~`(对话框的起始文件夹) : 份额
+团队在安装任何设备前拒绝( “ 此工程的文件夹是您的家 )
+目 录...) 在东道主,`team bootstrap --adopt ~ --json`回复`E_BAD_CWD`。 。 。 。
+24. ** 安装期间取消。 ** 在新主机上, 请在安装器流时按 Cancer: the
+结果显示安装被取消, SSH 项目保持开放且没有标记, 其终端
+继续跑, 没有东西被拖住。
+25. ** 前往团队标签上的共用节点。 ** 第17项之后,
+恢复的代理,它的会话边栏列,QQ和一个队友的脸都打开了球队的标签
+以节点为焦点,永远不要重开关闭的SSH项目的警告. 关闭团队标签 :
+它不列在“最近关闭的”下(也不在非公开会议上),QQT在节点上被删除。
+它显示关闭的调制解调器通知, 并且没有打开任何内容, 以及现在共享节点的通知
+显示 SSH 工程的重开警告 。 没有`nt-<id>`会话出现在此计算机上
+tmux 套接字在任何时间点。

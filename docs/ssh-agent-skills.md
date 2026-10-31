@@ -1,193 +1,179 @@
-# nodeterm skills in SSH projects
+> English: [docs/en/ssh-agent-skills.md](./en/ssh-agent-skills.md)
 
-How the agent-facing skills (`manage-nodeterm-canvas`, `get-linked-context`) reach an agent
-that is running on a **remote host** in an SSH project.
+# SSH诶项目的节点技能
 
-## The problem
+介绍人的技能如何`manage-nodeterm-canvas`, (中文).`get-linked-context`联系代理人
+运行在 SSH 项目中的 ** 远程主机**。
 
-Both skills were installed only into the desktop's own home:
+□ 问题
 
-- `manage-nodeterm-canvas` → `~/.claude/skills/…` + `<userData>/canvas-control/`
-- `get-linked-context` → `~/.claude/skills/…` + `<userData>/context-links/`
+这两种技能都只安装在桌面自己的家里:
 
-An SSH project's agent runs on the **host**, reads the **host's** `~/.claude/skills`, and finds
-nothing. Copying the files over would not have helped either: both shims were generated as
+- 怎么样?`manage-nodeterm-canvas`→`~/.claude/skills/…`+ 键`<userData>/canvas-control/`- `get-linked-context`→`~/.claude/skills/…`+ 键`<userData>/context-links/`
+
+一个SSH项目的代理人运行在**host**,读**host的**`~/.claude/skills`并找到
+没什么 复制文件也无济于事:
 
 ```sh
 ELECTRON_RUN_AS_NODE=1 exec "<the desktop's Electron binary>" "<…>/cli.mjs" "$@"
 ```
 
-— a path that exists on exactly one machine. And the Node CLI they exec'd talked to the hook
-server over `127.0.0.1:<port>`, which on the host is the host's own loopback, not the desktop's.
+—— 一条完全存在于一台机器上的路径. 和节点CLI 他们执行的谈话钩
+服务器结束`127.0.0.1:<port>`,在主机上是主机自己的回路,而不是桌面的回路.
 
-## The transport (already there)
+□ 运输(已经在那里)
 
-Nothing new had to be invented: an SSH project already runs a **reverse unix-socket tunnel** from
-the host back to the desktop's loopback hook server, because that is how remote agents report
-status (`RemoteHooks.setup`, `docs/`-less but see `src/main/remote-ssh/remote-hooks.ts`):
+不需要发明新东西:一个SSH项目已经运行了**逆向unix-socket隧道** from
+主机返回签约到桌面的回路钩服务器, 因为远程代理各种不同的报告方式
+状态(`RemoteHooks.setup`, (中文).`docs/`享受人权?`src/main/remote-ssh/remote-hooks.ts`:
 
 ```
 remote agent → curl --unix-socket ~/.nodeterm/hook-<projectId>.sock
              → ssh -R → desktop 127.0.0.1:<hook port>
 ```
 
-The per-project endpoint file `~/.nodeterm/hook-endpoint-<projectId>.env` carries the live
-`NODETERM_HOOK_SOCK` / `_TOKEN` / `_VERSION`, and every remote session's tmux env already points
-at it (`NODETERM_HOOK_ENDPOINT`) along with `NODETERM_NODE_ID`. So the design rule is:
+每个项目的终点文件`~/.nodeterm/hook-endpoint-<projectId>.env`带活的`NODETERM_HOOK_SOCK`页:1`_TOKEN`页:1`_VERSION`,并且每个远程会话的 tmux env 已经点
+在它(`NODETERM_HOOK_ENDPOINT`) 和`NODETERM_NODE_ID`因此,设计规则是:
 
-> **The remote side is a thin client.** It ships no parsing, no state and no app knowledge — it
-> POSTs over the existing tunnel and prints what comes back.
+> **远程侧是一个瘦客户端。 ** 它没有分析,没有状态 没有应用知识——它
+> POST 覆盖了已有的隧道并打印了返回的东西。
 
-## What shipped: canvas control over SSH
+□ 什么运出 : 帆布控制 SSH
 
-1. **The CLI is now POSIX sh + curl** (`CONTROL_SHIM_SCRIPT` in `canvas-control-core.ts`),
-   replacing the Electron-as-Node CLI. It carries **no machine-specific paths**, so the same
-   script is installed on the desktop and on the host. It picks its transport from the endpoint
-   it was given: `--unix-socket $NODETERM_HOOK_SOCK` when one is advertised (SSH), else
-   `127.0.0.1:$NODETERM_HOOK_PORT` (desktop). `curl` is not a new dependency — the managed hook
-   script already requires it.
+1.** 国家综合指数现为POSIX sh + 卷曲**(b)`CONTROL_SHIM_SCRIPT`输入`canvas-control-core.ts`), (中文(简体) ).
+替换Electron-as-Node CLI. 它没有机器专用路径,所以是一样的
+脚本安装在桌面和主机上. 它从终点选择运输
+它被赋予:`--unix-socket $NODETERM_HOOK_SOCK`当广告发布时,`127.0.0.1:$NODETERM_HOOK_PORT`(台顶).`curl`不是一个新的依附关系——管理钩
+脚本已经需要它了 。
 
-   The request is **form-urlencoded**, not JSON: `curl --data-urlencode` is the only escaping sh
-   can be trusted with. Values like `--prompt`, `--html` and `--team` routinely contain quotes,
-   newlines and `$`, and hand-built JSON in sh breaks on all three. `parseControlBody`
-   (`hook-server.ts`) reads both dialects; the desktop's in-process callers still send JSON.
-   A `text/plain` `Accept` makes the server render the reply, since sh has no JSON parser.
+请求是**form-urlencode**,而不是JSON:`curl --data-urlencode`这是唯一的逃脱sh
+可以信赖。 诸如`--prompt`, (中文).`--html`和`--team`通常包含引文,
+新线和`$`和手造JSON 在sh休息 在全部三个。`parseControlBody`(单位:千美元)`hook-server.ts`)读两种方言;桌面的在流程中调用者仍然发送JSON.
+A级`text/plain` `Accept`因为SH没有JSON 解析器,所以让服务器提供答复。
 
-2. **`RemoteHooks.installCanvasControl`** writes the shim + `SKILL.md` onto the host, and merges
-   the same marker-delimited instruction block into the host's `~/.codex/AGENTS.md`,
-   `~/.gemini/GEMINI.md`, copilot's `copilot-instructions.md` and
-   `${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md` (that last path is expanded by the **remote**
-   shell — the desktop's XDG value says nothing about the host). Managed Claude accounts, whose
-   sessions resolve skills relative to `CLAUDE_CONFIG_DIR` and never see `~/.claude/skills`, get
-   their own copy (`installCanvasSkillIntoAccountDir` when the account is added). On a connect
-   these are not written blind: `RemoteHooks.refreshAgentTools` checks them (see
-   [Keeping the host current](#keeping-the-host-current)) and rewrites only what differs.
+2. ** 联合国`RemoteHooks.installCanvasControl`** 写shim +`SKILL.md`在主机上,并合并
+相同的标记限制指令块进入主机`~/.codex/AGENTS.md`, (中文).`~/.gemini/GEMINI.md`副驾驶`copilot-instructions.md`和`${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md`(最后一条道路由** 远**
+shell——桌面的XDG值对主机不说. 管理着克劳德的账户
+课程解决相对于`CLAUDE_CONFIG_DIR`永远 看不到`~/.claude/skills`获取
+副本`installCanvasSkillIntoAccountDir`当账户被添加的时候。 在连接上
+这些不是盲文:`RemoteHooks.refreshAgentTools`检查它们(见
+[保持主机电流] (# 保持主机电流) , 只重写不同之处 。
 
-3. **The env gap** — `remoteHookEnvArgs` injected only endpoint/node-id/version, so a remote
-   session inherited neither `NODETERM_AGENT_ID` nor `NODETERM_CANVAS_CONTROL`. The CLI gates
-   itself on the latter, so the skill would have been inert on every SSH node even once
-   installed. It now mirrors the local `hookServer.buildPtyEnv` exactly, `canControlCanvas`
-   gate included.
+3. ** 洞隙** -`remoteHookEnvArgs`仅注射端点/ 节点代号/ 版本, 因此是远程
+无法继承`NODETERM_AGENT_ID`也没有`NODETERM_CANVAS_CONTROL`. CLI 大门
+因此,技能是惰性的 每个SSH节点甚至一次
+已安装。 它现在反映了当地人`hookServer.buildPtyEnv`没错`canControlCanvas`包括大门。
 
-### Flag syntax, and why a verb must not depend on it
+QQ 旗帜语法,为什么动词不能依赖它
 
-Flags are `--flag value` or `--flag=value`, and a flag may carry no value at all, anywhere on the
-line. The `=` form is the **only** way to pass a value that itself starts with `--`
-(`open-terminal --cmd=--version`); written as two tokens, a leading `--` is read as the next flag,
-so `--text --oops` sends an empty `--text` plus a stray `--oops`.
+旗帜是`--flag value`或`--flag=value`,而旗帜可能没有任何价值,在任何地方
+线条。 那个`=`窗体是 ** 只 ** 传递它本身开始的值的方法`--`(无)`open-terminal --cmd=--version`; 写成两个符号, 一个领先`--`读作下一面旗帜,
+这样`--text --oops`发送空`--text`加一个流浪者`--oops`。 。 。
 
-That is a deliberate trade. The loop used to consume the token after any `--flag`
-*unconditionally*, so `--read --node b1` became `arg.read=--node` with `b1` dropped, and a
-valueless flag was expressible only as the last token on the line. Both failures were **silent** —
-the request stayed well-formed and the server answered about the wrong flag, which sends the next
-debugger to the verb table instead of to the shim.
+这是蓄意交易。 用于在任何后消费符号的循环`--flag`*无条件* 所以`--read --node b1`成为`arg.read=--node`与`b1`掉下来,还有
+无价值旗帜只能作为线上的最后一个标志来表示。 两次失败都是**沉默** —
+请求保存完好, 服务器回答错误的旗帜, 它发送下一个
+调试器到动词表而不是shim.
 
-**The staleness window this lives in:** the shim is rewritten locally at every app boot, and an
-SSH host's copy is checked on every connect and brought up to this build (below), so a parser
-improvement reaches remote agent nodes on the first connect after the update. A host can still run
-an older loop for a while — its tunnel is down, the file is unreadable, or a second desktop on an
-older build shares the host account — with nothing on the wire to say which loop is running. New
-verbs are therefore designed to parse identically under both loops: give every flag a value and
-the old and new loops agree.
+**  window  window  window  lives  lives
+SSH 主机的复制件在每一个连接上都检查过, 并带入到这个构建中( 下方), 所以一个解析器
+改进在更新后的第一个连接上到达远程代理点。 主机还能运行
+稍长一段时间的旧循环 —— 它的隧道下行, 文件无法读取, 或者第二个桌面在一个
+更古老的构建共享主机账户——线条上没有任何内容可以说明哪个循环正在运行. 新设
+因此,动词被设计为在两个循环下进行相同的解析:给每个旗帜一个值和
+新旧圈子都同意了
 
-### Keeping the host current
+QQ 保持主机当前
 
-Everything above is generated by the app, so a host's copy is only as current as the last build
-that wrote it. `RemoteHooks.refreshAgentTools` keeps it current, for the canvas and context shims,
-both skills (system and every managed account pinned to the host), and our instruction blocks:
+上面所有的东西都是由应用程序生成的,所以一个主机的拷贝只和最后一个架构一样流畅
+写的`RemoteHooks.refreshAgentTools`保持它的时尚, 对于帆布和背景shims,
+无论是技能(系统还是每个管理账户都由主机这种说法),还是我们的指令:
 
-- **One probe, one round trip.** The host runs POSIX `cksum` over each file (over exactly our
-  marker span for an instruction file), and the desktop compares that with the checksum of the
-  bytes it would write. Only what differs is rewritten; a current host costs one read and no
-  write. On a host with no `cksum`, the files it can read are written without comparison (as every
-  connect did before) and the blocks merged; missing, unreadable and gated files are still told
-  apart.
-- **When.** Every connect (a fresh master, or the one that survived an app restart) and every
-  reverse-tunnel repair. The 45 s watchdog costs nothing once the host is confirmed for this run,
-  retries an unconfirmed host on a 1/5/15-minute backoff, and looks again hourly — the only thing
-  that can change the files mid-run is someone else (another desktop, a hand edit).
-- **Never.** A file that cannot be read is not written over; a managed account whose dir is gone
-  from the host does not get it back (re-checked in the write itself); a probe reply that does not
-  parse changes nothing. A stray end marker left above a hand-deleted block is skipped — by the
-  merge and the probe alike — so it no longer makes every check append a new copy.
-- **A running agent** keeps what it already read: the shim's `help` is current as soon as the
-  file is, a Claude skill is re-read when it is next invoked, and codex / gemini / opencode read
-  their instruction files at session start.
+- 一个探测器,一个往返。 主机运行 POSIX`cksum`覆盖每个文件(确切的说是我们的文件)
+指示文件的标记跨度),桌面将它与校验和比较
+它会写字节。 只重写不同之处; 当前主机需要读一次, 没有
+写作。 在没有主机上`cksum`,它可以读取的文件不作比较(如每个
+连接已执行), 并合并块; 丢失、 无法读取和已加闸的文件仍然被告知
+分开
+-**何时** 每个连接(一个新主机,或者一个在应用程序重新启动后幸存的)和每个
+逆隧道修复. 这45个监视器一经主机确认 就一文不值
+在1/5/15分钟的后台上重复一个未经证实的主持人,
+能够更改中途运行的文件是其他人(另一个桌面,一个手编辑)。
+- 从来没有。 无法读取的文件不被写入; 管理过的账户目录已丢失
+从宿主那里拿不回来(在写作中重新检查); 探测回复中没有
+解析会改变什么。 在手我们就删除块上方留下的偏差端标记被跳过——由
+合并和探测器都一样——所以它不再让每个检查附件成为新的副本.
+-** 一个运行中的特工** 保留它已经读到:shim's`help`状态
+文件是 Claude 技能在下次引用时被重新读取, 代码x / gemini / 打开代码读取
+在会话开始时它们的指令文件。
 
-### Gating and failure behavior
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}Gating and failing actory. {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}你觉得呢
 
-Install is gated on **both** a resolved remote `$HOME` (every remote path must be absolute — a
-literal `~` does not expand where these strings land) and a **verified** tunnel: `setup()` only
-returns an endpoint path after proving the reverse forward reaches *this* app run. A skill
-pointing at a dead socket is worse than no skill, because the agent retries instead of telling
-the user canvas control is unavailable.
+安装在 ** both ** 一个已解决的远程`$HOME`(每个此刻的远程路径必须是绝对的——a)
+字义`~`和经过**验证的**隧道:`setup()`仅限
+返回一个在证明反向前进到达 * 此* app 运行后的结束点路径。 一个技能
+指着一个死了的插座比没有技能更糟糕 因为特工没有告诉
+无法使用画布控制 。
 
-Everything else fails open, per step: an unwritable instruction file, a host without `curl`, a
-dropped connection — the session runs, just without canvas control. Outside a nodeterm-spawned
-session the shim exits immediately on its env gate, so it stays inert in the user's own
-terminals (same discipline as the managed hook script).
+其它所有失败都会打开, 每一步: 无法写入的指令文件, 没有主机 。`curl`页:1
+已丢弃的连接 —— 会话运行, 没有帆布控制 。 在节点外
+shim 立即在它的嵌入门上通过,所以它不会在用户自己的位置上停留
+终端(与管理的钩脚本相同的学科)。
 
-## What shipped: context link over SSH
+□ 什么运算: SSH 上下文链接
 
-`get-linked-context` could not use the canvas-control trick as-is: its CLI was a ~230-line parser
-for three transcript formats (claude JSONL, codex rollout, gemini event-sourced, plus an opencode
-export), too much to express in sh — and the host may have no `node` at all.
+`get-linked-context`无法使用画布控制技巧 as- is: 它的 CLI 是 ~ 230 行 剖析器
+真高兴能有3种笔录格式(Claude JSONL,代码推出,Gemini事件源,外加一个开放代码)
+导出),用sh表示太多——而主机可能没有`node`一点也不
 
-So the same rule was applied one level deeper: **the desktop does the reading and the parsing.**
+因此,同样的规则被应用到更深一层:**桌面进行读取和解析.**
 
-1. **The parsing moved out of the CLI** into `core/context-link-render.ts` — ordinary, tested TS
-   instead of JavaScript embedded in a template literal. `renderContextLink` takes a link document
-   and three injected fetchers and returns the text to print; it knows nothing about ssh, fs, or
-   tmux.
-2. **A `/context-link/<verb>` route** on the hook server answers with `text/plain`, and
-   `context.sh` — the sh+curl twin of `nodeterm.sh` — is the only client. The local path uses the
-   same route, so there is one implementation, not a local one and a remote one that drift.
-3. **Remote reads were already reachable** from the desktop: a remote node's hook-fed
-   `transcriptPath` *is* a remote path, read over the ControlMaster with `RemoteFile.readTail`
-   (bounded — a long session's transcript is tens of MB and a `summary` shows 15 lines), and
-   `PtyManager.captureSession` was already remote-aware, so `terminal` needed no new code. The
-   three deps are injected by `src/main` (`initContextLink(ptyManager, deps)`); the Server Edition
-   passes none and keeps its local-only behavior.
-4. **A missing link in the hook path**: the remote branch of the raw hook listener never called
-   `setNodeTranscript`, so a remote node had no known transcript at all. It does now — with the
-   path already jailed by `isSafeRemoteTranscriptPath`, so a forged POST cannot aim a link read at
-   an arbitrary remote file.
-5. **`resolveLinkTranscript` refuses the local locators for a remote node.** They search *this*
-   machine's disk and would have returned some unrelated local session's file — the linked agent
-   would have read a stranger's conversation with nothing to indicate it. For a remote node the
-   hook-fed path is the only trustworthy source; without it there is simply nothing to read yet.
+1. ** 解析从《国家清单》中移出**`core/context-link-render.ts`普通的、经过测试的TS
+而不是嵌入在模板文字中的 JavaScript 。`renderContextLink`获取链接文档
+和三个注入的获取器,然后返回文本打印;它对ssh、fs或
+.
+2. **A`/context-link/<verb>`路由** 在钩状服务器上的答案`text/plain`要是你认为`context.sh`-SH+Curl双胞胎`nodeterm.sh`这是唯一的客户端。 本地路径使用
+同样的路线,所以有一个执行,不是局部的,是偏僻的。
+3. ** 从桌面上读取凛然可及**:一个远程节点的钩子`transcriptPath`* 是* 一个远程路径, 在控制 Master 上 ...`RemoteFile.readTail`(捆绑着——长会记录有几十 MB和a`summary`显示15行),`PtyManager.captureSession`已经是远程意识之间建立的 所以`terminal`不需要新的代码。 那个
+3个是要注射的`src/main`(单位:千美元)`initContextLink(ptyManager, deps)`; 服务器版
+不通过任何行为,并保持其仅在当地的行为。
+4. **钩道缺失的链接**:原始钩听器的远程分支从未呼叫过`setNodeTranscript`,所以一个远程节点 根本没有已知的笔录。 它现在做到了——与
+已经被囚禁的道路`isSafeRemoteTranscriptPath`,因此伪造的 POST 无法瞄准读取的链接
+任意远程文件。
+5. ** 国家`resolveLinkTranscript`拒绝远程节点的本地定位器。 ** 他们搜索 * 此*
+机器的磁盘, 并且会返回一些无关的本地会话文件—— 链接代理
+会读到陌生人的谈话 却无动于衷 对于远程节点
+钩子喂食路径是唯一值得信赖的来源;没有它,根本就没有东西可以读。
 
-### Authorization
+授权
 
-The link document is chosen by the **requester's own node id**, and `pickLinkNode` will only
-return a node listed in it. So a caller holding the hook token still cannot read a node it was
-never linked to, and cannot read *through* an edge it does not itself hold (the link map is
-directional). The token remains the outer boundary, exactly as for status hooks. The one value
-that reaches a remote command line — an opencode session id — is shell-quoted at that site.
+链接文档由**请求者自己的节点 id** 选择,以及`pickLinkNode`只会
+返回其中列出的节点。 所以一个拿着钩子的呼叫者 仍然无法读出一个节点
+从未连接,也无法读取 * 通过 * 它本身没有的边缘( 链接地图是
+指向性). 标志仍然是外部边界,与状态钩一样。 一个价值
+到达远程命令行的 Opencode 会话 id 在那个站点被 shell 引用 。
 
-`docs/`-worthy consequence: at the time of this change `src/server` did not call
-`initContextLink`, so context link was absent on the Server Edition. **It is wired now** —
-`src/server/context-link.ts` calls `initContextLink(ptyManager, {})` and keeps the link map in step
-with the canvases on disk. It passes **no remote deps**, deliberately: that shell runs ON the host
-whose transcripts and tmux it reads, so local-only is the complete answer there and SSH projects are
-a desktop-only concept.
+`docs/`- 有意义的后果:在这一变化时`src/server`没有打电话`initContextLink`,因此服务器版没有上下文链接。 ** 现已接通。 **`src/server/context-link.ts`电话`initContextLink(ptyManager, {})`并保持链接地图的步进
+磁盘上有画布 它经过** 没有远程道具**,故意: 弹壳运行在主机上
+它读到的笔录和tmux, 所以只有本地是完整的答案 那里和SSH项目是
+一个只使用桌面的概念。
 
-## Testing
+□ 测试
 
-`canvas-control-shim.test.ts` runs the **real shim** under `/bin/sh` against a **real** hook
-server, over both a TCP port and a **unix socket** — the shim is generated source no compiler
-checks, and it is now the only canvas-control client. It covers the nasty-value round trip
-(quotes / newlines / `$` / backticks / backslashes), the positional forms, error propagation,
-the env gate, a bad token, a dead socket, and reading coordinates from the endpoint file.
+`canvas-control-shim.test.ts`运行 ** real shim ** 下方`/bin/sh`对**真**钩
+服务器,在 TCP 端口和一个 **unix 套接字** 上——shim 生成源代码无编译器
+检查,现在是唯一的帆布控制客户端。 它覆盖了下流价值的往返
+(引文/新线).`$`/ 回击/回击),位置表,错误传播,
+嵌入门, 一个坏的标志, 一个死塞, 和读取坐标 从端点文件。
 
-`context-link.cli.test.ts` does the same for the context-link shim, carrying over the fixtures and
-expectations of the suite that tested the retired Node CLI, so the rewrite answers for the
-behavior it inherited. `context-link.handler.test.ts` drives the real handler: authorization,
-the local/remote read split, and the locator guard.
+`context-link.cli.test.ts`对上下文链接shim, 携带固定装置和
+对测试已退休的节点CLI的套房的期望,所以重写答案
+行为它继承。`context-link.handler.test.ts`驱动真正的处理器: 授权,
+本地/远处读分,定位守卫。
 
-## Out of scope
+□ 超出范围
 
-- **Server Edition** — canvas control is not wired there at all (no `agent:control` handler),
-  which this change does not alter. The shim is now portable enough to be reused when it is.
-- **Mobile companion** — no canvas, so no canvas control to surface.
-- **Relay remote nodes** — a different transport with no client fs; unaffected.
+- **《服务版》**——帆布控制器根本没有接线(没有)`agent:control`处理者,
+但这一改变并不改变。 现在的Shim已经足够便携式了 当它被重新使用。
+-** 移动伴**——没有帆布,所以炽热的帆布控制器无法浮出水面.
+- ** 中继远程节点**——一种没有客户的普遍传输;不受影响。

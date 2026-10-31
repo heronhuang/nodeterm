@@ -1,1203 +1,1116 @@
-# Team presence — design
+> English: [docs/en/team-presence.md](./en/team-presence.md)
 
-**Date:** 2026-07-12
-**Status:** **Stage 1, Stage 2 and Stage 3 landed.**
-**Stage 1** — the `PresenceHub` (`src/core/presence/hub.ts`), both shells joining it (Server Edition
-browsers, the Electron window, cursorless relay phones), a real `window.nodeTerminal.presence` on
-**both** surfaces, and the three UI surfaces: project-scoped live cursors + cursor chat
-(`PresenceLayer`), the `Facepile` (off-project peers included), and per-node focused-avatar chips.
-**Stage 2** — terminal co-attach (the [Terminal co-attach](#terminal-co-attach) section): one pty,
-N subscribers; idempotent `pty:create`; smallest-subscriber-wins sizing; per-client backpressure with
-an 8 MB drop-and-redraw ceiling; typing attribution; and the delete/recycle split.
-**Stage 3** — canvas mutation sync (the [Canvas sync](#canvas-sync) section): a `canvas:mut` reflector
-that stamps one total order (`seq`) and fans each mutation to every client, a diff-based publisher
-with an `adopt()` loop guard and a solo gate, per-node last-write-wins in that order
-(`canvas-order.ts`) so concurrent edits **converge** instead of splitting the canvas in two, an
-in-place apply into the live React Flow array, a real `window.nodeTerminal.canvas` on both surfaces,
-and per-project apply (including into a loaded-but-inactive project's serialized nodes). Edges and
-board items now travel on the same channel, ordered by the same rules
-([Edge sync](#edge-sync-bridges--ropes), [Board sync](#board-sync-kanban)); on a Server Edition
-hosting a team, a shared project's content is written from these ops by the canvas authority
-(`docs/hosted-team-relay.md`). What it resolves and what it does not:
-[Concurrent-edit resolution](#concurrent-edit-resolution-what-converges-and-what-does-not).
-Deltas between this document and what actually shipped are recorded in
-[What Stage 1 changed](#what-stage-1-changed-relative-to-this-spec),
-[What Stage 2 changed](#what-stage-2-changed-relative-to-this-spec) and
-[What Stage 3 changed](#what-stage-3-changed-relative-to-this-spec).
-**Scope:** live cursors with names, ephemeral cursor chat, per-node "who is active here",
-and the terminal co-attach that makes those indicators mean something.
+# 团队存在-设计
 
-## Goal
+** 日期:** 2026-07-12
+** 现状:** 第1阶段、第2阶段和第3阶段着陆。 **
+** 步骤1**——`PresenceHub`(单位:千美元)`src/core/presence/hub.ts`),两个贝壳加入它(Server版)
+浏览器、电子窗口、无光标中继电话),一个真实`window.nodeTerminal.presence`打开
+** ** 表面, 以及三个UI表面: 工程扫描的活光标+光标聊天
+(单位:千美元)`PresenceLayer`,则`Facepile`(包括项目以外的同行),以及每个节点的焦点-avatar芯片.
+** 第2段** —— 终端连线([永久失效連結](#terminal-co-attach)段): 1 pty,
+N 订阅者; 同位素`pty:create`实例为:
+a 8 MB 投放和重排上限;打入归属;以及删除/循环拆分。
+** Stage 3 ** – 帆布突变同步(the [Canvas sync sync] (#canvas-sync) 部分): a`canvas:mut`反射镜
+邮票总订单`seq`)和粉丝每个突变 每一个客户端,一个diff的出版商
+带有`adopt()`循环守护和独奏门,按顺序排列
+(单位:千美元)`canvas-order.ts`因此同时编辑 ** converge ** 而不是将画布一分为二,a
+应用到活的 React Flow 数组,一个真实的`window.nodeTerminal.canvas`在两个表面,
+和每个项目适用(包括装入但未活动的项目的序列节点)。 边缘和
+棋盘物品现在在同一频道上行驶,按照同样的规则订购
+([Edge同步](#edge- Sync-bridges-ropes),[Board同步](#board-sync-kanban));在一个服务器版上;
+主办团队,共享项目的内容由帆布管理局从这些操作中写入
+(单位:千美元)`docs/hosted-team-relay.md`) (中文(简体) ). 它解决的和它不解决的:
+[同时编辑 也许我能用它来解释
+本文档与实际发货之间的三角洲记录在
+[什么阶段1改变了] (#什么阶段1 - 改变的 - 相对的 - 此谱),
+[第二阶段有什么变化] (#什么阶段-2-改变-相对-此谱)和
+[什么阶段3改变] (#什么阶段3-改变-相对-此谱).
+** 范围:** 有名称的活光标,ephemer 光标聊天,每个节点"谁在这里活动",
+和终端 联合附图 使这些指标 意味着什么。
 
-Turn nodeterm from a single-operator canvas into one a small team (~5–10 people) can inhabit
-at the same time: you see where your teammates' cursors are, you can say something quickly
-without leaving the canvas, and you can see who is sitting in — and typing into — a given
-terminal. Two people can look at the same terminal at the same time.
+□ 目标
 
-This is deliberately a *presence* feature, not a permissions feature. Identity is weak,
-there is no locking, and there are no roles. See Non-goals.
+将节点从一个单一操作帆布变成一个小团队(~5~10人)可以居住
+同时,你可以看到队友的光标在哪里,你可以快速说点什么
+你可以看到谁坐在... ... 和打入...
+终端。 两人可以同时看同一航站楼.
 
-## Constraints discovered in the codebase
+这是故意的 * 存在 * 特性, 不是权限特性 。 身份是脆弱的,
+没有锁,也没有角色。 见非目标。
 
-Three facts shaped every decision below:
+□ 密码国家的政府
 
-1. **There is no notion of a user anywhere.** Server Edition auth is a single shared
-   password (scrypt) with anonymous session tokens (`src/server/auth.ts`); the license layer
-   identifies a *device*, not a human (`src/core/license.ts`). Identity is invented from scratch.
-2. **Multi-client transport already exists.** `ServerPlatform.sinks` is a real client registry
-   (`src/server/platform-server.ts:104`) and `broadcast()` (`:96`) already fans out
-   `agent:status` and friends to every connected client. Presence needs no new transport.
-3. **Terminals are not shareable today.** PTY output is unicast to the creating client
-   (`Session.webContentsId`, `src/core/pty-manager.ts:251`, flushed at `:780`), and a second
-   client attaching to the same node runs `tmux -A -D` (`:668`) — the `-D` *detaches the other
-   client*. Two browsers on one node fight, and output follows whoever attached last.
+以下每项决定由三个事实决定:
 
-## Architecture
+1.** 没有任何用户的概念。 ** 服务器版 auth 是共享的
+密码 (crypt) 带有匿名会话符号 (`src/server/auth.ts`); 许可证层
+识别一个*装置 *,而不是人类(`src/core/license.ts`) (中文(简体) ). 身份是从零开始发明的。
+2. ** 多客户运输已经存在。 **`ServerPlatform.sinks`是一个真实的客户端注册
+(单位:千美元)`src/server/platform-server.ts:104`和 (中文(简体) ).`broadcast()`(单位:千美元)`:96`)已经粉丝出`agent:status`和每个连接客户的朋友 存在不需要新的运输工具。
+3. ** 任期今天无法分享。 ** PTY 输出为创建客户端的独播
+(单位:千美元)`Session.webContentsId`, (中文).`src/core/pty-manager.ts:251`,冲在`:780`)), 如果我们没有时间
+连接在同一节点运行的客户端`tmux -A -D`(单位:千美元)`:668`()——`-D`* 互相残杀
+客户端*。 两个浏览器在一个节点对战,输出跟随谁最后附着.
 
-### PresenceHub lives in core, not in a shell
+□ 结构
 
-New `src/core/presence/hub.ts`: a pure `PresenceHub` holding `Map<clientId, PeerState>`,
-applying events and emitting diffs. No electron, no `ws`, no disk. **Presence is never
-persisted** — it is as transient as the live half of `agentStatus`.
+* 存在Hub生活在核心,而不是壳中
 
-Both shells feed the same hub through the same interface:
+新设`src/core/presence/hub.ts`: 一个纯`PresenceHub`持有`Map<clientId, PeerState>`, (中文).
+应用事件和排放气体。 没有电子,没有`ws`没有磁盘。 ** 存在永远不会
+坚持**——与活人一半一样短暂。`agentStatus`。 。 。
 
-- **Server Edition** — `ServerPlatform.attach()/detach()` (`platform-server.ts:104`) is already
-  the client registry; `hub.join(uiId)` / `hub.leave(uiId)` hook in there, and fan-out uses the
-  existing `broadcast()`.
-- **Relay / desktop host** — a `HostSession` connecting calls the same `hub.join()`.
-  `host-canvas-hub` already mirrors canvas state to N clients via its `subs` set; presence
-  rides the same path.
+两个贝共享通过同一个接口为同一个中枢提供:
 
-One hub, two adapters — not two implementations.
+- ** 服务版** -`ServerPlatform.attach()/detach()`(单位:千美元)`platform-server.ts:104`)已经
+客户登记册;`hub.join(uiId)`页:1`hub.leave(uiId)`钩在里面,粉丝用
+现有`broadcast()`。 。 。
+- ** 中继/桌面主机** — a`HostSession`连接呼叫相同`hub.join()`。 。 。`host-canvas-hub`已经通过 N 客户端镜像画布状态`subs`设置; 存在
+拮据同一条路
 
-### Identity: lightweight, unverified, deliberate
+一个枢纽,两个适配器——不是两个执行.
 
-Auth is untouched (one shared password stays). On first connect the browser asks for a name;
-`{name, color}` is kept in `localStorage` under `nodeterm.presence.me`, with a color
-auto-assigned from a palette and user-changeable. The client announces itself with
-`presence:hello {name, color}`; the server assigns a `clientId` (the existing `uiId`).
+身份:轻、未经核实、故意
 
-The server does not verify names. Anyone can claim to be anyone. This is sufficient for "who
-is typing in this shell" and insufficient for audit or permissions — an accepted, documented
-trade-off. Two tabs from one person show as two peers (as in Figma).
+Auth 未受污染( 共享密码保留一个) 。 浏览器第一次连接时会询问名称;`{name, color}`保存在`localStorage`下级`nodeterm.presence.me`颜色
+从调色板和用户可更改的自动分配。 客户宣布自己与`presence:hello {name, color}`; 服务器指定一个`clientId`(现有`uiId`) (中文(简体) ).
 
-### Presence is scoped to a project
+服务器不验证名称 。 任何人都可以自称是任何人。 这足以让"谁"
+正在输入此 shell 中, 且无法进行审核或授权 。
+权衡. 一人的两个标签显示为两个同伴(如Figma).
 
-A project *is* a canvas, with its own node set and its own flow coordinate space. A peer's
-cursor, chat bubble and node chips are therefore rendered **only for peers on the same
-project** (`PeerState.projectId`, filtered through the single pure selector
-`peersOnProject(peers, projectId)`). Without that filter, a teammate looking at project "api"
-while you look at "web" would have their cursor drawn on your canvas at meaningless
-coordinates.
+                                                                                              
 
-The facepile deliberately does *not* filter: off-project peers appear dimmed, labelled with the
-project they are in, and clicking one switches you to that project and centers on their focused
-node. What would have been a bug becomes the "who is working where" view.
+*工程是* 帆布,有自己的节点设置和自己的流坐标空间. 一个同伴
+因此,光标、聊天泡和节点芯片只能用于同位素
+项目**(`PeerState.projectId`,通过单个纯选择器过滤`peersOnProject(peers, projectId)`) (中文(简体) 被指定为"中国大陆". 没有这个过滤器,一个队友被指定为“api”项目
+当你看到“web”时 他们的光标会在你的画布上画得毫无意义
+坐标。
 
-### Peers may have no cursor
+假面孔刻意做 * not * 过滤器:项目外的对等确定其面孔,
+并点击一个切换器切换到项目 并集中他们的焦点
+节点。 本来什么是虫子 变成了"谁在哪里工作"的观点。
+
+QQ 同伴可能没有光标
 
 `PeerState = { clientId, name, color, cursor: {x,y} | null, focus: nodeId | null, chat: string | null }`
 
-**`cursor`, `focus` and `chat` are three independent signals**, and a cursorless peer is a
-first-class citizen — not a peer with a fabricated position. The mobile companion has no
-mouse; modelling presence as "everyone has an x/y" would have forced it to either invent a
-cursor or vanish. Every UI surface degrades per signal.
-
-### Wire protocol
-
-New `presence:*` channels in `src/shared/ipc.ts`. The server is a dumb reflector: it holds the
-peer table and fans out, and applies no policy.
-
-| Direction | Channel | Payload |
-|---|---|---|
-| client→server (`cast`) | `presence:hello` | `{name, color}` |
-| client→server | `presence:cursor` | `{x, y}` — **flow coordinates**, sampled on rAF, throttled to ~20 Hz |
-| client→server | `presence:focus` | `{nodeId \| null}` |
-| client→server | `presence:chat` | `{text \| null}` — live per-keystroke; `null` closes |
-| client→server | `presence:project` | `{projectId \| null}` — which canvas we are looking at |
-| server→clients (`ev`) | `presence:sync` | full snapshot on join |
-| server→clients | `presence:peer` | single-peer diff (join / update / leave) |
-
-Cursors travel in **flow coordinates** (`screenToFlowPosition`), never screen coordinates, so a
-cursor lands on the correct node regardless of each viewer's zoom and pan. A `presence:project`
-also **clears the cursor**: it belonged to the old canvas, and a keyboard-driven project switch
-sends no new sample.
-
-"Dumb reflector" is about *policy*, not about trust: everything the hub takes from one client it
-fans out to all of them, so the ingest side is hardened. Every string off the wire goes through the
-one truncation rule (`capCodePoints`: chat 200, name 32 — control/bidi characters stripped —
-focus/project ids 128 code points), and every cast is rate-limited per (client, channel) by a token
-bucket (`PRESENCE_RATE_BUDGETS`; the cursor budget is exactly the renderer's own 20 Hz, so an honest
-client never loses a sample — excess is dropped silently, never disconnected). The Server Edition
-socket additionally caps a single frame at `WS_MAX_PAYLOAD` (8 MiB), well above the largest
-legitimate one (an `fs:write` of an editor file).
-
-## Terminal co-attach
-
-The enabling change: two people must be able to watch one terminal.
-
-**One PTY, N subscribers** — *not* "drop tmux's `-D`". When a second client calls `pty.create`
-with a live `persistKey`, we do not spawn a second tmux client; we subscribe it to the existing
-`Session`. The app therefore still has exactly one tmux client per session, `-D` stays as it is,
-and tmux's multi-client size negotiation never engages. The relay path already does exactly this
-(`attachDetached`, `src/core/pty-manager.ts:485`) — we generalize that mechanism rather than
-inventing a second one.
-
-Changes:
-
-1. **`Session.webContentsId: number | null` → `subscribers: Set<ClientId>`**
-   (`pty-manager.ts:251`). `flush()` (`:780`) fans out to the subscriber set instead of
-   unicasting. The relay's `onData`/`onExit` sinks are **not** in that set (they have no
-   `ClientId`): a detached, relay-served pty keeps its own session and is deliberately left out of
-   `subscribers` *and* out of the `byPersistKey` co-attach index, so the relay path is bit-for-bit
-   what it was. `flush()` calls the sink and then fans out to the subscribers — two paths, kept
-   apart on purpose.
-2. **`pty:create` becomes idempotent.** A live session for that `persistKey` means subscribe +
-   return `fresh:false` rather than spawn. Cold-restore and scrollback replay already branch on
-   `fresh`, so they keep working.
-3. **Size: smallest subscriber wins.** Two browsers at different zoom/DPI compute different
-   cols/rows and would corrupt each other's rendering — the classic shared-terminal problem.
-   PtyManager tracks each subscriber's requested size, sets the effective size to
-   **min(cols) × min(rows)**, and broadcasts the authoritative size on `pty:size:<sessionId>`.
-   Each xterm calls `term.resize()` from that broadcast instead of from its own `fit()`, and
-   letterboxes the remainder. With one subscriber, `min` of one element is your own size — the
-   **single-user path stays bit-for-bit identical to today**.
-4. **Backpressure becomes per-client.** Today `paused` is keyed by session
-   (`platform-server.ts:39`) and `detach()` clears the *entire* map on any disconnect — a bug
-   already confessed in a "v1 is single-UI" comment (`:110`). Left alone, one slow phone would
-   stall everyone's output. Rekey to `(clientId, sessionId)`; detach clears only that client's
-   entries. The shared PTY is paused only when *every* client of that session is over
-   high-water, so the slowest link no longer sets the pace for the team.
-
-   That alone would let a slow client's send buffer grow without bound, so it is capped:
-   at `WS_DROP_WATER` (8 MB buffered on one client's socket) we **drop that client's
-   queued output** rather than pause the others, and when its buffer drains we **resynchronise
-   it by redrawing the current screen from tmux** (reusing the existing `capture-pane` path)
-   with a "reconnected — earlier output skipped" separator. For a terminal the current screen
-   is what matters, not the 8 MB of scrollback a bad link missed; tmux is the authoritative
-   source of that screen.
-
-   Three properties of that ceiling, stated honestly:
-   - **The bound is per SOCKET, not per session.** `bufferedAmount` is `ws.bufferedAmount` — one
-     number for the whole connection, which is where the bytes actually sit. So a client that
-     floods past the ceiling on one session desyncs on *every* session it is watching (each on its
-     next chunk). Other **viewers** of those sessions are untouched — they have their own sockets.
-   - **Recovery is per `(client, session)`:** the desync state is keyed that way, so each session
-     gets its own capture and its own redraw.
-   - **The drain is the trigger, not the next chunk.** The common case is a flood that *ends*
-     (`npm run build` finishes; the socket drains; no further output ever arrives). A redraw hung
-     off the next chunk would never fire, leaving the user on a screen truncated mid-flood. A
-     250 ms sweep — armed on desync, cleared when the desynced set empties, so the healthy path
-     pays nothing — watches the socket and redraws once it is back under the low-water mark.
-   - **An empty capture is never sent.** `captureForResync` returns `''` on any tmux/ssh failure,
-     and the renderer's resync handler resets the terminal; sending `''` would blank a live
-     terminal. An empty/failed capture keeps the client desynced and is retried with backoff
-     (250 ms → 10 s cap). `pty:resync` payloads are therefore guaranteed non-empty.
-
-### Painting the joiner
-
-A joining client gets `fresh:false`, which is what tells the renderer *not* to replay the persisted
-scrollback (tmux is live; a replay would duplicate it). But co-attach adds **no tmux client** — the
-session already has one — so nothing redraws for the joiner either, *unless* the join happens to
-resize the pty: tmux repaints on SIGWINCH, and only a joiner strictly **smaller** than the current
-grid causes one. **Equal is the expected case** (both clients render the node's persisted geometry
-with the same font; canvas zoom is a CSS transform and does not change `clientWidth`), and equal or
-larger resizes nothing. Left alone, the headline path of the feature — open the same terminal in a
-second client — lands on a **blank but live** terminal until the next byte of output, nondeterministically
-(a ±1-cell measurement difference between two machines silently hides the bug).
-
-So a join that did **not** resize the pty carries the session's **current screen** on
-`PtyCreateResult.screen`, captured with the same `captureForResync` (`tmux capture-pane -e`) the
-drop-and-redraw path uses; the renderer writes it into its empty xterm before the live stream starts.
-Three rules:
-
-- It rides the **create result**, not a `pty:resync` event: the renderer only subscribes to a
-  session's channels *after* `create()` resolves, so an event pushed at join time would land on no
-  listener.
-- A join that **did** resize gets nothing — tmux is already painting it, and two paints would splice
-  two different points in time onto one screen.
-- An **empty capture is omitted**, never sent as `''` (same contract as `pty:resync`). A solo user
-  never reaches this path at all: a fresh spawn has nothing to paint, and a warm reattach starts a
-  tmux client, which redraws by itself.
-
-**`screen` is the joiner's paint — and the ONLY thing a warm attach seeds.** There was briefly a
-second source: a `warm-history` seed that hydrated every `fresh:false` attach from tmux's own
-scrollback (`transport.captureHistory`). That whole hydration is **gone** — tmux owns the mouse and
-the scrollback again (see CLAUDE.md, "Terminal session continuity"), so it redraws the pane and its
-history is scrollable in place; hydrating on top of a screen *painter* is what produced the black
-bands and duplicated screens. A solo warm reattach therefore seeds **nothing**, and `seedPaint`'s
-`create-screen` — this capture — is the one seed a `warm-attach` can still yield, for the one client
-tmux does not repaint: a joiner that did not resize.
-
-**A `pty:resync` supersedes the seed, and the queue behind it.** `main`'s attach path subscribes to
-`pty:data` *before* awaiting its seed and holds the chunks in a `createDataGate`. A resync that lands
-during that window is a redraw of the CURRENT screen, so everything the gate is holding *predates*
-it: draining the queue would splice the stale flood back over the fresh screen, and the in-flight
-history seed would then write an even older screen on top of that. The resync handler therefore
-`gate.reset()`s (drops the queue, returning its bytes to the flow-control accounting, and switches to
-pass-through) and marks the seed **superseded**, so the seed writes nothing when its capture returns.
-Everything that arrives after the capture streams straight through, in order.
-
-Two details that are easy to get wrong, and are pinned by tests in `terminal-config.test.ts`:
-
-- **Superseded means "paint nothing", never "return".** The seed lives inside the spawn continuation,
-  which still has to wire `onExit`, `term.onData` (**the keyboard input path**) and the
-  `initialCommand` / cold-start agent resume *below* it. Returning early there yields a terminal that
-  streams output and looks perfectly alive while silently accepting no input, forever. The decision
-  is a pure helper — `seedPaint()` — whose result type has no abort member for exactly that reason.
-- **The repaint's `reset()` is sequenced behind a write callback** (`repaintResync()`): `term.write()`
-  is parsed asynchronously while `reset()` clears the buffer immediately, so an inline reset landing
-  between the seed's (up to a megabyte of) history writes and xterm parsing them would clear an
-  almost-empty buffer, let the stale history paint onto the cleared screen, and append the fresh
-  capture *below* it.
-
-### Typing attribution — and why it is server-side
-
-`cast()` used to discard the sender (`void uiId`). `pty:write` is routed through the sender-aware
-seam (`onWithSender`) instead, so the handler knows WHO typed: it calls `presenceHub.noteTyping(
-clientId, session.nodeId)` directly — there is no `lastWriter` field on the session, because nothing
-would read one (the badge is peer state, and it lives in the hub's peer table, not on the pty). The
-hub throttles the broadcast to 1/500 ms per (client, node); the badge decays after ~2 s. `write`
-skips the call entirely when there is only one peer, so a solo keystroke burst costs nothing.
-
-A write is only accepted from a **subscriber** of that session (session ids are guessable), and the
-same membership check gates `pty:resize` / `pty:flow` / `pty:kill` — everything in a session's
-`pausedBy` / `sizes` therefore belongs to a client that is actually watching it, which is what makes
-`dropClient` a complete cleanup.
-
-Attribution is done **on the server rather than by client self-declaration** specifically
-because of mobile: when the phone writes over the relay, the sender is already known as a
-`HostSession`. So *typing from the phone lights up the "Enes is typing" badge on someone's
-desktop canvas without a single line of Swift.*
-
-### No locking (v1)
-
-Two people can type into one shell simultaneously; both badges pulse and the characters
-interleave in the single tmux session. This is accepted, not overlooked — it is the behavior
-every tmux pair-programmer already knows, and the badge *is* the warning. Locking / handoff is
-v2.
-
-If a node is deleted while others are attached, `destroy(persistKey)` kills the tmux session and
-the remaining subscribers enter a "closed by <name>" state rather than respawning it.
-
-### Deletion vs recycling
-
-Killing a node's tmux session is used for two opposite intents, and PtyManager keeps them apart:
-
-- **Deletion** (× / delete node) → `destroy(persistKey)`. The node leaves the canvas. Co-viewers get
-  `pty:closed:<sid> { by }` and must never respawn it — a respawn would resurrect a terminal its
-  owner deliberately killed, in a fresh shell, and strand a tmux session.
-- **Recycling** ("move into worktree") → `recycle(persistKey)`. Same `tmux kill-session` (otherwise
-  `new-session -A` would just reattach the old working directory), but the node **stays** on every
-  canvas and keeps working. Co-viewers get `pty:recycled:<sid> { ready }`: restart the terminal,
-  the node moved. Their re-create **co-attaches** to the replacement session, so they follow the node
-  into its new cwd and are never left holding the dead pty.
-
-The recycled notice is **withheld until the replacement session is registered** (`ready:true`). Sent
-any earlier, a co-viewer's restart could beat the mover's own `create()` and spawn `nt-<nodeId>` from
-*its* options — i.e. in the node's stale cwd — silently undoing the move for everyone.
-
-A recycler can die between the `kill-session` and its own `create()` (app quit / crash), so a 10 s
-timeout releases the co-viewers anyway — with **`ready:false`**, which means *do not respawn*. This
-is the one case where restarting is worse than not: a co-viewer's create options still carry the
-node's **old cwd** (a cwd change is not broadcast on this branch), so its spawn would put
-`nt-<nodeId>` back in the stale folder — and when the mover's app returns, its own `new-session -A`
-**reattaches** that session (the cwd option is ignored on attach), so *everyone's* node would claim
-the worktree path while the shell sits in the old directory. Silent, and exactly what the withheld
-notice exists to prevent. So the terminal shows **"session ended — reopen to restart"** instead: the
-move can be lost only by an explicit user click, never by a timeout.
-
-### The respawn guard — and the tombstone that backs it
-
-`pty:closed` only reaches a session's **subscribers**. A co-viewer whose project is *inactive or
-closed* has no mounted terminal, so it is not one — yet the node is still on its canvas. Its next
-`create` for that node (opening the project later) would find no session, fail `tmux has-session`,
-and spawn a brand-new one: the deleted terminal, resurrected as a fresh shell.
-
-`PtyManager.tombstones` closes that: a destroyed `persistKey` is remembered, and a later `create`
-for it by **another** client is refused (`PtyCreateResult.closed = { by }`) instead of spawning —
-the renderer lands in the same "closed by <name>" state. The destroying client is **exempt**, so its
-own ⌘Z (undo of a delete) still restores the node, and the single-user path is untouched. A
-`recycle` clears the tombstone (nothing was deleted).
-
-Its limits are real (see Known risks): the tombstone is in-memory, so it lives exactly as long as
-the core process. Stage 3's canvas-delete **mutation** is the structural fix — it removes the node
-from every *attached* client's canvas, so nobody is left holding one to re-create. It did **not**
-make the tombstone removable: the mutation covers the clients that were attached at the moment of
-the delete, and the paths it does not cover still need the respawn guard. See
-[What Stage 3 changed](#what-stage-3-changed-relative-to-this-spec) for the exact list.
-
-The map is also **bounded in size and time** (`TOMBSTONE_MAX` / `TOMBSTONE_TTL_MS`, an LRU), and the
-`pty:destroy` / `pty:recycle` casts are **length-capped** (`REF_MAX_LEN`, like every other
-client-supplied reference) and **rate-limited** per client (`PTY_END_BUDGET`). They have to be: the
-key comes verbatim off the wire, a tombstone is recorded even when no live session exists, and each
-call costs an `fs.rm` plus a `tmux kill-session` subprocess. The burst is sized well past a bulk
-delete (one cast per node in a single tick), so it can never fail a real user; eviction degrades to
-the pre-tombstone behavior, never to something worse.
-
-## Canvas sync
-
-Node edits broadcast as mutations so cursors don't hover over stale geometry.
-
-The vocabulary already exists — `CanvasMutation = {op:'upsert', node} | {op:'remove', id}`
-(`src/shared/types.ts:119`) — and so does the receiving end: `applyCanvasMutation`
-(`Canvas.tsx:917`), written for the relay. We add only the emitting side: `handleNodesChange`
-publishes a mutation (position-only, throttled to 20 Hz, while dragging; a full upsert on
-settle; an upsert on add / remove / color / title / collapse), and the server reflects it to
-every client except the sender.
-
-Convergence makes persistence safe for free: because all clients that saw the whole exchange
-converge on the same node set, whichever of them calls `workspace.save` writes the same canvas,
-which defuses today's last-writer-wins save. The exceptions (a client that loaded after a delete,
-board bytes in two cases) are in the
-[does-not-converge list](#concurrent-edit-resolution-what-converges-and-what-does-not). The existing rev-based conflict bar (`workspace-watcher`) stays as the
-backstop. On a Server Edition hosting a team, a shared project's content does not come from these
-saves at all: the canvas authority overlays each one with the content it applied from ops
-(`docs/hosted-team-relay.md`).
-
-Two things are deliberately **not** synced: ephemeral nodes (subagent / loop cards) are derived
-independently on each client from the already-broadcast `agent:status` stream; and undo stays
-**local per user** — you can in principle undo someone else's change (last-write-wins). No CRDT.
-
-**Implemented (Stage 3).** `CanvasMutation` now travels on `canvas:mut` (`src/shared/ipc.ts`):
-
-- **Publisher** (`src/shared/canvas-publish.ts`) — the renderer diffs each settled node snapshot
-  against the last one it published (`diffToMutations`), so edits that never pass through
-  `onNodesChange` (a rename, a color pick, a collapse, a direct `setNodes`) sync too. Position frames
-  are throttled to ~20 Hz while dragging and flushed on drag-stop; everything else is a full upsert.
-  Ephemeral subagent/loop cards are filtered out (`publishableStates`). Every mutation is stamped
-  with `src`, this Canvas's publisher tag.
-- **Solo gate** — `shouldPublish` (fed by the presence peer table, read through a ref so it can never
-  re-render Canvas). With nobody else attached, `publish()` degrades to `adopt()`: it takes the
-  snapshot as the baseline and does **no** diff, no `stableStringify` of every node, no IPC cast. A
-  solo user pays nothing for team sync, and because the baseline still tracks the canvas, the first
-  edit after a peer joins diffs correctly — no resync step, no missed mutation. **The exception is a
-  governed project** (`shouldPublishCanvas`: peers OR governed). A canvas authority writes a project
-  only from the ops it hears, so an edit the solo gate swallowed there would be erased by the next
-  overlaid save. A Server Edition tab asks its core which projects are governed (`canvas:authority`),
-  publishes for every project until the first answer, and asks again on reconnect; the desktop
-  answers none, so its gate is unchanged. Only a cast from ANOTHER client proves a peer
-  (`provesPeer`): our own echo and a core-published op (no `src`) do not.
-- **Reflector** (`src/core/canvas-sync.ts`) — holds no canvas state and persists nothing, but it is
-  **not** stateless: it stamps every mutation with a monotone **`seq`** and sends it to **every**
-  attached client, the sender included (`CorePlatform.clientIds()` + `onWithSender`). `seq` is
-  server-authoritative (a client-supplied one is overwritten at ingest).
-- **Ordering** (`src/shared/canvas-order.ts`) — the client half, and the reason concurrent edits
-  converge instead of splitting the canvas in two. Per node, the highest `seq` wins. Three rules: (1)
-  our own echo is an **ack**, not an edit — it carries the `seq` our mutation was given, and is never
-  re-applied (re-applying it would rubber-band a node we are still dragging); (2) while one of our
-  own mutations for a node is unacked, we ignore peers' mutations for that node — FIFO delivery means
-  ours is necessarily *later* in the total order, so it will win on every other client too; (3) rule
-  1 is only sound **while our optimistic value is still on our canvas**. Rule 2's suppression is
-  bounded by `PENDING_TTL_MS` (an ack can be late — the same socket carries pty output, and Stage 2
-  tolerates an 8 MB backlog on it), and once it lapses a peer's mutation can overwrite the value we
-  are still waiting to have acked. From that moment our echo is the **only** copy of a value that
-  already won on every other client, so it is **applied** (a repair), not dropped. Without rule 3 a
-  late ack left that client permanently on the losing value — and its whole-file `workspace.save`
-  then wrote those losing bytes over everyone else's canvas, which is precisely the property this
-  stage exists to guarantee. The pending entry's `since` is refreshed on every local mutation for
-  that node, so a drag longer than the TTL cannot expire its own suppression mid-drag.
-  `order.reset()` is called whenever our presence clientId changes (i.e. on every (re)connect): if
-  the core restarted, its `seq` restarted at 0 while our `seen` map still held high values, and we
-  would silently drop every new mutation as a straggler. Correctness no longer depends on the
-  ws-bridge's `location.reload()`. The reset keeps one thing: our own causal position (`lastSeq`,
-  what rule 4's `seen` stamps). A reconnect to the SAME core also resets, and a first cast stamped
-  `seen: 0` there — ⌘Z of a node deleted before the drop — was a stale frame to every peer holding
-  the tombstone. After a real restart the kept value is above every new `seq`, so our casts read as
-  "never stale": the pre-rule-4 verdict, not a split. That window is bounded: the first stamped `seq`
-  heard after a reset re-bases the position when it is at or below it (the core restarted and its
-  counter began again), and leaves it alone when it is above it (the same core carried on). (The
-  reflector clamps it to `seq - 1`, which changes no verdict here; see the note on the clamp under
-  rule 4.)
-- **A cast the reflector would refuse is never made** — the publisher validates with the **same**
-  predicate the reflector's ingest uses (`isCanvasMutation`, moved to `src/shared/canvas-mutations.ts`
-  so both ends share one verdict) *before* recording a pending entry and *before* casting. A refusal
-  therefore costs neither a pending entry (which would have deafened that node to its peers for the
-  whole TTL — a peer's `remove` landing in that window was dropped and never recovered, so the next
-  whole-file save resurrected the node they deleted) nor the retry: the refused node keeps its
-  **previous baseline entry**, so the very next publish re-emits it and it syncs the moment it becomes
-  castable. The only thing that can legitimately exceed `MUTATION_MAX_BYTES` is free text — a sticky
-  someone pasted a document into — so Canvas **tells the user** ("This note is too large to share with
-  your teammates (over 250 KB)… they will not see it until you shorten it") instead of leaving them
-  with a note the team silently never receives.
-- **Loop guard** — a mutation applied from a peer is `adopt()`ed into the publisher's baseline before
-  the next diff runs, so it can never be re-published (no A→B→C→A ping-pong).
-- **Apply** — the vocabulary is single-sourced in `src/shared/canvas-mutations.ts` and used by both
-  ends. In the renderer, an incoming mutation is patched into the **live React Flow array**
-  (`applyMutationToFlow`, `src/renderer/state/workspace.ts`) — never round-tripped through the
-  (lossy) serializers, which would wipe your selection, delete your relay-remote nodes and re-render
-  every node component on every peer mutation. `window.nodeTerminal.canvas` is real on the preload
-  **and** the ws-bridge.
-- **Undo is rebased, not clobbered** — a peer's mutation is applied to the undo baseline
-  (`committedRef`) rather than replacing it, so a local edit still inside the 300 ms undo debounce
-  survives a peer's mutation landing on top of it.
-
-## Edge sync (bridges + ropes)
-
-Stage 3 addressed **nodes**. Edges — `bridges` (context links, which an agent actually reads
-through) and `ropes` (display-only "spawned by" lineage) — were left out, and that was the worst
-gap the stage shipped with, because they are **persisted in the same whole-file `workspace.save`**.
-An edge you drew never reached your teammate, and their next save — of a canvas that never had it —
-**deleted it**. Same in reverse.
-
-They are in the vocabulary now, and everything around them is the node machinery unchanged:
-
-- **Vocabulary** — `CanvasMutation` gains `edge-upsert` / `edge-remove`, each carrying a
-  `kind: 'bridge' | 'rope'` (which persisted list to write) and the edge's three ids. **Only the ids
-  travel.** A rope's colour and its waiting look are derived at render time from each client's own
-  nodes (`displayEdges` / `ropeVisual`), so sending them would ship one client's palette to another.
-- **Ordering** — the same `CanvasOrder`, keyed by `mutationKey`: `n:<id>` for nodes, `e:<id>` for
-  edges, one key space with a prefix (a node id and an edge id are generated independently and could
-  collide). The `kind` is deliberately **not** in the key: one id is one edge, and a bridge and a
-  rope claiming the same id must be resolved to one thing rather than held as two. Rule 4 (the
-  causal delete) therefore covers an edge exactly as it covers a node. The apply and the diff agree:
-  `applyEdgeMutationToScene` takes an upserted id out of the other list and a remove drops it from
-  both, and `diffToMutations` casts no remove for an id that only moved between the lists (a trailing
-  remove would delete it from both).
-- **Publisher** — the snapshot became a `CanvasScene` (`{nodes, bridges, ropes}`), so one diff, one
-  throttle and one baseline cover both. The Canvas publish effect has the edge arrays in its deps:
-  drawing a link never touches `nodes`, so without that the edit would never be published. React
-  Flow rebuilds those arrays on a mere **selection** change too — that costs one diff yielding no
-  mutation (the diff compares id/source/target only), and the solo gate means a solo user does not
-  pay even that.
-- **Batch order is load-bearing.** A peer applies mutations one at a time, so `diffToMutations`
-  emits **node adds → edge adds → edge removes → node removes**: an edge naming a node that has not
-  arrived yet would draw into nothing, and an edge whose node dies in the same batch has to be
-  removed while it is still there.
-- **Ephemeral endpoints are filtered** (`publishableScene`). An edge naming a subagent / loop card
-  addresses a node the peer derives itself, with its own lifetime — it would be pruned there at a
-  moment we do not control and re-published back at us.
-- **Background projects** get `useProjects.applyEdgeMutation`, for the same reason nodes do: that
-  project's serialized edges are what our next whole-file save writes.
-- **The snapshot thunk captures the edge arrays when it is CREATED** (`publishableLater`). The
-  publisher keeps an `adopt` baseline unresolved until the next publish, so a thunk that read the
-  edge refs when it RAN saw the link the user had drawn since the last peer op or project load: the
-  diff was empty, nothing was cast, and the teammate's next save deleted the link. Only the `.map`
-  is deferred (React state arrays are never mutated in place), so the solo gate still skips the cost.
-- **The edge refs move synchronously** with their setters on a project load and a server change,
-  and the render-time mirror copies the state only when it CHANGED. A zustand write re-renders on
-  the SyncLane and skips the pending DefaultLane setter (see `nodesEpoch.ts`), so an unconditional
-  mirror put the previous project's edges back into the ref — and a peer's edge op arriving before
-  the next render was applied to them and overwrote the load.
-- **An edge whose endpoint the peer does not have is held, not cast.** A node the size guard refuses
-  (an oversized sticky) never reaches the peer; an edge to it that did would be pruned there, and the
-  peer's `edge-remove` would delete the link on our canvas too. The publisher holds such an
-  `edge-upsert` inside the emit that refused the node (and on every later emit while the node's last
-  cast stays refused — `refusedNodeIds()`), keeps it owed, and casts it in the same batch as the node,
-  after it, on the first emit in which the node goes through. That holds across a peer's op too: the
-  adopt that applies it takes the scene on screen, which already contains the refused node and the
-  held edge, so the adopted baseline keeps the PREVIOUS baseline's entry for an owed node that scene
-  still holds and for every edge in it touching one (`adoptBaseline`) — otherwise the node would
-  re-diff only when it next changed, and the edge would never differ from the baseline again and
-  never be cast. Only what the adopted scene still holds: one publisher serves every local project,
-  so a project switch adopts ANOTHER project's scene, and re-emitting an owed node it lacks would
-  cast a `remove` of the old project's node under the new project's id (and a peer's delete, which
-  also arrives as an adopt, would be echoed back). The hold is in the publisher, not a filter on the
-  scene: dropping an edge the baseline already holds would diff as an `edge-remove` — the same
-  delete, cast by us. It is conservative: an edge to a node whose EARLIER version the peer has also
-  waits. What it does not cover: (1) a baseline taken while the solo gate is closed (`shouldPublish`
-  false) is not rebased, so an owed item swallowed there syncs only when it next changes — the gate
-  closes on an open publisher only when a hosted role drops to read-only; (2) a round trip to
-  another project (A → B → A), which in practice is almost ANY visit to B: an emit keeps owed only
-  the nodes of the scene it diffs, and the publisher emits on every change to B's `nodes` state
-  (React Flow's own measure and selection updates included, not only an edit), so the owed A node is
-  forgotten there; the load that returns to A adopts A's whole scene, so a held edge is not cast
-  after the node is trimmed until the edge itself changes; (3) a `remove` that was itself refused (no
-  active project) and then adopted over is not retried. None of the three is a regression — the
-  publisher behaved the same way before holds existed.
-- **"This note is too large" is said only for a node upsert.** An edge op is refused only for a
-  malformed or over-long id, so the sentence would name a cause nobody measured; the refusal is
-  logged instead.
-
-What this does **not** change: an edge is still pruned locally when an endpoint disappears, so a
-peer's node delete can leave one drawn against nothing for a tick (see Known risks). Also still
-open: a peer edge op applied in the same task as a local functional edge update overwrites that
-update (the node path no longer does: its receive `setNodes` is functional, `rebaseOnLatest`); a
-local node delete publishes its `remove` first and the
-pruned edges' `edge-remove`s one render later, and every peer prunes the same dangling edge itself
-(converges, with redundant casts); canvas-control writes into a project that is not on screen are
-not cast as edge ops. The Server Edition's headless canvas control is cast now: it diffs every
-project's whole content (nodes, edges, board) against what it last loaded or saved, and casts every
-op before it saves (`castAndSave`, `src/server/headless-node-factory.ts`).
-
-## Board sync (kanban)
-
-The board (`project.kanban`) had the edges' problem: `canvas:mut` carried no board item, and the
-board rode every whole-file save, so a teammate's card move never reached you and your next save
-wrote your board over theirs. Board items are in the vocabulary now, one op per item
-(`src/shared/kanban-ops.ts`), under a third key prefix:
-
-| Item | Ops | Order key |
-|---|---|---|
-| Column | `kb-column` / `kb-column-remove` | `k:col:<id>` |
-| Column order | `kb-column-order` | `k:colorder:<projectId>` |
-| Card placement | `kb-card` / `kb-card-remove` | `k:card:<nodeId>` |
-| Card metadata | `kb-meta` / `kb-meta-remove` | `k:meta:<nodeId>` |
-| Label | `kb-label` / `kb-label-remove` | `k:label:<id>` |
-| Label order | `kb-label-order` | `k:labelorder:<projectId>` |
-| Saved view | `kb-view` / `kb-view-remove` | `k:view:<id>` |
-
-- **Last writer wins per ITEM, not per board.** The node rules are unchanged: per key, the highest
-  `seq` wins. Two people moving two different cards at once both land; two moves of the same card
-  end on the later-ordered one. A card's placement and metadata key by its node id under their own
-  sub-prefix, so a card move is not a node edit, and deleting a node does not tombstone its card.
-- **The two order keys carry the project.** Each is a per-project singleton, and one `CanvasOrder`
-  orders every loaded project: unscoped, our unacked reorder in one project held off (rule 2) a
-  teammate's reorder in another.
-- **Rule 4 is for deletions only.** `kb-column-remove`, `kb-label-remove` and `kb-view-remove` mean
-  "this item is gone" and tombstone their key, exactly like `remove` and `edge-remove`.
-  `kb-card-remove` ("back to Ungrouped") and `kb-meta-remove` ("no metadata") are VALUES and order
-  like any other write (`isKanbanDeletion`): a card taken off the board and filed again is not a
-  resurrection, and a tombstone would drop a teammate's concurrent move as a stale frame.
-- **Order ops are cast on additions too.** An item op only says the item exists, and a peer that
-  applies it alone appends it. So the publisher also casts the list's order op whenever the list
-  gained an id or the relative order of the ids both sides share changed (`orderChanged`), and every
-  replica lands on the later order op's list. An order op lists only the ids its sender knew, so
-  ids other clients added in the same window are not in it: `reorder` puts those after the listed
-  ones SORTED BY ID, and the op's own sender applies the echo of its last order op for that list
-  instead of dropping it as an ack (`CanvasOrder.accept`). Without both, three concurrent adds
-  converged in only 30 of the 90 reflector interleavings; with them, all do
-  (`kanban-ops.convergence.test.ts` enumerates every interleaving for three clients).
-- **Names are repaired, not refused.** A column title, label name or assignee name is trimmed,
-  stripped of control and bidi-override characters and cut to its bound (`displayText`); only an
-  empty result is refused. The UI puts no length cap on them, so a refusal would be a rename that
-  silently never syncs. Ids are refused, never repaired. The sender casts the repaired form and keeps
-  it locally too, because its own echo is only an ack (`renderer/canvas/kanban-sync.ts`).
-- **Default columns are deterministic.** A project with no `kanban` block renders a lazy default
-  board that is not written until the first edit, and with live sync two people can make that edit
-  at once. Its column ids are a hash of the project id and the column's index (`seededColumnId`,
-  `defaultKanbanFor` in `src/shared/kanban-default-board.ts`): the same on every client, so the two
-  first edits land on the same three columns instead of six. A board created explicitly (the core's
-  `ensureProjectBoard`, the phone's first board) keeps random ids.
-- **The publisher hangs off the one store funnel.** Every board write goes through
-  `useProjects.setProjectKanban`, whose hook diffs the board item by item and casts through the same
-  send and the same publish gate as nodes: the board, the card modal, the Omni board, node labels and
-  the `assign` verb all publish without a call site of their own. A peer's board op is applied
-  through the store reducer (`applyCanvasOp`), never through `setProjectKanban`, so nothing received
-  is published again, and it writes no board-log entry: only the client that made a change records
-  it. The entries a board change writes go through the project's own session (a relay tab's to its
-  host).
-- **Prune removals are never cast.** Every board commit prunes the cards of nodes that are not live
-  locally. A teammate whose node op has not arrived yet would otherwise cast the removal of a fresh
-  card for everyone, so `diffKanbanOps` casts a card or metadata removal only for a node live in that
-  project: React Flow's nodes for the project it holds, the stored nodes for any other. While the Omni
-  board is open, React Flow ∩ the stored copy (`boardLiveNodeIds`): its lanes prune against the stored
-  copy, which lags React Flow for the rendered project, and a smaller live set can only cast fewer
-  removals. The cost: removing, on the Omni board, the card of a node created moments ago is not cast.
-- **A board edit is cast only to the active tab's core** (`castFor`), as a node edit is: the order
-  hears one core's echoes. A board edit to a lane on another core (the Omni board editing a relay
-  lane while a local tab is active, or the reverse) is not cast.
-
-## UI
-
-`PresenceLayer` renders inside React Flow's `<ViewportPortal>`, so cursors sit in flow
-coordinates and the CSS transform handles zoom/pan. Peers live in a transient zustand store
-(`src/renderer/state/presence.ts`, never persisted) that **only `PresenceLayer` subscribes to** —
-following the existing `viewportRef` + rAF pattern (`Canvas.tsx:162`). If cursor traffic were to
-re-render `Canvas`, every mouse move would redraw a 4000-line component.
-
-- **Cursor** — arrow in the peer's color with a name label. Incoming positions arrive at 20 Hz
-  and are lerped between frames. Your own cursor is never drawn.
-- **Cursor chat** — `/` opens an input beside your cursor, broadcasts on every keystroke, and
-  fades ~5 s after Enter/Esc. **Gotcha:** `/` must not open chat while you are typing in a
-  terminal — the key only fires when the event target is the canvas pane, not xterm / Monaco /
-  an input, matching the command palette's existing guard.
-- **Facepile** (top right) — who is connected, in their colors. Cursorless peers (phones) appear
-  here with a phone icon, since this is their only surface. Clicking an avatar centers the
-  viewport on that peer's focused node.
-- **Node header** — avatar chips for peers focused on the node, with a pulsing ring while they
-  type. Reuses the `agentStatus` badge machinery (per-node badges from a transient store).
-
-## Surfaces
-
-- **Server Edition** — the primary stage; full feature.
-- **Desktop (Electron)** — presence is silent when alone (≤1 peer draws nothing, zero cost).
-  Acting as a relay host, the desktop shows the full peer list.
-- **Mobile (nodeterm-ios, separate repo)** — a phone joins over the relay as a `HostSession`, so
-  `hub.join()` fires for it today; it appears as a cursorless peer named "Phone" until it sends
-  `presence:hello`. Typing attribution already works for it (see above). **Follow-up task in
-  that repo:** send `presence:hello` + `presence:focus`, and render received cursor chat as a
-  banner (it has no cursor to anchor a bubble to). Mobile does not *send* cursor chat in v1.
-
-## Live dino (spectator mode)
-
-The dino node (a T-Rex runner easter-egg) is a live/shared game on a shared canvas: one authority
-plays, everyone else on that project watches the SAME game live — like cursors. It rides presence,
-adding NO new core channel.
-
-- **Wire.** `PeerState` carries an ephemeral `dino: { nodeId; snap: DinoSnapshot } | null` (like
-  `chat`), cast on `presence:dino` and cleared on leave. The hub `sanitizeDinoPayload`s every cast
-  (clamps `DINO_MAX_OBSTACLES`, coerces every number finite, validates each obstacle `kind`, caps
-  the nodeId) — a peer cannot inject unbounded/garbage state. The cast is rate-limited like the
-  cursor; only the genuine `null` stop is exempt (a dropped stop would strand a spectator).
-- **Engine** (`dino/dino-game.ts` + the pure `dino/dino-sync.ts`). The authority broadcasts
-  `currentSnapshot()` at `DINO_BROADCAST_HZ = 20`, and exactly ONE `null` on the run→idle/stop edge.
-  A spectator's `setRemote(snap)` suspends its own physics + input and renders the snapshot (the loop
-  runs even unfocused); `setRemote(null)` returns to local idle and is idempotent (calling it every
-  render while already local never resets a live game). A local key while spectating is a **take-over**:
-  the engine seeds from the last snapshot (no teleport) and becomes the authority.
-- **Node** (`DinoNode.tsx`). It's under the active-session provider, so `api.presence.dino` +
-  `selectDino` follow the active session (a **relay tab's** dino is live over the tunnel for free).
-  The lowest `clientId` wins the authority tiebreak (`dino/dino-authority.ts` `shouldSpectate`), so a
-  two-player Space race converges deterministically; a "▷ &lt;name&gt; is playing" pill (peer color)
-  marks a spectated node.
-- **Free when alone** — like `reportFocus`, the ~20 Hz snapshot cast is skipped with no peers (the
-  `null` stop always lands). A solo player's game is byte-identical to before this feature.
-- **Surfaces:** desktop / relay tab / Server-Edition browser all work via the hub + bridge. **Mobile:**
-  the phone is on the retained old dialect (no rpc presence) — it neither broadcasts nor watches dino;
-  a graceful degrade that rides the phone's eventual rpc migration.
-
-## What Stage 1 changed relative to this spec
-
-The sections above are the design as approved. Stage 1 implemented them faithfully with three
-deviations, recorded here so this document does not lie to the next reader:
-
-1. **Presence is scoped to a project, and the facepile deliberately breaks that scope.** The peer
-   table carries `PeerState.projectId`, fed by a `presence:project` channel that was not in the
-   original wire table (it is now, above). Cursors, chat bubbles and node chips are filtered
-   through the single pure selector `peersOnProject(peers, projectId)`; the facepile intentionally
-   does *not* filter, showing off-project peers dimmed and labelled with the project they are in,
-   clickable to travel there. This was designed in as the feature described under
-   [Presence is scoped to a project](#presence-is-scoped-to-a-project) — it is called out again
-   here because it is the one place where "presence is per-canvas" is deliberately violated.
-2. **A WebSocket heartbeat was added.** Not in the original design: a browser tab that *vanished*
-   (killed, laptop slept, network dropped) never triggered a WS `close`, so its peer stayed in the
-   table forever — a permanent ghost cursor. The Server Edition now runs a 30 s ping/pong heartbeat
-   and reaps sockets that miss a pong, so a vanished client leaves within ~60 s. A cleanly closed
-   tab still leaves immediately, on `close`.
-3. ~~**`PeerState.typing` exists but is always `null` in Stage 1.**~~ **Closed in Stage 2.** The
-   sender-aware `pty:write` handler calls `noteTyping()`, and the renderer draws the pulsing ring on
-   the typist's header chip (`src/renderer/lib/typingPeers.ts` + `components/PresenceChips.tsx`).
-   Two rules worth knowing before you touch it: the ring decays against the **local receipt time**,
-   not the host's `typing.at` (a viewer's clock can be minutes off), and it is fed **only** by live
-   `presence:peer` diffs — never by a `presence:sync` snapshot, which can carry a ten-minute-old
-   stamp because the hub never clears `typing`. It is also the one node-scoped signal that is
-   **not** project-filtered: a phone has `projectId: null`, and typing from the phone is exactly
-   what the ring exists to surface (node ids are globally unique, so this is safe).
-
-## What Stage 2 changed relative to this spec
-
-Stage 2 implemented [Terminal co-attach](#terminal-co-attach) as approved — one pty with N
-subscribers, an idempotent `pty:create`, smallest-subscriber-wins sizing, per-client backpressure,
-and server-side typing attribution. Four things are **not** in the spec as originally written and
-were added during implementation; the sections above have been amended to match, and they are
-collected here so the delta is legible.
-
-1. **`pty:recycle` — a separate primitive from delete.** The spec had exactly one way to kill a tmux
-   session (`destroy`), and co-viewers of a destroyed session are told "closed by <name>" and must
-   never respawn it. But **"Move into worktree"** also kills the session (`new-session -A` would
-   otherwise just reattach the *old* working directory) — and there the node is **not** going away:
-   it stays on every canvas and must keep working. Routing a worktree move through `destroy` would
-   have shown every co-viewer a false "closed by …" and bricked their node. So the two intents are
-   now distinct primitives with distinct events — `destroy` → `pty:closed {by}` (do not respawn) and
-   `recycle` → `pty:recycled {ready}` (restart and re-attach; the node moved). See
-   [Deletion vs recycling](#deletion-vs-recycling) for the full contract, including why the recycled
-   notice is **withheld** until the replacement session is registered and why the 10 s escape-hatch
-   timeout sends `ready:false` (= *do not respawn*) rather than letting a co-viewer silently re-spawn
-   the node in its stale cwd.
-
-2. **The tombstone — and its limit, stated plainly.** `pty:closed` only reaches a session's
-   **subscribers**. A co-viewer whose project is closed or inactive has no mounted terminal, so it is
-   not one — yet the node is still on its canvas, and its next `create` would spawn a fresh
-   `nt-<nodeId>`: the deleted terminal, resurrected as an empty shell. `PtyManager.tombstones`
-   refuses that create (`PtyCreateResult.closed = {by}`), exempting the destroying client so its own
-   ⌘Z still works.
-   **The limit is real and is not papered over: the tombstone is in-memory.** It lives exactly as
-   long as the core process. Restart the core — the Server Edition process, or the desktop app
-   hosting the relay — and the tombstones are gone; a client whose canvas still carries the deleted
-   node will spawn a fresh session for it the next time it opens that project. This is deliberately
-   **not** fixed by persisting the tombstone, because persistence is not the missing piece: **the
-   node should not be on that canvas at all.** The actual fix is **Stage 3's canvas-delete
-   mutation**, which removes the node from every client so nobody is left holding one to re-create.
-   Until Stage 3 lands this is a bounded, named gap (also listed under [Known risks](#known-risks)),
-   not a promise.
-
-3. **A parked node reports `null`, not a size.** The spec said the pty runs at
-   `min(cols) × min(rows)` over its subscribers, which is only correct for subscribers that are
-   actually *looking*. A **parked** node (project switched away — the xterm is detached from the DOM
-   but the PTY client is still alive and subscribed) has no meaningful size, and a collapsed or
-   zero-height node measures as `0×0`. Either would clamp everyone else's terminal to nothing. So
-   `transport.resize(sid, cols, rows)` takes `number | null`, and `null` means **"subscribed but not
-   viewing"**: the subscriber is *absent* from the size map and is excluded from the min entirely
-   (`reportedSize` in `src/renderer/terminal/terminal-config.ts`; `effectiveSize` in
-   `src/core/pty-size.ts`). Parking a node therefore stops it constraining the shared grid, and
-   un-parking makes it constrain again.
-
-4. **Drop-and-redraw is a two-sided contract.** The 8 MB `WS_DROP_WATER` ceiling drops a slow
-   client's queued output and resynchronises it by redrawing the current screen from tmux — never by
-   replaying the backlog. Two rules, one per side, and **both** are enforced:
-   - **Sender:** an **empty capture is never sent.** `captureForResync` returns `''` on any tmux/ssh
-     failure, and `pty:resync` payloads are guaranteed non-empty (`ServerPlatform.resync`); an empty
-     capture keeps the client desynced and is retried with backoff (250 ms → 10 s cap).
-   - **Receiver:** the renderer **must ignore an empty payload anyway** (`shouldApplyResync`). The
-     resync handler `term.reset()`s before repainting, so acting on `''` would blank a live terminal
-     and leave only the separator. The two guards are redundant on purpose: a wrongly cleared screen
-     is unrecoverable, a skipped repaint is not.
-
-## What Stage 3 changed relative to this spec
-
-Stage 3 implemented [Canvas sync](#canvas-sync) as approved — a publisher, a reflector, echo
-suppression, no CRDT, undo local per user. Five things differ from the spec as originally written, or
-were decided during implementation; the sections above are amended to match, and they are collected
-here so the delta is legible.
-
-1. **The publisher diffs SNAPSHOTS, not React Flow change-lists.** The spec said "`handleNodesChange`
-   publishes a mutation". That would have synced only the edits that flow through `onNodesChange` —
-   drags, selections, resizes. A rename, a color pick, a collapse, an add and a delete all reach the
-   nodes array through direct `setNodes(...)` calls that never touch it, so half the edits would have
-   silently failed to sync. The publisher instead diffs the serialized snapshot against the last one
-   it published (`src/shared/canvas-publish.ts`), which catches every edit whatever path produced it.
-
-2. **The reflector is deliberately NOT rate-limited** (`src/core/canvas-sync.ts`). Every other client
-   cast in this feature is bucketed (presence: `PRESENCE_RATE_BUDGETS`; session-ending pty casts:
-   `PTY_END_BUDGET`). A mutation is different in kind. A presence cast is a **sampled** signal whose
-   loss is self-correcting — the next cursor frame carries the current position. A mutation is an
-   **edge**: nothing supersedes it and nothing re-announces it, so a dropped mutation is *lost state*
-   — a node that never appears on a peer's canvas, or a delete that never lands and then gets written
-   back to disk by that peer's next whole-file save, which is the exact bug this stage exists to kill.
-   Legitimate traffic is also burstier than any bucket sized for it would survive: a drag emits at
-   20 Hz and a bulk delete emits N mutations in one tick. What **is** bounded is the *payload*:
-   `isCanvasMutation` refuses a malformed or oversized cast at ingest (`MUTATION_MAX_BYTES` = 256 KB,
-   ids capped at `REF_MAX_LEN`), so a hostile cast cannot amplify into every peer's socket or wedge a
-   peer's React Flow. If a budget is ever added here it must **queue**, never drop.
-
-3. **Mutations are project-scoped, and a mutation for a loaded-but-INACTIVE project is applied, not
-   dropped.** Each cast carries a `projectId` (React Flow only ever holds the *active* project's
-   nodes). Dropping a mutation for a project the client is not looking at would have been the
-   data-loss bug in a new costume: that project's nodes still sit in the `projects` store, and the
-   next whole-file `workspace.save` from that client would resurrect a node a peer had deleted. So
-   `Canvas` applies a peer's mutation for a non-active project straight into that project's
-   **serialized** nodes (`useProjects.applyNodeMutation`, `src/renderer/state/projects.ts`) and marks
-   the workspace dirty. An unknown project id is a no-op (nothing to apply). Clients therefore
-   converge **per project**, and the workspace rev-conflict bar stays as the cross-project backstop.
-
-4. **The tombstone stays. It could not honestly be removed.** Stage 2 said the tombstone
-   (`PtyManager.tombstones`, `src/core/pty-manager.ts`) was a stopgap and that Stage 3's canvas-delete
-   mutation was its real replacement. Stage 3 makes it *mostly* redundant — an attached client's
-   canvas loses the node the moment a peer deletes it, so it never asks to `create` it again — but
-   two live paths still reach `create` for a deleted node, and both would spawn a fresh `nt-<id>`
-   (the terminal its owner deliberately killed, as an empty shell) if the tombstone were deleted:
-   - **Project-level operations are not in the mutation vocabulary.** `CanvasMutation` addresses
-     nodes, edges and board items, never a project. `deleteProject`
-     (`src/renderer/canvas/Canvas.tsx`, the `×` on a "Recently closed" entry) ends every
-     terminal's tmux session via `transport.destroy(nodeId)` and publishes
-     **nothing** — the project itself, with all of its nodes, is still in every peer's `projects`
-     store. A peer that reopens it from *its* "Recently closed" list mounts those nodes and creates
-     their ptys. Only the tombstone refuses that.
-   - **Delivery is best-effort with no catch-up.** The reflector casts to the clients attached *at
-     that instant*; there is no join snapshot and no replay. A client whose socket was down when the
-     delete landed never sees it. In the Server Edition the ws-bridge full-page-reloads on reconnect
-     (so it re-reads the workspace from disk and self-heals) — but only once the deleting client's
-     **debounced** save has flushed; inside that window the client is holding a node the file no
-     longer has.
-   Removing the tombstone would trade a bounded in-memory LRU for a resurrected terminal on those two
-   paths, so it stays. It is unchanged by this stage: still in-memory, still an LRU
-   (`TOMBSTONE_MAX` / `TOMBSTONE_TTL_MS`), still exempting the destroyer so their own ⌘Z works.
-
-5. **What canvas sync does NOT cover** (all deliberate; none of it is fixed by this stage):
-   - ~~**Edges are NOT in the mutation vocabulary**~~ — **closed; see
-     [Edge sync](#edge-sync-bridges--ropes) below.** This was the worst of the gaps and not a
-     cosmetic one: edges rode the whole-file `workspace.save` without being in the vocabulary, so an
-     edge you drew never reached your peer **and their next save — of a canvas that never had it —
-     DELETED it**.
-   - **A peer's node removal unmounts the node and disposes its terminal co-state**
-     (`disposeTerminalOnUnmount` — the module-level xterm/park/co-attach state), but it does **not**
-     run the rest of the local delete path (`useAgentStatus.remove`, chat-driver dispose). The
-     session itself is already dead (the *deleting* client's `transport.destroy` killed it), so
-     nothing leaks server-side; what remains on the peer is a stale `agentStatus` entry for a node id
-     that no longer exists. Disposing the co-state matters because the delete is undoable: if the
-     owner hits ⌘Z, the node comes back **alive**, and a peer that had kept the stale co-state would
-     be looking at a node stuck in "closed by another user" whose only obvious cure (clicking `×`)
-     would kill the owner's live session for real.
-   - **Project lifecycle** (create / rename / close / delete / folder change) is **not** synced.
-   - **Viewport, selection and undo** are not synced. Undo is local per user, by design.
-   - **No conflict resolution beyond per-item last-write-wins** (per node, edge or board item). See
-     [Concurrent-edit resolution](#concurrent-edit-resolution-what-converges-and-what-does-not).
-     No CRDT.
-
-## Concurrent-edit resolution: what converges, and what does not
-
-**Converges, on any interleaving, among the clients that saw the whole exchange.** Every such client
-ends with the same **set** and the same **value** for every node and edge, and shows the same board,
-because every mutation is ordered by the reflector's `seq` and the highest `seq` per item wins
-everywhere (`src/shared/canvas-order.ts`). A client that loaded after a delete did not see it all; it
-is the first entry in the list below, and the board's exceptions are listed there too. This is the
-property persistence depends on: whichever client's whole-file `workspace.save` runs, it writes a
-canvas the others agree with. Proven end-to-end against an **asynchronous** bus (queued casts + FIFO
-deliveries, edits genuinely in flight) in `src/core/canvas-sync.convergence.test.ts`.
-
-That guarantee does **not** rest on any timeout. The pending TTL is a bound on how long we *suppress*
-peers, never on correctness: an ack that arrives after it **repairs** the node (rule 3 above), and a
-cast the reflector would refuse is never made in the first place (the publisher shares the reflector's
-predicate, records no pending entry, and keeps retrying the node until it is castable). Both cases are
-in the convergence suite — a client whose socket is stalled past the TTL, and an oversized sticky cast
-concurrently with a peer's delete.
-
-**Does NOT converge — named, not hidden:**
-
-- **A stale frame reaching a client that holds no tombstone.** Rule 4 (below) judges an upsert only
-  against the removes a client has itself applied. A client that loaded the canvas after a delete, or
-  reset its order on a reconnect (`reset()` clears the tombstones), has none for that node, so a stale
-  frame for it arriving later (from a peer whose socket was stalled) is applied there and dropped by
-  every other client. That client holds a node the others do not until its next load, and its next
-  whole-file save can write it back. (A canvas authority that heard the delete drops the frame too,
-  and overlays that save.)
-- **Array order after a resurrection.** If a node is deleted and then legitimately re-created, the
-  client that issued the delete removed it and re-appended it, so it can sit in a different **slot**
-  in the array than on a client that never removed it. Node set, positions, sizes and data all agree;
-  only the array order (which drives the sidebar listing) can differ, and the next load normalizes it.
-- **Intent, on a contended node.** Two people dragging the same node fight: the node lands wherever
-  the last-ordered frame put it. Two people typing a title get one title. That is last-write-wins,
-  not a merge — by design (no CRDT).
-- **Edge array ORDER**, for the same reason and with even less consequence: two clients that draw
-  an edge at the same time each append the peer's to their own, so the two arrays hold the same
-  edges in different slots. Nothing lists edges in order; they are rendered as a set.
-- **Board column and label order, for ids two clients added in the same window**, until the next
-  order op (see [Board sync](#board-sync-kanban)).
-- **A card's stored placement when its column is deleted as it is filed there.** Depending on the
-  order, one client can keep a placement naming the deleted column while another has none. Both show
-  the card in Ungrouped, which holds every card with no placement or one naming no column
-  (convergence case 5 in `src/core/canvas-sync.convergence.test.ts`).
-- **Anything outside the node/edge/board vocabulary** — project lifecycle (see item 5 above).
-
-### A delete beats a concurrent edit — CAUSALLY, not by a tiebreak (rule 4)
-
-This used to be in the list above, as a named wart: A deletes a node while B is mid-drag, B's next
-frame is ordered after A's remove, so the node **survived on every canvas** — but A's
-`transport.destroy` had already run `tmux kill-session`, so what came back was a **shell around a
-dead terminal**. Consistent, and nobody had asked for that node back.
-
-The fix is not the "delete always wins" tiebreak this document previously rejected — that one buys
-the opposite hazard, a stale drag frame from a disconnected peer erasing a node that was
-legitimately re-created. The missing fact was **causality**, so every mutation now carries `seen`:
-the highest `seq` its sender had applied when it cast. The rule is exact, with no timer:
-
-> an upsert for a removed node is dropped **iff** `seen < the seq the remove was ordered at`.
-
-B's drag frame was produced in ignorance of the delete and dies everywhere; a re-creation (⌘Z on
-the delete, the node added again) necessarily carries `seen` at or past it and lands. Its mirror on
-the receiving side: **a `remove` is never held off by rule 2's suppression** — rule 2 rests on "our
-unacked mutation wins everywhere", which under rule 4 it no longer does, so suppressing the remove
-would be the one way to disagree with our peers.
-
-**A re-creation waits for our OWN remove's echo** (`CanvasOrder.hasPendingRemove`). Our remove enters
-our `seen` only when its echo comes back, so a re-creation of the same id cast before that — a link
-deleted and redrawn, a node deleted and ⌘Z'd, inside one round trip — carried a `seen` below the
-remove: every peer dropped it as a stale frame while we kept showing it, and the next whole-file save
-became last-writer-wins on disk. Canvas's send callback now refuses any non-remove op for a key with a
-remove of ours in flight (counted per key, not TTL-bound — a late ack is exactly when it matters). A
-LOST ack does not come with a reconnect: the ui sink drops a single message and keeps the connection
-(`SINK_FAILURE_LIMIT`). Our echoes come back in the order we cast (FIFO), so the echo of a LATER cast
-of ours proves an earlier one was lost, and releases that remove's gate too; Canvas compares the total
-count of pending removes across each `accept` to see it. A reset still clears everything. The record
-of our casts that FIFO match reads is capped (`LOCAL_CASTS_MAX`, 4096), which only matters while the
-core answers nothing at all: a remove the cap forgets is released as it goes (the pre-gate degrade,
-not a gate stuck until a reset), and a forgotten cast's own late echo releases nothing (matched to a
-later cast of its key, it would release removes whose echoes are still in flight). The
-refusal keeps the op owed in the
-publisher, and an adopt in that window keeps an owed EDGE owed as well as an owed node (a teammate's
-op is usually what arrives during that round trip). Nothing else would ever cast it — our echo is an
-ack and changes no React state — so the echo that clears the gate re-publishes, after the handler and
-only when the publisher `hasOwed()`.
-
-`seen` is client-supplied. The reflector tidies it (`stampMutation`): a value at or past the order the
-mutation is being given is clamped to just below it, and a non-integer or negative one is dropped.
-**The clamp is hygiene, not a guard: it changes no verdict.** A remove ordered before this mutation
-has a `seq` at most `seq - 1`, so a clamped `seen` still counts as having seen it, and a remove ordered
-after it supersedes it by `seq` alone. A forged `seen` therefore resurrects a deleted node, clamp or no
-clamp. What bounds that is who may cast at all: on a hosted team `canvas:mut` is Editor-only, and an
-Editor has a shell on the host anyway. A mutation with **no** `seen` (an older peer, the relay mirror)
-is judged exactly as before rule 4 existed — degrade, never break.
-
-What this does **not** do: un-kill the process. If the delete wins, the terminal is gone, which is
-what the human asked for. If the node is deliberately re-created later, it is still a fresh session
-under the same `nt-<nodeId>` (a cold start).
-
-## Non-goals (v1)
-
-Roles/permissions, follow/spotlight mode, persistent chat history, comment threads, write
-locking, CRDT, character-level cursors inside editor/diff nodes (node-level focus only),
-read-only guests, per-user settings.
-
-## Testing
-
-- `PresenceHub` pure unit tests: join / leave / diff, cursorless peer.
-- Server e2e with **two** WS clients: hello → snapshot, cursor fan-out, echo suppression, leave
-  on disconnect.
-- **Co-attach** (delivered): two clients, one `persistKey` → a single spawn; both receive output;
-  min-size resize; the joiner is painted from the current screen when the join did not resize the
-  pty (and is NOT painted when it did); only a subscriber may write/resize/pause/kill a session, and
-  nothing it owed outlives it; the destroy path is capped, bounded and rate-limited; one client's
-  backpressure does not stall the other; a client that falls 8 MB behind is dropped and redrawn from
-  tmux rather than buffered forever; and a pause is released by the drain sweep even when no further
-  output ever arrives. → `src/core/pty-coattach.test.ts` (60 tests), `src/core/pty-size.test.ts`,
-  `src/server/backpressure.test.ts`, `src/server/platform-server.test.ts`
-- **Typing attribution** (delivered): the sender-aware `pty:write` stamps the writer; the ring decays
-  against local receipt time and is fed only by live diffs. → `src/core/pty-typing.test.ts`,
-  `src/renderer/lib/typingPeers.test.ts`
-- **Renderer co-attach logic** (delivered): reported-vs-effective size, letterboxing, resync-empty
-  guard, recycle action, "closed by" label. → `src/renderer/terminal/terminal-config.test.ts`
-- **Registration guard** (delivered): `pty:write` must stay routed through the *sender-aware* seam —
-  the test fails if a merge resurrects the old sender-less `platform().on(IPC.ptyWrite, …)` beside
-  it. → `src/core/pty-manager-platform.test.ts`
-- **Single-client regression** (delivered): min-size equals your own size and the spawn path is
-  unchanged. → `src/core/pty-single-user.test.ts` (17 tests)
-- **Canvas sync** (delivered): the reflector stamps the total order (`seq`, monotone across senders
-  and projects, never trusted from the client) and fans a mutation to every client *including* the
-  sender, refuses a malformed/oversized cast, and registers exactly once per platform; the publisher
-  diffs snapshots, stamps `src`, throttles drag frames, flushes on settle, `adopt()`s without
-  emitting, and — while solo — emits and diffs **nothing** while still keeping its baseline current.
-  → `src/core/canvas-sync.test.ts`, `src/shared/canvas-publish.test.ts`,
-  `src/shared/canvas-mutations.test.ts`
-- **Ordering** (delivered): an own echo is an ack and is never re-applied; a peer's edit loses to an
-  unacked local edit of the same node (per node, counted per in-flight frame); a superseded straggler
-  is dropped; an ack that never comes expires; a **late** ack repairs a node a peer overwrote after
-  the TTL lapsed (and one that lost the total order is still just an ack); a fresh local edit re-arms
-  the node; a continuous drag keeps its own suppression alive past the TTL.
-  → `src/shared/canvas-order.test.ts` (15 tests)
-- **Canvas convergence** (delivered): two clients running the **real** publisher and **real** ordering
-  against the **real** reflector, over an **ASYNCHRONOUS** bus (casts and deliveries queued, FIFO per
-  link — so several edits are genuinely in flight and the test chooses the interleaving). *The
-  earlier synchronous bus could not express concurrency at all, and therefore "passed" a design that
-  diverged permanently on the first concurrent drag.* Covered: a concurrent move of the same node
-  converges on the ordered winner (both orderings); a concurrent delete-vs-drag converges (both ways
-  round) — no split-brain save; 20 frames of two clients dragging one node converge; three clients
-  editing one node converge; every interleaving × every settle point of a six-edit set converges; a
-  peer's mutation is applied once and **re-published never** (one cast per local edit, no
-  counter-cast, even for a bulk delete across three clients); ephemeral cards never go on the wire; a
-  late joiner converges; a peer's delete is not resurrected by the surviving client's next save; a
-  client whose **inbox is stalled past the TTL** (a backed-up socket) is repaired by its own late ack
-  instead of being left on the losing value; and an **oversized** node the reflector would refuse
-  neither deafens that node to a peer's concurrent delete nor is silently lost (it is retried, and
-  syncs once trimmed). → `src/core/canvas-sync.convergence.test.ts`
-- **Applying a peer's mutation** (delivered): patches the live React Flow array — keeps your
-  selection, keeps relay-remote nodes, keeps local-only node data, keeps every untouched node's
-  object identity, drops the stale `measured` size so a peer's resize is not fought back, and keeps
-  group parents before their children. → `src/renderer/state/workspace.mutation.test.ts` (10 tests)
-- **Board sync** (delivered): the reducer and sanitizers per op; two different cards moved at once
-  both land; one card moved twice ends on the later op; two first-ever board edits make three
-  columns, not six; a card whose node has not arrived survives a peer that prunes it; a column
-  deleted while a card moves into it leaves the card in Ungrouped; concurrent column and label adds
-  converge. → `src/shared/kanban-ops.test.ts`, `src/shared/kanban-ops.convergence.test.ts`,
-  `src/shared/canvas-content.test.ts`, `src/renderer/canvas/kanban-sync.test.ts`, and the board cases
-  in `src/core/canvas-sync.convergence.test.ts`. The Server Edition's canvas authority has its own
-  suite (`src/core/canvas-authority.test.ts`) and an end-to-end run with no browser attached
-  (`src/server/hosted-e2e.test.ts`).
-
-### Manual smoke test (Stage 1)
-
-Presence needs two clients, which no unit test gives you. The cheapest two-client rig is the Server
-Edition in two browser tabs (see docs/SERVER.md):
+页:1`cursor`, (中文).`focus`和`chat`无光标的对等点是
+一等公民——不是有捏造立场的同伴。 移动同伴没有
+鼠标; 建模存在为“ 人人都有 x/y ” 将迫使它要么发明一个
+中 , 水 ,                                                                                                   Silk                        稠姗                                  ,                 昙                                                           ,           水 水 水 水 水 水 水 水 水 水 水 水                                                                                                           稠姗                                                    昙                                            的                         
+
+Q拣
+
+新设`presence:*`频道进入`src/shared/ipc.ts`。服务器是一个哑弹反射器:它持有
+平面表和粉丝退出,不执行任何政策。
+
+QQ 方向 频道 QQ 有效载荷
+|,|也.
+QQ 客户端 服务器( S)`cast`· 国家`presence:hello`页:1`{name, color}`页:1
+服务员`presence:cursor`页:1`{x, y}`- **流坐标**,在RAF上取样,节流至~20赫兹
+服务员`presence:focus`|`{nodeId \| null}`|
+客户端 服务器`presence:chat`|`{text \| null}`现场直播;`null`关闭QQ
+客户端 服务器`presence:project`|`{projectId \| null}`我们所看到的画布
+服务器 客户端`ev`) (中文(简体) ).`presence:sync`QQ 加入时的完整快照QQ
+服务器 客户端`presence:peer`QQ 单调 diff( 加入/ 更新/ 离开) QQ
+
+光标在**流量坐标**(`screenToFlowPosition`从不显示坐标 所以
+光标降落在正确的节点上,不管每个查看器的缩放和平板。 A级`presence:project`也** 清除光标**:属于旧画布,以及键盘驱动的项目开关
+没有发送新的样本。
+
+"Dumb反射器"是关于"政策*,而不是信任:枢机从一个客户端那里得到的一切
+粉丝们都出去了,所以食欲方面变硬了. 线上的每根绳子都穿过
+一条缩短规则(`capCodePoints`:聊天200,名字32——控制/比迪字符剥离——
+焦点/项目编号 128 代码点),每个投影器每个(客户端,频道)以一个符号限制费率
+桶数(`PRESENCE_RATE_BUDGETS`光标预算正好是制作者自己的20Hz 所以老实说
+客户端从不丢失样本——过量被静静地丢弃,从不断开). 服务器版 agreements
+套接字加盖单个帧, 以`WS_MAX_PAYLOAD`(8米B),远高于最大
+合法( 一个`fs:write`编辑器文件).
+
+□ 终端连线
+
+有利的变化:两个人必须能够观看一个终端.
+
+** 1 PTY, N 订阅者 ** — * not * “ Drop tmux's`-D`" .. 当第二个客户端打电话`pty.create`活着`persistKey`,我们不会生成第二个 tmux 客户端;我们订阅现有的`Session`因此,应用程序每个会话仍有一个 tmux 客户端,`-D`焕然一新
+Tmux的多客户大小谈判从不介入. 中继路径已经这样做了
+(单位:千美元)`attachDetached`, (中文).`src/core/pty-manager.ts:485`)——我们概括了这一机制,而不是
+发明第二个。
+
+变化 :
+
+1. ** 经常预算:`Session.webContentsId: number | null`→`subscribers: Set<ClientId>`页:1
+(单位:千美元)`pty-manager.ts:251`) (中文(简体) ).`flush()`(单位:千美元)`:780`) 向订阅者播放,而不是
+单轨。 中继器`onData`页:1`onExit`汇是**不**在该套中(没有)`ClientId`: 分离的、中继服务的pty保持自己的会话,并被故意省去`subscribers`绽放`byPersistKey`co-attach 索引,所以中继路径为位元
+是什么来着?`flush()`呼叫水槽,然后粉丝到 That's a business.
+故意分开
+2. ** 经常预算:`pty:create`成为一能者。 ** 现场直播`persistKey`表示订阅 +
+返回时`fresh:false`而不是产卵。 冷还原和回滚 他会重新播放`fresh`所以他们继续工作
+3. **规模:最小的用户获胜。 ** 不同的缩放/ DPI 计算不同的浏览器
+cors/rows and will 腐烂对方的渲染——经典的共享-死板问题.
+PtyManager 跟踪每个用户请求的大小, 设定有效大小为
+** min(cols) × min(rows)**,并在`pty:size:<sessionId>`。 。 。
+每个x定期电话`term.resize()`从广播而不是自己的`fit()`,以及
+后面的字母框。 有一位订户`min`一个元素的大小是:
+** 单一用户 Được
+4. ** 压力变成每个客户。 ** 现在`paused`按会话键
+(单位:千美元)`platform-server.ts:39`和(或)`detach()`清除任何断开处上的 * entire * 地图—— a bug
+已经在"v1是单UI"的评论中供认过(.`:110`) (中文(简体) ). 一个人呆着,一个慢电话
+暂停每个人的输出。 重键到`(clientId, sessionId)`; 解析器只清除客户端的
+条目。 共享的 PTY 仅在该会话的 * 每个* 客户端结束时暂停
+高水,所以最慢的链接不再为球队定下速度.
+
+只有这样,一个慢客户端的发送缓冲器才会不受约束地增长,所以它被封顶:
+时积极合作`WS_DROP_WATER`(8 MB 缓冲到一个客户端的套接字上) 我们** 放下该客户端的
+窟内排队输出**而不是暂停其它,当缓冲排出时,我们** 重新同步
+它通过从 tmux ** 重新绘制当前屏幕( 重用现有的`capture-pane`路径)
+带有“ 重联 —— 早期输出跳过” 分隔符 。 对于终端, 当前屏幕
+关键是,而不是回滚的 8 MB 错误的链接被错过; tmux 是权威的
+屏幕的来源。
+
+该上限的三个属性,诚实地说:
+- ** 约束是按SOCKET,而不是按会话。 **`bufferedAmount`这是`ws.bufferedAmount`一个
+整个连接的编号,这是字节实际坐落的地方。 所以一个客户
+洪水流过天花板时,有一次它正在观看的每次会议(每次会议)
+下一个块。 其他** 观众** 未受影响——他们有自己的插座。
+-** 恢复是按`(client, session)`:** 解毒状态按键是那样的,所以每次会话
+获得自己的捕捉 和自己的重报告中的建议。
+- 排水管是触发器,不是下一个块。 常见的情况是洪水 结束了
+(单位:千美元)`npm run build`完成; 套接字排出; 不再输出 。 重画挂起
+下块不会开火, 离开用户在屏幕截断 中风。 A级
+250毫秒的扫射, 武装在脱对这种物质, 清除当脱氧的空虚, 所以健康的路径
+无报酬——一旦套接字重新回到低水位标记下,就注意重新绘制。
+- ** 从未发送过空捉。 **`captureForResync`返回时`''`任何 tmux/sh 失败,
+和渲染器的再同步处理器重置终端; 发送`''`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}会给现场留空白
+终端。 空/ 失败的抓取会让客户端失去同步, 并用备份重审
+(250 ms ~ 10 s 盖).`pty:resync`因此,有效载荷可以保证不空。
+
+绘制加入者
+
+加入客户端`fresh:false`,这就是告诉 制造者 * 不 * 重放 坚持
+回滚( tmux 是实时的; 重播会复制它). 但是, com-attach 添加了 ** no tmux 客户端 ** ——
+会话已经有一个了, 所以没有重新绘制加盟者,
+在 SIGWINCH 上修改 pty 的大小: tmux 重新油漆, 并且只有一个加载器 严格地** 小于当前**
+网格导致一个。本着这个精神, ** 等值是预期案例** (两个客户都使节点的恒定几何)
+字体相同; 画布缩放为 行了 CSS  Philadelphiam, 不更改`clientWidth`),并且等于或
+更大的大小没有改变。 左边,该特性的头条路径——在一个
+第二个客户端——降落在**blank但活**终端上,直到下一个产出字节,非决定性
+(a±1-细胞测量差值两台机器无声地隐藏了虫子).
+
+因此,一个加盟,** 不** 调整大小 pty 带会话的** 当前屏幕**`PtyCreateResult.screen`,用同样的抓获`captureForResync`(单位:千美元)`tmux capture-pane -e`(a) 与《公约》有关的其他事项
+drop-and-redraw 路径使用; 渲染器在直播流开始前将其写入其空的xterm.
+三条:
+
+- 它 这是个创造的结果 - 不是`pty:resync`事件: 渲染器只订阅一个
+会话频道 * 之后 *`create()`因此,一个共同时间推动的事件不会降落在
+听着
+- 加入一个**did** 调整大小得到什么 - tmux已经在画它, 和两幅颜料会相表达了
+在一个屏幕上有两个不同的时间点。
+- 一个**空捕捉被省略**,从来没有作为`''`(合同与`pty:resync`) (中文(简体) ). 一个独唱用户
+从来没有到达这条道路: 新鲜的产卵 没有什么可以画, 温暖的再接力开始
+tmux客户端,它自己重新绘制.
+
+页:1`screen`是加入者的油彩,只有热附着的种子。 有一个简短的
+第二个来源:a`warm-history`种子水合每个`fresh:false`从 tmux 自带附件
+向后滚动( R)`transport.captureHistory`) (中文(简体) ). 这整个水合物是**Gone** ——Tmux拥有鼠标和
+再次回滚(见CLAUDE.md,“结束会话连续性”),因此它重新绘制面板及其
+历史可以滚动; 屏幕改善其水分 。
+带和重复屏幕。 独身的温暖重生 所以种子** 无**,和`seedPaint`因为`create-screen`——这个捕捉——是一个种子a.`warm-attach`仍然可以屈服, 对于一个客户端
+tmux 不重新油漆:没有调整大小的加入器 。
+
+页:1`pty:resync`替换种子及其后面的队列。 **`main`附加路径订阅到`pty:data`等待它的种子, 并將其的種子 :`createDataGate`. 登陆的再同步
+那扇窗子是CURENT屏幕的重画 所以门上所有东西都拿着
+它:排水排水会把 沉积的洪水带回 新鲜的屏幕和飞行中
+历史种子会在上面写一个更老的屏幕。 因此,再同步处理器`gate.reset()`s(将队列放下,将其字节返回到流量控制核算中,并切换到
+),并标记种子**叠加**,因此种子在捕获返回时没有写作.
+捕捉后到达的所有东西 都直接穿过,按顺序排列
+
+有两个细节很容易弄错 并且被测试所包围`terminal-config.test.ts`编号 :
+
+-** 被替换的意思是"无所事事" 绝不是"回归" 种子生活在产卵延续中
+仍然需要电线`onExit`, (中文).`term.onData`(**键盘输入路径**)和`initialCommand`/ 冷启动剂恢复 * 低于 * 。 早点回来 就会有终点站
+流输出且看起来完美无缺 同时默默接受任何输入 永远 决定
+一个纯洁的助手,`seedPaint()`——其结果类型玲珑无堕胎成员正是因为这个原因.
+- 喷漆的`reset()`以回调字母排序** (`repaintResync()`:`term.write()`正在同步解析,同时`reset()`立即清除缓冲器, 进行内线重置降落
+在种子的(最多1兆字节)历史书写和xterm解析之间,可以清除
+几乎是空的缓冲器,让沉淀的历史画到清空的屏幕上,然后附加新鲜的
+捕捉到* 的某些方面。
+
+QQ 打字归属——以及它为什么是服务器侧
+
+`cast()`用于丢弃发件人(`void uiId`) (中文(简体) ).`pty:write`通过发件人认识路由
+缝合( E)`onWithSender`相反,处理者知道WHO打字:它称为`存在Hub.noteTyping(
+客户端ID, 会话. nodeId)` directly — there is no `关于会话的最后 Writer 字段, 因为无
+会读主持了一个(徽章是同级状态,它住在枢机的同级桌子上,而不是pty). 这个
+中枢节流器将广播节流到每台1/500ms(客户端,节点);徽章在~2s后衰减.`write`当只有一个对等点时, 完全跳过呼叫, 所以一个独奏键盘爆裂 没有任何代价。
+
+仅接受该会话的**订阅者**(会话编号可进行检查)的 太好了
+同一成员检查门`pty:resize`页:1`pty:flow`页:1`pty:kill`- 某届会议的一切`pausedBy`页:1`sizes`因此,属于一个客户 正在实际观看它, 这就是为什么`dropClient`彻底清理
+
+归属由** 服务器进行,而不是由客户端自我声明进行**
+因为手机:当电话在中继器上写时,发送者已经被称为`HostSession`所以,从手机灯光打字 "Enes在打"徽章的人
+没有单行Swift的桌面画布。 *
+
+QQ 无锁定( v1)
+
+两个人可以同时打入一个贝壳;徽章脉冲和人物
+交互在 tmux 会话中。 这是被接受的,而不是被忽略的——这是行为
+每个 tm耸动双程序员已经知道, 徽章 * 是 * 警告 。 锁定/交接是
+v二.
+
+如果一个节点被删除而其他节点这项活动被附上,`destroy(persistKey)`杀死 tmux 会话和
+其余的订阅者输入“ 由 < name > 关闭” 状态, 而不是重播 。
+
+删除与回收
+
+杀死一个节点的tmux会话被用于两个相反的意图,PtyManager将其分开:
+
+- ** 删除**(×/删除节点) `destroy(persistKey)`节点离开帆布。 共同观看`pty:closed:<sid> { by }`永远不能重生 重生会复活一个终端
+确认了所有者是故意杀人的, 在一个新鲜的外壳里, 并绑了一个tmux会话。
+- **回收** (“移入工作树”) −`recycle(persistKey)`相同`tmux kill-session`(否则)`new-session -A`但节点 ** 停留**
+画画和继续工作。 共同观看`pty:recycled:<sid> { ready }`: 重新启动终端,
+节点移动。 他们重新创建了 **co-attaches ** 到替换会话, 所以他们遵循节点
+进入它的新圈套 永远不会离开 持有死去的pty。
+
+回收通知ổ地保存,直到替换会议注册为止** (`ready:true`) (中文(简体) ). 发送
+任何更早的, 共同观看器的重启可以击败移动器自己的`create()`和产卵`nt-<nodeId>`从
+*its* 选项——即在节点的 stale cwd——默默地为每个人取消动作谄媚.
+
+回收机可能会在`kill-session`及其国家`create()`(应用程序退出/ 崩溃),所以是 10 s
+超时释放 共同观看者-与 **协调行动`ready:false`** 表示不重生。 这个
+是一个重启比不重启更糟糕的情况: 共同查看器的创建选项仍然带有
+{\fn华文楷体\fs16\1cHE0E0E0}所以它的产卵会放出`nt-<nodeId>`返回到 stale 文件夹中 —— 当移动器的应用程序返回时, 它自己的`new-session -A`(cwd选项在附件中被忽略) 所以每个人都会声称
+工作树路径,而贝壳则坐落在旧目录中。 寂静的,和所隐讳的,
+通知的存在是为了防止。 因此终端显示 **"会话结束——重启" **:
+移动只能通过明确的用户点击而丢失,从不通过超时.
+
+重生的守护者 和支撑它的墓碑
+
+`pty:closed`只达到会话的**订阅者**. 其项目不活跃或
+关闭* 没有挂载的终端,因此它不是一个——然而节点仍在它的画布上. 下一个`create`因为这个节点( 稍后打开工程) 找不到会话, 失败 。`tmux has-session`, (中文).
+并历来产下一个全新的: 被删除的终端,作为新鲜的外壳复活.
+
+`PtyManager.tombstones`关闭: 已销毁`persistKey`被铭记,而后`create`另一客户拒绝(`PtyCreateResult.closed = { by }`)而不是产卵——
+渲染器在同一“由 < name> 状态关闭” 中着陆。 摧毁的客户是** 豁免**,所以它的
+自身QQZ( 取消删除) 仍然恢复节点, 而单用户路径未受影响 。 A级`recycle`清除墓碑(没有删除)。
+
+它的极限是真实的(见已知的风险):墓碑是内在的,所以它生存的时间是完全的.
+核心进程。 第3阶段的画布删除** mutation**是结构固定——它去除节点
+从每一个*附着*客户端的画布, 所以没有人会留下一个 持有重造。 没有,没有
+使墓碑可以移动: 变异覆盖了当时的客户
+和它没有覆盖的路径 仍然需要再生守护。 见
+[什么阶段3] (#什么阶段3-改变-相对-此谱) 准确列表.
+
+地图还标有大小和时间**`TOMBSTONE_MAX`页:1`TOMBSTONE_TTL_MS`,一个LRU),以及`pty:destroy`编号/`pty:recycle`铸件为**长盖**(`REF_MAX_LEN`像其他的一样
+客户提供参考)和每个客户的** 费率有限**(`PTY_END_BUDGET`) (中文(简体) ). 它们必须是:
+密钥从电线上逐字递出, 墓碑被录制围绕着即使没有现场会议,
+调用费用a`fs.rm`加一个`tmux kill-session`子进程。 爆破的大小远超过大块
+删除(每个节点一个在单个勾选中),这样它就永远不能让真正的用户失望;驱逐降解为:
+石头前的行为 永远不要更糟
+
+□ 彩绘同步
+
+节点编辑以变异方式播出,这样光标就不会在 Stale 几何上徘徊.
+
+词汇已经存在——`CanvasMutation = {op:'upsert', node} | {op:'remove', id}`(单位:千美元)`src/shared/types.ts:119`——接收端也一样:`applyCanvasMutation`(单位:千美元)`Canvas.tsx:917`),为继电器写. 我们只增加排放方:`handleNodesChange`发布一个变异( 仅位置, 节流到 20 Hz, 同时拖曳; 完全提升 on
+结算; 在添加/ 删除 / 颜色/ 标题/ 崩溃 上调值, 服务器将其反射到
+除了发件人之外,每个客户都一样
+
+因为所有看到整个交换的客户
+聚集在同一节点上,无论谁调用`workspace.save`写同样的画布,
+它能解除今天最后的写作者们的救赎 例外(删除后加载的客户端,
+两种情况下的棋盘字节)
+[does-no-converge list] (#同时代编辑-解析-什么-converges-和什么-does-not). 现有的基于rev的冲突条`workspace-watcher`保持为
+支助支助。 在"服务器编辑各派"中,一个共享项目的内容并不来自这些
+保存 : 帆布权限覆盖每个帆布, 并包含其应用的操作内容
+(单位:千美元)`docs/hosted-team-relay.md`) (中文(简体) ).
+
+有两件事是故意的 ** 不** 同步的: ephemerical 节点( subgent / 循环卡) 衍生出来的
+在已播出的每个客户端上独立播放`agent:status`流; 撤销保留
+**每个用户的本地**——原则上可以取消别人的改变(最后写成-wins). 没有RDT。
+
+** 已执行(步骤3)。 **`CanvasMutation`现在出发了`canvas:mut`(单位:千美元)`src/shared/ipc.ts`:
+
+- ** 图书馆**(`src/shared/canvas-publish.ts`——渲染器 diff 每个固定的节点快照
+与它公布的最后一篇相比,`diffToMutations`),所以编辑从未通过过`onNodesChange`(重命名、颜色选择、崩溃、直接)`setNodes`同步也一样。 位置框架
+被拖到~20赫兹,同时拖动和冲压在拖动中;其他一切都是完全上升的。
+电离子剂/胶片被过滤掉(`publishableStates`) (中文(简体) ). 每一次变异都会被盖章
+与`src`这个Canvas的出版商标签
+-**索洛门**-`shouldPublish`(由存在对等表填充,通过参考书目读取,以便永远不能)
+复降坎华. 没有其他人附身`publish()`降解为`adopt()`: 这需要
+作为基线的快照,并且**没有** diff, no`stableStringify`每个节点,没有IPC铸造。 页:1
+独奏用户不付任何团队同步费用 因为基线仍然跟踪画布,第一个
+在对等点加入 diffs 后编辑正确 —— 没有再同步步骤, 没有错失突变 。 ** 例外情况是:
+受管项目**(`shouldPublishCanvas`: 同行或被管理). 一个画布权威写一个工程
+只有从它听到的操作, 所以编辑 独行门吞没在那里, 会被下一个擦男女平等
+覆盖保存。 服务器版标签会询问它的核心是哪个项目被管理( S)`canvas:authority`), (中文(简体) ).
+发布每个工程直到第一个答案,并在重新连接时再次询问;桌面
+没有回答,所以它的大门没有改变。 只有来自另一个客户端的铸件能证明同伴
+(单位:千美元)`provesPeer`:我们自己的回声和一个核心公开的操作(否)`src`没有。
+- ** 参考器**(`src/core/canvas-sync.ts`) ——没有布介绍状态,一无所获,但它是
+** 不**无国籍:每一次变异都用单酮标出**`seq`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}然后把它寄给每个人 {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}我...
+客户端,包括发送者(`CorePlatform.clientIds()`+ 键`onWithSender`) (中文(简体) ).`seq`这是
+服务器授权(一个客户端提供的一个在摄氏处被覆盖).
+- ** 命令**(`src/shared/canvas-order.ts`)——客户端的一半,以及同时编辑的原因.
+而不是把画布一分为二 每节点,最高`seq`赢了。 三条:(1)
+我们自己的回声是**ack**,不是编辑——它带有`seq`我们的变异被赋予, 从来没有
+重新应用(重新应用它将会将我们仍在拖的节点橡胶带),而我们的一个节点是:
+节点的突变没有被取消 我们忽略了同行的突变
+我们的必然是* 后*的顺序,所以它也会赢得其他客户。 (3) 规则
+我们的乐观价值仍在我们看来**。 规则2的压制是
+以`PENDING_TTL_MS`(Ack可能晚点——同一套接字带有pty输出,第2 够了)
+容忍8MB的积压,一旦它失效,同伴的突变可以覆盖我们的值
+还等着被撞到呢 从那一刻起,我们的回声就是 仅** ** 复制一个值,
+已经赢得了其他客户,所以是**应用**(修复),而不是放弃。 无规则3 a
+过时的 Ack 将客户端永久留在丢失的值上 —— 及其全部文件`workspace.save`然后在其他人的画布上写了丢失字节的字节 这恰恰是财产
+存在保障阶段。 等待的条目`since`在每个本地变异上刷新
+这个节点,所以拖长于TTL 无法结束它自己的压制 中干。`order.reset()`每当我们的存在客户端ID更改( 即在每个( 重新连接) 上) 时都会被调用 : 如果
+核心重新启动,其`seq`于 0 重新开始`seen`地图仍然具有很高的价值,我们
+{\fn华文楷体\fs以何种方式将每一个新的突变 都悄悄地抛下 正确性不再取决于
+桥的`location.reload()`重置保留了一件事: 我们自己的因果位置(`lastSeq`, (中文).
+什么规则4's`seen`邮票)。 重联到SAME核心也重联,第一个铸币局盖章`seen: 0`那里——在投放之前删除的节点的QQZ——是每个对等控件的僵硬框架
+墓志铭。 真正重启后, 保留值高于每个新值`seq`,所以我们的演员读作
+"永不罢休":判前四判决,不分. 那扇窗子是绑定的,第一个盖了章`seq`重置后听到的重置位置在其位置上或下方(核心重新启动,其核心
+在那日,他音频的答覆,在答覆之前,你应当避开它。 (无)
+反射器夹住它`seq - 1`,此处不改变判决;见夹子下面的注解。
+第4条.)
+- 反射器从未被铸造过 —— 出版商以相同的方式验证
+反射器的摄入用途(`isCanvasMutation`移动到`src/shared/canvas-mutations.ts`因此,两端都有一个判决) * 在录制一个待决条目之前和* 铸造之前。 拒绝
+因此,一个待补条目既不需要费用(该条目会使该节点听不见同行的发言)。
+整个 TTL — 对等点`remove`降落在那扇窗子上 一直没有恢复 所以接下来
+完整文件保存了他们删除的节点复活) 或重试: 被拒绝的节点保留它
+之前的基线条目**, 所以下一次发布 重现它 并同步它成为的时刻
+可阉. 唯一可以合法超越的东西`MUTATION_MAX_BYTES`是自由文本——粘度
+外 外 外 处 ("本注太大,不能与
+你队友(超过250KB)... 他们不会看到它,直到你缩短它"。
+带着一张纸条 球队从未默默收到过
+- **Loop guard**——从对等点应用的一个变种是:`adopt()`编辑到出版商的基线
+(没有A B C A乒乓)。
+-**pply**——词汇单源于`src/shared/canvas-mutations.ts`两者均使用
+结束 。 在渲染器中,一个传入的突变被补入**live React Flow阵列**
+(单位:千美元)`applyMutationToFlow`, (中文).`src/renderer/state/workspace.ts`)——从未绕过.
+(丢失) 序列器, 它会擦拭录像带的选择, 删除您的继电器远端节点并重置
+每个对等突变的节点组件。`window.nodeTerminal.canvas`预装时真实
+和**ws-桥。
+- ** Undo是重置的,而不是拼接的** – 对等方的变异被应用到撤消基线中
+(单位:千美元)`committedRef`) 而不是 难道不是替换它,所以在300 ms 内仍然有一个本地编辑 取消跳动
+幸存了同伴的突变 降落在上面。
+
+□边缘同步(桥+绳)
+
+第三阶段涉及**节点**。 边缘-`bridges`(context links,一个代理人实际上读作
+(通过)和`ropes`(只播放的"由"血统)——被忽略了,这是最糟糕的
+相隔的舞台被运出, 因为它们被固定在同一文件里`workspace.save`页:1
+你画的边缘从来没有到达你的队友, 他们的下一个保存—— 一个帆布 从来没有它,
+** 删除**。 倒数一样
+
+它们现在在词汇中,周围的一切 都没有改变的节点机械:
+
+- ** 词汇** -`CanvasMutation`收益`edge-upsert`页:1`edge-remove`,每个带一个`kind: 'bridge' | 'rope'`(它坚持列表写) 和边缘的三个ID。 ** 只有身份证
+旅费。 ** 绳子的颜色和等待的外观 是从每个客户的 自己产生
+节点( E)`displayEdges`页:1`ropeVisual`),所以发送它们可以将一个客户的调色板运送到另一个客户.
+-**谚语**-相同`CanvasOrder`键`mutationKey`编号 :`n:<id>`对于节点,`e:<id>`(单位:千美元)
+边缘,一个带有前缀的密钥空间(节点 id 和边缘 id 独立生成,可以
+撞车了 那个`kind`键中刻意**不**:一个id是一条边缘,一个桥和一个
+要求同一身份的绳子必须解决一件事,而不是两件事。 第 4 条
+因此,因果删除)涵盖了一个 你很准确的边缘,因为它涵盖了一个节点。 申请和主任同意:`applyEdgeMutationToScene`从另一个列表中取出一个升格的 ID 并删除它
+两者,以及`diffToMutations`不为仅在列表之间移动的 ID 设定删除( 后缀)
+删除将会从两者中删除)。
+- ** Publisher ** - 该快照成为`CanvasScene`(单位:千美元)`{nodes, bridges, ropes}`所以,一个diff,一个
+油门和一个基线都覆盖着 Canvas的发布效果在其道具中有边缘阵列:
+应能绘制链接`nodes`,因此,没有编辑内容就永远不会出版。 反应
+流 重建这些阵列 仅靠** 选择** 变化太 —— 花费一个 diff 表示不
+突变(diff 别比较 id/ source/ target),独奏门表示独奏用户不
+给钱,甚至。
+-**批量订单是负载的均有。 同伴一次应用一次突变,所以均有`diffToMutations`输出 ** 节点添加 → 边缘添加 → 边缘删除 → 节点删除 **:一个边缘命名一个没有的节点
+到达后却无动于衷 结点在同一批中死亡的边缘
+当它还在的时候就被移除了。
+- ** 叶片终点经过过滤**(`publishableScene`) (中文(简体) ). 命名子代理/ 循环卡的边缘
+处理一个端点 , 拥有自己的寿命 , 它将在一个
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}现在我们无法控制 {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}我们又重新发表在我们面前
+- ** 背景项目**`useProjects.applyEdgeMutation`,基于同样的原因,节点这样做:
+工程的序列边缘是我们下一个完整文件保存的文字.
+- ** 闪电快照在CREATED**时捕捉边缘阵列(`publishableLater`) (中文(简体) ). 那个
+出版社保持一个`adopt`基线在下次发布之前尚未解决,所以读取
+倒计时:
+diff是空的,没有投出来,队友的下一个保存删除了链接. 只有`.map`被推迟( 反应状态阵列从未设置过变异) , 因此独奏门仍然跳过成本 。
+-** 边缘调整器在项目负载和服务器变化上与设置器同步移动,
+和渲染时间镜像只复制状态 当它改变。 一个水手写回
+SyncLane 并跳过待定的默认Lane设置(参见`nodesEpoch.ts`),所以无条件的
+镜像将前一个工程的边线重新放回了 校对 tumoure 的边线 。
+接下来的渲染被应用到他们身上,并过度渲染负载.
+- ** 端点没有、没有铸造的边缘。 ** 一个节点 大小守卫拒绝
+永远不能到达对等点,那对对等点的边缘将在那里被磨损,
+端点`edge-remove`也为被拒绝的被拒绝的被拒绝。 被拒绝的,是被拒绝的`edge-upsert`在拒绝节点的发射中(在节点最后的发射时)
+铸币局拒绝`refusedNodeIds()`并且把它投在结点的向工作组,
+在它之后,在第一个发出 节点通过。 这也贯穿了同行的行动:
+采用该应用 它在屏幕上拍摄场景 屏幕上已经包含拒绝的节点和
+因此,通过的基准 保留先前的基准输入 欠节点的场景
+刚好是坚忍的,而且每逢它有一处边缘。`adoptBaseline`)——否则节点将
+只有在下次改变时才重新调整,边缘再也不会与基线和
+永远不要被抛弃。 只有被采纳的场景仍然维持着:一个出版商为每个本地项目服务,
+因此,一个项目切换器采用了 ANONER 项目的场景, 并重新排放欠 节点它缺少
+投出一个`remove`在新工程的代号下旧项目的节点(和对等删除,
+也作为收养而抵达,将回音。 持有在出版社,而不是过滤器上
+场景 : 放下一个已经持有的边缘`edge-remove`- 一样
+删掉,由持久的解决办法。 这是保守的:一个节点的边缘,对等点的EARLIER版本也有
+书面材料。 不包括的:(1) 独奏门 不会关闭时使用的基线(`shouldPublish`(false)不是重制的,因此,只有在下一次更改时——即大门——才将一个以欠债方式吞入的物项同时进行。
+仅在主机角色降至只读时关闭开放的出版商; (2) 往返
+另一个项目(A + B + A),实际上几乎是任何一次访问B :发射只相应地拖欠
+网站的节点 出版商在B的每一个变化上`nodes`状态
+( React Flow 本身的度量和选择更新包含,而不仅仅是编辑),所以欠A节点是
+在那里被遗忘了;返回A的负载 收养A的全部场景,所以一个坚固的边缘没有被铸成
+节点修剪后,直到边缘本身发生变化; (3) a`remove`本身被拒绝(无)
+正在运行的项目),然后被通过,不经过重审. 三者都不是倒退——
+出版商的行为在被搁置之前也一样。
+-** "这个字条太大了"只说用来 各国节点 边缘行动只因
+错误或过长的ID,所以句子会妍指无人测量的原因;拒绝是
+改为登录。
+
+这有什么作用** 不**改变:当一个终点消失时,一个边缘仍然被当地覆盖,所以
+pate 的节点删除可以留下一个不为勾选而绘制的(参见已知风险). 还有
+打开:在本地功能边缘更新覆盖的同一任务中应用的对等边 op
+更新( 节点路径不再存在: 接收)`setNodes`已经运行,`rebaseOnLatest`页:1
+本地节点删除`remove`首先,还有
+倾斜的边缘'`edge-remove`每一个同龄人都会有同样的边缘
+(converges,带有冗余的铸件);画布控制写到一个没有在屏幕上的项目是
+而不是作为边缘行动。 服务器版的无头画布控件现在已投放: 它向每个
+工程的全部内容(节点、边缘、板)与它上次装入或保存的内容相对应,并投出每个
+在它节省(`castAndSave`, 编号:`src/server/headless-node-factory.ts`) (中文(简体) ).
+
+□ 董事会同步( kanban)
+
+董事会`project.kanban`有边缘的问题:`canvas:mut`没有带嵌入物,
+棋盘骑着所有文件保存, 所以队友的卡片动作 从来没有到达你和你的下一个保存
+写你的板 在他们的。 棋盘项目现在在词汇中,每个项目一个操作
+(单位:千美元)`src/shared/kanban-ops.ts`),在第三个键前缀下:
+
+* * * 项目 * * * 操作 * * * * 顺序键 * * *
+|,|也.
+纵队 :`kb-column`页:1`kb-column-remove`|`k:col:<id>`|
+― ― 列顺序 ― ―`kb-column-order`|`k:colorder:<projectId>`|
+·卡片放置`kb-card`页:1`kb-card-remove`|`k:card:<nodeId>`|
+卡片元数据`kb-meta`页:1`kb-meta-remove`|`k:meta:<nodeId>`|
+标签`kb-label`页:1`kb-label-remove`|`k:label:<id>`|
+标签命令`kb-label-order`|`k:labelorder:<projectId>`|
+QQE 保存的视图`kb-view`页:1`kb-view-remove`|`k:view:<id>`|
+
+- ** 最后一个作者胜出 ♪每个项目,而不是每个板。 ** 节点规则不变:每 ♪按键,最高`seq`赢了。 两人同时移动两张牌,两张牌同时着陆,两张牌同时移动
+结束于后序的。 一个卡片的放置和元数据密钥 由它的节点 ID 在自己的下
+子前缀,因此卡片移动不是节点编辑,删除节点不会墓刻其卡片.
+- ** 两个顺序键承载项目。 ** 每个都是每个项目的单体,一个`CanvasOrder`命令每个已装倪的工程:未瞄准,我们在一个工程中未锁定的重排(规则2)a
+队友的重排在另一个。
+- ** 第4条仅供删除。 **`kb-column-remove`,所具有的`kb-label-remove`和`kb-view-remove`说
+"这个东西不见了" 并墓碑 他们的钥匙,就像`remove`和`edge-remove`。 。 。`kb-card-remove`("回到未组合")和`kb-meta-remove`("无元数据")是VALUES和顺序
+和任何其他写作一样(`isKanbanDeletion`:一张从板上摘下来并再次存档的牌不是
+复活 墓碑会把队友同时移动的动作 当作一个僵硬的框架
+- ** 命令行动也是附加内容。 ** 一个项目操作只说项目存在,一个对等者说
+单独应用它 附加它。 因此,出版商也投放列表的订单 op,只要列表
+获得ID或双方共享的IDs相对顺序改变(`orderChanged`)和每个
+复制品出现在后期命令的操作列表中. 命令操作只列出发件人知道的身份,所以
+在同一窗口中添加的其他客户端的ID不在其中:`reorder`把那些放在列表之后
+由ID发送的, 并且行动本身的发送者 应用了它的最后一个命令的回声 op 该列表
+而不是把它当作一个沉船扔下`CanvasOrder.accept`) (中文(简体) ). 两者不同时增加三个
+在90个反射器中,只有30个会合。
+(单位:千美元)`kanban-ops.convergence.test.ts`列出三个客户的每次离职。
+- ** 姓名已修复,没有拒绝。 ** 栏名、标签名称或受让人名称经过修剪,
+失去控制权和统治性角色,切入其束缚(`displayText`; 仅一个
+空结果被拒绝 。 所以拒绝就是重新命名
+默默地从不同步. 药被拒,从未修复. 寄件人铸造修复的表格并保存
+因为它本身的回声只是个响尾蛇`renderer/canvas/kanban-sync.ts`) (中文(简体) ).
+-仍有待确定。 ** 仍有待完成的项目`kanban`块使默认懒惰
+在第一次编辑之前不会写的板子, 通过现场同步, 两个人可以让编辑
+马上 其柱式id是项目id和柱式索引的散列(.`seededColumnId`, (中文).`defaultKanbanFor`输入`src/shared/kanban-default-board.ts`:每个客户都一样,所以两个
+首先编辑同一三个栏而不是六个栏。 明确创建的棋盘(核心`ensureProjectBoard`电话的第一板)保持随机的ID文档.
+- ** 出版商挂起一个商店漏斗。 ** 每张板子都经过`useProjects.setProjectKanban`他的钩子将棋盘按项逐项排列 并投出相同的
+发送和发布与节点相同的门:棋盘、卡式、Omni棋盘、节点标签和
+联合国`assign`动词全部发布,没有自己的调用网站. 应用对等者的棋盘操作
+通过商店压缩器(`applyCanvasOp`),从未通过`setProjectKanban`,所以没有收到
+重新发布,它不会写 board-log 条目: 只有更改记录的客户端
+这个 棋盘更改的条目会通过项目自己的会话( 中继标签) 。
+(原始内容存档于2018-09-29). host).
+- ** 清除量从未投出。 ** 每块棋盘都会刷出不活的节点牌
+当地。 节点行动还没到的队友 要不然就把一个新鲜的
+每个人的卡,所以`diffKanbanOps`将卡片或元数据删除仅用于节点活字
+Project:反应流的节点用于它所持有的项目,存储的节点用于任何其他项目. 而奥姆尼
+板子打开, 回放 FlowQQ 存储副本(`boardLiveNodeIds`它的车道与储存的车道相对
+复制, 拖慢了恺末工程的 React Flow, 较小的直播集只能投少
+清除。 成本:在Omni板上移除,一个刚创建的节点的卡片没有铸造.
+- ** 董事会编辑只投放到活动标签的核心**(`castFor`),作为节点编辑是:
+听到一个核心的回声。 棋盘编辑到另一个核心上的车道( Omni 棋盘编辑中继器)
+当本地标签正在运行时,或者反向)不显示。
+
+□UI(乌伊)
+
+`PresenceLayer`使内置反应流`<ViewportPortal>`,所以光标坐落在流中
+坐标和CSS变换手柄缩放/泛. 同行们住在一个瞬息万变的祖山店里
+(单位:千美元)`src/renderer/state/presence.ts`,从未坚持),这**只`PresenceLayer`订户** -
+按照现有的`viewportRef`+ rAF 模式 (`Canvas.tsx:162`) (中文(简体) ). 如果光标流量为
+重新放弃`Canvas`,鼠标每次移动都会重新绘制4000行组件.
+
+-**Cursor** — 带名字标签的对等者颜色的箭头。 20赫兹抵达
+并在框架之间被放入。 您的光标从未绘制 。
+-** 教师聊天** -`/`在光标旁打开一个输入, 在每个键盘上广播,以及
+Enter/ Esc 后淡出~5 s. ** Gotcha: **`/`输入时不能打开聊天
+终端 — 当事件目标为帆布窗, 而不是xterm / 限制因素/ 摩纳哥/
+输入,匹配命令调色板的现有守护。
+- **Facepile**(右上方)——谁以其颜色相连。 无光标对等器( 手机) 出现
+这里有一个电话图标,因为这是他们唯一的表面。 点击浮雕中心
+查看端点的焦点节点晴天
+- **节点头**——对等点的在国际节点上聚焦的阿凡达芯片,同时带有脉冲环.
+类型。 重复使用`agentStatus`徽章机械(一个临时商店的每个节点徽章)。
+
+□ 表面
+
+- **《服务版》**——初级阶段;全功能。
+- **Desktop(电子)**——单独存在时无声(≤1对等点无声,零成本)。
+作为中继主机,桌面显示完整的对等列表.
+- ** 移动(nodeterm-ios, 单独的repo)**——电话作为接线器连接。`HostSession`,这样`hub.join()`今天为它点火; 它作为无光标的对等端出现, 命名为“ Phone ” , 直到它发出`presence:hello`. 打字归属已对其有效(见上文)。 ** 后续行动
+该还原:**发送`presence:hello`+ 键`presence:focus`,并将收受的光标聊天作为
+横幅(它没有光标可以锁定气泡。) Mobile 不在 v1 中发送 * send * 光标聊天 。
+
+□ Live dino(观察者模式)
+
+dino节点(一个T-Rex跑步者Easter-egg)是共享帆呐上的一个直播/共享游戏:一个权威
+游戏中,其他人在这个项目上观看SAME游戏实况——如光标. 它载着存在,
+添加无新核心频道。
+
+-**电线**`PeerState`带着电流`dino: { nodeId; snap: DinoSnapshot } | null`(比如说)`chat`),铸作于`presence:dino`列有休假证明 列有:`sanitizeDinoPayload`每个铸币局
+(惊痫)`DINO_MAX_OBSTACLES`,强迫每个数量有限, 验证每个障碍`kind`顶盖
+节点Id)——对等点不能注入无约束/垃圾状态. 铸币局的票价有限
+光标; 只有真`null`停止是免予执行的(停站会拖住观众)。
+- ** 工程**ù(`dino/dino-game.ts`+ 纯度`dino/dino-sync.ts`) (中文(简体) ). 当局的广播`currentSnapshot()`时间`DINO_BROADCAST_HZ = 20`,准确的说是一个`null`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy杏仁\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}在路边
+一个观众的`setRemote(snap)`暂停自己的物理 + 输入并制作快照( 循环)
+运行甚至没有重点;`setRemote(null)`返回到本地闲置, 并具有同源性( 调用它 )
+渲染,而本地已经不再重播游戏。 本地密钥同时显示为 ** 接收 ** :
+成为权威。
+- ** 节点**(`DinoNode.tsx`) (中文(简体) ). 由活跃的会话提供商负责 所以`api.presence.dino`+ 键`selectDino`遵循活动会话(一个 ** relay tab 的 ** dino 免费在隧道上直播).
+最低`clientId`赢得权限断裂( R)`dino/dino-authority.ts` `shouldSpectate`因此,一个
+双玩家空间竞技在决定性上趋同; 一种“ &lt; name&gt; is playing” pill( 等色)
+标记一个显式节点。
+- 孤独时自由 - 就像`reportFocus`中,没有对等方跳过 ~20 Hz 的快照显示`null`停止总是着陆。 独奏玩家的游戏与本功能之前的字节相同.
+- **Surfaces:**桌面/中继标签/Server-Edition浏览器均通过枢纽+桥进行工作. ** 移动:**
+电话在保留下来的旧方言上(没有rpc的存在)——它既不广播也不看Dino;
+一个优雅的贬损 搭乘电话 最终的rpc迁移。
+
+□ 第1阶段相对于此规格的变化
+
+以上各节为核定设计. 第一阶段以三个方式忠实执行
+偏差, 在此记录, 因此此文档不会对下一个阅读器说谎 :
+
+1. ** 存在范围为项目范围,面孔故意打破范围。 ** 同行
+表格夹`PeerState.projectId`时,`presence:project`频道没有在
+原线表(现为上). 光标、聊天泡和节点芯片被过滤
+通过单一的纯选择器`peersOnProject(peers, projectId)`;故意脸孔
+* 不 * 过滤器,显示项目外的同位素,并贴上项目标签,
+可以点击到那里。 这是作为下文所述特点设计的。
+[正视范围为一个项目] (#正视范围为一个项目)——再次呼唤.
+因为它是"存在是每幅画" 被蓄意侵犯的地方
+2. ** 增加了WebSocket心跳。 ** 不在原设计中:一个浏览器标签,该标签是“弃用”的
+(杀死,笔记本电脑睡觉,网络掉落) 从未触发WS`close`,所以它的同伴留在
+表格永远——永久的幽灵光标。 服务器版现在运行一个30 s 乒乓球心跳
+所以一个消失的客户在60秒内离开 一个干净的封闭
+选项卡仍然立即离开,打开`close`。 。 。
+3. 国家`PeerState.typing`存在但总是`null`第1阶段 ** 第2阶段结束**
+发件人意识`pty:write`处理器呼叫`noteTyping()`,而渲染器绘制脉冲环
+打字机头芯片( T)`src/renderer/lib/typingPeers.ts`+ 键`components/PresenceChips.tsx`) (中文(简体) ).
+向妇女提供两条规则 在你触摸它之前值得知道: 环的衰变与**当地接收时间**,
+不是主持人的`typing.at`(观众的钟可以休息几分钟) 它只能靠直播来喂食****`presence:peer`diffs——从未被一个`presence:sync`快照,可以带个十分钟长的
+因为枢机从不清理`typing`。它也是一个节点扫描信号
+** 不** 项目过滤:电话有`projectId: null`从电话打字就是
+环存在到表面(节点ID是全球碧眼独有的,所以这是安全的).
+
+□ 第2阶段相对于此规格的变化
+
+第二阶段已执行,
+订户,一等元`pty:create`最小的订户赢的尺寸 每客户反压
+和服务器侧打字属性。 四件事是**不** 在谱系中 原写和
+执行 期间增加的;以上各节已作相应修改,而且
+在这里收集,所以三角洲是可以辨识的。
+
+1. ** 经常预算:`pty:recycle`——一个单独的原始与删除。 ** 这个Spec有一种方法可以杀死一个Tmux
+届会`destroy`)),和被销毁会话的共同查看者被告知“由<名称>关闭,必须
+永远不要重生 但是,**“进入工作树”** 也杀死了会议(`new-session -A`将
+否则,只要重新输入旧的*工作目录——这里的节点是**不**去在其各自:
+它留在每张画布上,必须继续工作。 骑着工作树走过去`destroy`将
+向每个共同观看者展示了一个虚假的"被... 关闭" 并砖砌了他们的节点。 所以这两个意图是
+现在的原始人 有着不同的事件`destroy`社会性别问题`pty:closed {by}`(不复发)和`recycle`→`pty:recycled {ready}`(重新启动和重新附加;节点移动). 见
+[删除 vs 回收 (# 删除 vs- 的一个基本合同),包括为什么回收
+在替换会话注册之前, 通知被** 保存到** , 以及为什么10 s 的逃逸标记
+超时发送`ready:false`(=======================================================
+节点在它的 Stale cwd。
+
+2. **  没说清楚的墓碑及其限度。 **`pty:closed`只达到会话
+** 订阅者**。 其项目关闭或闲置的共收视器没有挂载终端,所以
+但节点仍然在它的画布上,它的下一个`create`将产生新鲜的`nt-<nodeId>`:被删除的终端,作为空壳复活.`PtyManager.tombstones`拒绝创建( E)`PtyCreateResult.closed = {by}`),豁免毁灭客户端,这样它自己的
+QQZ还在工作。
+** 限制是真实的,没有纸面上的:墓碑是纪念物。 ** 活得一模一样
+和核心过程一样 重新启动核心——服务器版进程,或桌面应用
+担任中继器的托管人——墓碑也不见了;一个画布仍然带有删除的客户端
+节点会在下次打开项目时为它产生新的会话. 这是故意的
+** 不是由坚守墓碑而固定的,因为坚守不是缺失的一块:**
+节点根本不应该在画布上。 ** 实际的修补是 **Stage 3的帆布-删除
+突变**,它从每个客户端中移除了节点,这样就没有人再持有一个来重新创建了.
+在阶段3着陆之前,这是一个有界限、有名的缺口(也列在[已知风险](#已知风险)之下),
+不是承诺
+
+3. **A 已停放节点报告`null`没有大小。 ** 光谱说,pty运行在`min(cols) × min(rows)`仅对用户正确
+实际上,"看起来"。 一个**parked**节点(项目切换掉——xterm脱离DOM)
+但PTY客户端仍然活着 并订阅),没有有意义的大小,一个崩溃或
+零高度节点度量为`0×0`要么把其他人的终端都封了 这么说`transport.resize(sid, cols, rows)`带`number | null`,以及`null`表示**"已订阅,但没有
+查看“ **: 订阅者从大小地图上* 缺席 * 并且完全从分钟中排除
+(单位:千美元)`reportedSize`输入`src/renderer/terminal/terminal-config.ts`· ;`effectiveSize`输入`src/core/pty-size.ts`) (中文(简体) ). 因此,停放一个节点会限制共享网格,
+不停车又会束缚你嘱咐我
+
+4. ** Drop-and-redraw是一项双面合同。 ** 8 MB 键`WS_DROP_WATER`天花板下降缓慢
+客户端的队列输出并重新同步,  他们在 tmux 重划当前屏幕 —— 从不通过
+重放积压。 两项规则,即每方一条,以及** 两项规则均得到执行:
+- 士兵:** 一个空洞的俘虏从来没有发送。**`captureForResync`返回时`''`在任何 tmux/ssh 上显示
+失败,以及`pty:resync`保证有效载荷不空(`ServerPlatform.resync`页:1
+抓取保持客户端的脱氧化,并用备份(250 ms ~ 10 s cap)进行重试.
+- **接收器:** 制造器** 无论如何必须忽略空载荷**(`shouldApplyResync`) (中文(简体) ). 那个
+再同步处理器`term.reset()`在重新油漆之前,所以采取行动`''`将空出一个直播终端
+而只留下分隔者。 两个警卫是故意冗余的:一个错误清理的屏幕
+无法恢复, 跳过重新油漆则不是 。
+
+□什么阶段 3 相对于此规格的变化
+
+第3阶段已执行,
+压制,没有CRDT,取消每个用户的本地功能. 5种东西与最初的规格不同,或者
+在执行期间决定的; 对以上各 这位各节进行修改,使之相匹配,并加以收集
+所以三角洲是可以辨识的
+
+1. ** 出版商diffs绅士(SNAPSHOTS),而不是反应流变单。 ** 光谱上说: "`handleNodesChange`发布突变". 这只会同步流经的编辑`onNodesChange`. . . . . .
+拖曳、选择、调整大小。 重命名、 颜色选择、 崩溃、 添加和删除都到达
+通过直接的节点数组`setNodes(...)`永远不要碰它的电话, 所以一半的编辑会
+默默未能同步 。 出版商将连载的快照与举例说明
+该出版物(`src/shared/canvas-publish.ts`它捕捉到每一个编辑 任何路径产生它。
+
+2. ** 反射器故意不限速率**(`src/core/canvas-sync.ts`通过以下方式:通过以下客户
+此特性中的铸造是桶式( 存在 :`PRESENCE_RATE_BUDGETS`页:1`PTY_END_BUDGET`) (中文(简体) ). 一个突变在实物上是不同的. 存在铸造器是被取样的信号。
+丢失是自我修正的——下一个光标框架带有当前位置。 一个变种是
+** edge **:没有任何东西能取代它,没有任何东西能重新发出它,所以一个掉落的突变是* 丢失状态*
+——一个从不出现在对等者画布上的节点,或者一个从不登陆然后被写入的删除
+返回到磁盘, 由对等点的下一个完整文件保存, 这就是这个阶段要杀死的确切错误 。
+合法交通也比任何大小的桶子都快,因为它会生存下来:
+20赫兹和一个大块删除 释放N突变在一个滴。 ** 所限定的是* 负载 * :`isCanvasMutation`拒绝在摄入物上铸造畸形或超大体型(`MUTATION_MAX_BYTES`= 256KB, (单位:千美元)
+编号封顶`REF_MAX_LEN`),因此敌对的铸件无法放大到每个对等方的套接字或楔形a.
+对应的反演流 。 如果在这里增加一个预算,它必须**排队**,永远不要下降。
+
+3. ** 混合物是并不构成项目范围的,而且对装药但非项目采用了变种,而不是
+放弃。 ** 每个铸币局都有一个`projectId`(反应流只持有 * 活动 * 项目的
+节点). 为客户端未查看的项目丢弃突变
+新的服装中的数据丢失错误: 工程的节点仍然坐在`projects`存储和
+下一个完整文件`workspace.save`从该客户端恢复一个已删除的节点。 这么说`Canvas`对非活动项目应用对等方的突变,直接进入该项目的
+**  临时议程项目**`useProjects.applyNodeMutation`, (中文).`src/renderer/state/projects.ts`)和标记
+工作空间肮脏。 未知的项目 id 是无操作( 无应用程序) 。 因此,客户
+聚合**每个项目**,工作空间rev-冲突栏作为跨项目后台保留.
+
+4. ** 墓碑留下。 它实际上无法删除。 ** 第二阶段说墓碑
+(单位:千美元)`PtyManager.tombstones`, (中文).`src/core/pty-manager.ts`是一个权宜之计,第3阶段的画布删除
+变异是它真正的替代品。 第三阶段使得它*大部分*是多余的——一个附属客户端的.
+画布在对等点删除时丢失节点, 所以它从不要求`create`又来了 但是...
+还有两条活路`create`对于一个被删除的节点, 两个都会产生一个新鲜的`nt-<id>`如果墓碑被删除:
+- ** 项目级操作不在变异词汇中。 **`CanvasMutation`地址
+节点,边缘和棋盘项目,从不做项目.`deleteProject`(单位:千美元)`src/renderer/canvas/Canvas.tsx`,则`×`在“最近关闭的”条目上)
+终端的 tmux 会话通过`transport.destroy(nodeId)`并出版
+** 什么都没有**——项目本身及其所有节点仍然在每一个同行`projects`存储。 一个从 *its * “ 最近关闭的” 列表重新打开的对等点会挂载这些节点并创建
+他们的裤子。 只有墓碑拒绝
+- ** 交付是最佳的,没有赶上。 ** 向客户投放的反射器
+瞬间 * ; 没有联合快照, 没有重播 。 一个客户端的插座在下
+删除已登陆时从未看到 。 在服务器版中, Ws- bridge 重新连接时的整页重载
+(所以它从磁盘和自愈中重新读取工作空间)——但只有删除客户端的
+** debounted ** 保存已冲出; 在该窗口内客户端持有节点文件 no
+更长久了
+把墓碑拆掉 就能用一个有界的记忆路基站换回那两个
+路径,所以它停留。 它在这一阶段没有变化:仍然在记忆中,仍然是一个LRU
+(单位:千美元) đó`TOMBSTONE_MAX`ưμ㼯A`TOMBSTONE_TTL_MS`),仍然豁免驱逐舰,所以他们自己的QQZ工作.
+
+编号 : 编号
+- ~~** ge ge ge  mutati  mutati 进一步推动**~~ **~~ **~~ ~~** ~~** ~~** ~~** ~~** ~~** ~~**  mutati  mutati  mutati  mutati  mutati  mutati  mutati  mutati开办了  **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ 冗**~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~ **~~
+[Edge同步](#edge-sync-bridges-ropes-ropes)下方.** 这是最糟糕的差距,而不是
+化妆品一:边缘骑着整个档案`workspace.save`没有在词汇,所以
+你画的边从来没有到达你的对等在某种程度上, 和他们的下一个保存, 从一个帆布从来没有它,
+将其删除**。
+- **对等点的节点清除卸载节点并处理其终端共态**
+(单位:千美元)`disposeTerminalOnUnmount`模块级的xterm/park/co-attach状态,但它确实**不**
+运行本地删除路径的其余部分( E)`useAgentStatus.remove`聊天司机处理。 那个
+会话本身已经死亡( 正在删除 * 客户端的`transport.destroy`杀了它,所以
+没有泄露服务器侧; 端点上留下的是一个 stale`agentStatus`节点编号条目
+这已经不复存在。 取消共态关系,因为删除是可撤销的:如果
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}一个保持僵硬状态的同伴
+正在查看一个“ 被另一个用户关闭” 的节点, 该节点唯一的明显解药( 单击)`×`页:1
+会真正杀死主人的现场直播会
+- ** 项目生命周期**(创建/重命名/关闭/删除/文件夹更改)为**不**同步。
+- ** 视频、选择和撤消** 不同步。 按设计,撤消是每个用户本地的。
+- ** 除了每个项目的最后写成**(每个节点、边缘或棋盘项目)之外,没有解决冲突的办法。 见
+[同步编辑解析](#同步编辑解析-什么集合-什么集合-做-不).
+没有RDT。
+
+□并行编辑解析:何谓趋同,何谓不趋.
+
+** 整个交易所的客户之间任何离异的连接。 ** 每个这样的客户
+每个节点和边缘以相同的**set**和相同的**值**结尾,并显示相同的板,
+因为每个变异都是由反射器命令的`seq`最高`seq`每件获胜
+各地(`src/shared/canvas-order.ts`) (中文(简体) ). 删除后加载的客户端没有全部看到; 它
+这是下面列表中的第一个条目,董事会的例外也在此列出. 这是
+属性持久性取决于: 客户端的全部文件`workspace.save`运行,它写着
+说服其他人同意 对**同步**总线(排队铸件+FIFO)的验证端对端
+(在飞行中真正编辑)`src/core/canvas-sync.convergence.test.ts`。 。 。
+
+这一保证不会因为任何时间而中断。 等待的TTL 是一个束缚 多久我们 "压
+同龄人,永远不要正确:一个在它之后到达的沉船**修复**节点(上文规则3),以及a
+反射器将拒绝 从来没有做在第一。 (出版商共享反射器的
+上游,记录无待录条目,并不断重试节点直至可铸造). 两个案件都是
+在汇合套件中——一个插座被TTL停止的客户端,以及一个超大小的粘度铸件
+与对等点的删除同时进行。
+
+** 不趋同——命名,不隐藏:**
+
+- ** 固定的框架,送达没有墓碑的客户。 ** 规则4(以下)
+反对删除的客户端本身已经应用。 一个在删除后装入画布的客户端,或者
+在重联上重订顺序( Q)`reset()`清除墓碑,没有那个节点,所以,
+后期(从套接字被停止的对等端)的帧被应用到那里,然后通过
+其他客户 那个客户持有一个节点 其他的直到它的下一个负载,它的下一个
+全文件保存可以写回. (一个听到删除的画布权威 也降低了帧,
+并覆盖保存。 )
+- 你为什么这么说?آ! 如果 你为什么这么做?آ .
+发布删除的客户端将其删除并重新批准,这样它就可以坐在不同的**slot**
+在数组中,比起从未删除过的客户端。 节点设置、位置、大小和数据均同意;
+只有数组顺序(驱动侧边栏列表)可以不同,接下来的负载会使其正常化.
+- ** 意向,在一个有争议的节点上。 ** 两个人拖着同一个节点 战斗: 节点在哪里降落
+最后的订货框放在那里。 两个人打一个标题 得到一个标题。 这是最后的写作胜利,
+不是合并——按設計(没有CRDT).
+- ** Edge 数组命令**,理由相同,后果更小:两个客户提取
+每个边同时将对等点附加到自己的边上,所以两个阵列保持相同
+边缘在不同槽中。 没有任何边线列出顺序;褒贬不一。
+- ** 标列和标签顺序,用于在同一窗口中添加两个客户的编号**,直至下一个
+命令 op (参见 [Board同步] (#board-sync- weaponsanban)).
+- **当卡的列被删除时,卡片的存放位置即已归档。 ** 取决于
+命令,一个客户端可以保留一个位置,命名被删除的列,另一个则没有。 两个节目
+在未组合的卡片中,绽放每张卡片,没有放置,也没有命名任何列
+(合并案件5取得的进步)`src/core/canvas-sync.convergence.test.ts`) (中文(简体) ).
+- ** 节点/网格/板块词汇以外的任何东西**——项目 为什么不使用周期(见上文项目5)。
+
+QQ 删除比同时编辑的“ CAUSALLY”, 而不是“ 断开” (规则 4)
+
+这曾经是上面的列表中,作为一个命名的wart: A删除一个节点,而 B 是中段, B 是下一个
+框在A的删除后被命令,所以节点**在每一个画布上存活**——但是A'提示`transport.destroy`已经运行`tmux kill-session`所以,回来的是一个**壳围绕一个
+死亡终点站**. 始终如一,没有人要那个节点回来。
+
+修复不是“删除总是赢” 打破了这个以前被拒绝的文档,
+从断开的对等面拖曳框中清除一个节点
+合法地重新创造。 所缺失的事实貂皮是** 原因**,所以每个突变现在携带`seen`编号 :
+最高级`seq`它的发件人在投球时就申请了 规则是准确的,没有定时器:
+
+> 已删除节点的上升值被删除**iff**`seen < the seq the remove was ordered at`。 。 。
+
+B的拖曳框是在对删除的无知中产生的,并随处死亡;一个重制(QQZ on)
+删除, 重新添加节点) 必然带有`seen`或经过它和陆地。 它的镜子打开
+接收方: **a`remove`规则2从未受到规则2的压制** ——规则2基于“我们的”
+是吗? 到处都是无锁突变 规则第4条规定它不再这样了
+这将是与我们的同行产生分歧的唯一方法。
+
+** 重新创作等待我们的OWN删除的回立足点**(`CanvasOrder.hasPendingRemove`) (中文(简体) ). 我们的清除进入
+我们`seen`只有当它的回声回来, 所以重新创造 同样的id铸在这之前—— 一个链接
+删除并重新绘制,删除一个节点和QQZ'd,在一次往返内——携带一个`seen`低于
+删除: 当我们不断显示时, 每个对等点都把它作为僵硬框架丢弃, 而下一个完整文件保存
+在磁盘上成为最后的写手胜者. Canvas发送回调 现在的同时拒绝任何不可撤换的操作
+清除飞行中的我们(按按键计算,而不是按TTL键计算——在紧要关头是迟到的)。 A级
+Lost ack 不带重联来: ui 水槽丢弃单个消息并保持连接
+(单位:千美元)`SINK_FAILURE_LIMIT`) (中文(简体) ). 我们的回声以我们所投的顺序出现 所以后期的回声
+证明我们之前的一次失踪了, 并且释放了移除大门的人;
+各个待清除的数`accept`来看它。 复设仍令一切清净. 记录
+我们除其他事项外,FIFO的配对被封了`LOCAL_CASTS_MAX`,第第4096条)
+完全不回答任何问题: 一个去除的盖会随它去掉(前门会降解)
+一个被遗忘的铸造者自己的后期回声 释放不出任何东西
+它会释放出那些回声仍在飞行中的人 这个
+拒绝保留在
+出版商 窗内一个收养人 拥有欠EDGE的债款 以及欠一个节点的债款(队友的)
+通常在往返旅行中到达的地方, 我们的回声不会是... ...
+ack and changes no React state –所以所开展的清关的回声在处理器和
+只当出版商`hasOwed()`。 。 。
+
+`seen`是客户端提供的。 反射者咬住它,`stampMutation`: 值在或超过
+给定的突变被夹在它下面,一个非整数或负数被丢掉。
+** 夹子是卫生,不是警卫:它改变不了判决。 ** 在此变异之前命令删除
+有一个`seq`最多时`seq - 1`,所以夹住`seen`仍然算在看过之后 下令撤职
+在它取代它之后`seq`一个人 伪造的`seen`因此重现一个已删除的节点、 夹或否
+夹子。 究竟谁可以投出什么界限: 在东道团队中`canvas:mut`仅为编辑器,且
+编辑器在主机上有外壳 与**no**的变异`seen`(旧的对等器,中继镜)
+其判断方式与第4条存在之前完全相同——堕落,永不破裂。
+
+这能做什么? 不这样做:不杀死这个过程。 如果删除获胜,终端就不见了,即
+人类要求的 如果节点后来被刻意重造,那还是新鲜的会话
+在同一项目下`nt-<nodeId>`(一个寒冷的开始).
+
+□ 非目标(v1)
+
+角色/许可、跟随/闪光模式、持续聊天历史、评论线索、写
+相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 逐案 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 瓮 相关 相关 相关 相关 相关 有关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 有关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 有关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 有关 相关 相关 相关 相关 相关 相关 相关 相关 相关 有关 相关 相关 相关 相关 相关 相关 相关 有关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 相关 有关 相关 相关 
+只读宾客,每个用户设置。
+
+□ 测试
+
+- 怎么样?`PresenceHub`纯单位测试: 加入 / 离开 / diff, 无光标对等点 。
+- 服务器 e2e 有** 2 ** WS 客户端:你好 ~ 快照、光标扇、回声压制、离开
+连接。
+- **Co-attach**(交付):两名客户,一名`persistKey`− 单一产卵;两者均得到输出;
+min- 大小调整大小; 当加盟者未调整大小时, 加入者会从当前屏幕中绘制
+pty(在完成时不画);只有订阅者可以写/修改/暂停/杀死会话,以及
+它所欠的一切都比它长;毁灭的道路是封闭的、有界限的、有费率限制的;一个客户的
+backpressure 不拖动另一个; 掉下 8 MB 的客户端被丢弃与各重画
+tmux 而不是永远的缓冲;即使没有进一步的排水管扫荡也会释放暂停
+输出摈弃。 - 摈弃`src/core/pty-coattach.test.ts`(60项测试),`src/core/pty-size.test.ts`, (中文).`src/server/backpressure.test.ts`, (中文).`src/server/platform-server.test.ts`- ** 跟踪归属**(交付):发送者意识`pty:write`刻录器; 环衰减
+以当地接收时间为准,仅由现场播音员提供。 →`src/core/pty-typing.test.ts`, (中文).`src/renderer/lib/typingPeers.test.ts`- ** 渲染器共附逻辑**(交付):报告-vs-有效大小、信箱、重联空
+警卫,回收动作,"关闭"标签。 →`src/renderer/terminal/terminal-config.test.ts`- ** 登记警卫**(交付):`pty:write`必须通过“感应线”接合线——
+如果合并使旧发送器复活, 测试失败`platform().on(IPC.ptyWrite, …)`旁边
+- 就是这样`src/core/pty-manager-platform.test.ts`- ** 单一客户回归**(交付):分钟大小等于自己的大小,产卵路径是
+不变。 →`src/core/pty-single-user.test.ts`(17次测试)
+- **加拿大同步**(交付):反射器按总顺序盖章(`seq`单调对寄件人
+和项目,从来没有从客户信任) 和粉丝突变 每一个客户 * 包括 *
+发件人,拒绝不当/过量的投影,每个平台登记一次;出版商
+diffs快照、邮票`src`油门拖着车架, 冲在定居,`adopt()`没有
+排放,以及——虽然是单独排放,但排放和排放** 无** 保持基线不变。
+→`src/core/canvas-sync.test.ts`, (中文).`src/shared/canvas-publish.test.ts`, (中文).`src/shared/canvas-mutations.test.ts`-** 命令**(交付):自己的回声是响起,从不重新应用;对等的编辑输给一个
+同一节点的本地编辑(每个节点,每架飞行框计数);一个被取代的断面主持了
+被丢弃; 永不过期的沉淀; ** late** 沉淀修复一个节点, 之后的对等重写
+TTL 已失效( 失去总订单的文本仍然只是 ack); 新的本地编辑重装
+节点; 连续拖动使其自身的压制活过 TTL 。
+→`src/shared/canvas-order.test.ts`(15次测试)
+- ** Canvas 汇合**(交付):两个客户管理**真实**出版社和**真实**订购
+对**真实** 反射器,在** ASYNCHRONOUS** 公共汽车(广播和交付排队,FIFO /
+链接——所以几个编辑在飞行中是真实的,测试选择了互换. *这
+早期的同步总线完全不能表示通量,因此"通过了"这个设计.
+在第一次同时拖动时永久存在分歧。 * 覆盖:同一节点同时移动
+与命令的获胜者(两种命令)汇合; 给你同时删除的vs-drag汇合(两种方式)
+回合)——没有分裂大脑保存;20帧两个客户拖一个节点汇合;3个客户端
+编辑一个节点汇合; 六版集的每个结算点均汇合; a
+pate 的突变被应用一次, ** 永远不再发布 ** (每次本地编辑一次, 不)
+反广播,甚至对3个客户进行批量删除);麻黄卡从不上线;a
+延迟加入者聚合; 同伴删除不会被幸存客户端的下一个保存复活; a
+客户端的**inbox在 TTL **( 备份套接字) 上被它自己的后端锁定修复
+而不是被留在丢失的值上; 反射器会拒绝一个**大小过大的**节点。
+既不聋人,又不聋人,
+(                                       刊物 确定其                                                                                          (               憧                                                                                                       在本届会议期间  (                                       刊物 确定其                                                       (                                                  憧            (                                                                                          在本届会议期间  `src/core/canvas-sync.convergence.test.ts`- ** 应用对等方的突变**(交付):补丁活的反作用流阵列——保留您的
+选择、 保留中继- 远程节点、 保留本地唯一的节点数据、 保存每个未触及的节点
+对象身份,删除 stale`measured`大小所以对等点的大小调整不会回击,并保留
+在孩子出生之前就把父母分开 →`src/renderer/state/workspace.mutation.test.ts`(10次测试)
+- ** 董事会同步**(交付):每个业务的减压器和消毒器;两个不同的卡 秘书处的说明
+两块地;一张牌移动了两次 结尾在后期的操作上; 两张首创版编辑 3
+列,不是6个; 节点未到的卡片, 幸存的对等 欢迎。
+在卡片移动进入时删除, 将卡片放在未组合中; 并列和标签添加
+趋同. →`src/shared/kanban-ops.test.ts`, (中文).`src/shared/kanban-ops.convergence.test.ts`, (中文).`src/shared/canvas-content.test.ts`, (中文).`src/renderer/canvas/kanban-sync.test.ts`,和董事会案件
+输入`src/core/canvas-sync.convergence.test.ts`。服务器版的画布权威有自己的
+套房(`src/core/canvas-authority.test.ts`)和不附带浏览器的端到端运行
+(单位:千美元)`src/server/hosted-e2e.test.ts`。 。 。 。 。
+
+* 人工烟雾测试(第1阶段)
+
+在场需要两个客户,没有单位测试给你。 最便宜的二客户端是服务器
+在两个浏览器标签中编辑(见docs/SERVER.md):
 
 ```bash
 npm run server:dev     # then open the printed URL in TWO browser windows
 ```
 
-Use one **normal** window and one **private** window (or two profiles): a second tab in the *same*
-profile shares `localStorage`, so it would not re-prompt for a name and both peers would carry the
-same identity. Call them **A** and **B**; log both in with the shared password.
+使用一个 ** 正常 ** 窗口和一个 ** 私人 ** 泾渭窗口( 或两个配置文件): 在 * same * 中的第二个标签
+配置共享`localStorage`,所以它不会重现一个名字 和两个同行将携带
+同样的身份 将其称为**A**和**B**;同时登录共享密码。
 
-1. **Name prompt, once.** B prompts for a name on first connect. Enter one. It does **not** prompt
-   again on reload (it is remembered in `localStorage` under `nodeterm.presence.me`). Do the same in
-   A with a different name.
-2. **Names propagate.** Each tab shows the other's avatar in the facepile (top right) in its color,
-   with the name entered in step 1 — not "Someone".
-3. **Cursors, in flow coordinates.** Move the mouse over A's canvas: B draws A's cursor with a name
-   label, tracking it. Now **zoom and pan B** (trackpad pinch / two-finger scroll). A's cursor stays
-   pinned to the same *canvas* point — the same node, the same corner of it — at every zoom level.
-   Neither tab ever draws its own cursor.
-4. **Cursor chat opens on `/`.** With the pointer over A's empty canvas, press `/`. An input opens
-   beside A's cursor; type — the text streams into A's bubble in B *per keystroke*. Enter leaves the
-   bubble up and it fades after ~5 s; Escape clears it at once.
-5. **`/` inside a terminal does NOT open cursor chat.** (The most important negative case.) In A,
-   hover into a terminal node until the hover guard releases and the terminal takes focus, then type
-   `/`. The `/` must reach the **shell** — it appears at the prompt — and **no chat input opens**.
-   Repeat inside an editor node (Monaco) and inside the rename box in a node header: same result.
-6. **Node focus chips.** While A is focused in that terminal, B shows A's avatar chip in **that
-   node's header**. Click A onto a different node → the chip moves. Click A onto empty canvas → the
-   chip disappears.
-7. **Off-project peers: dimmed, labelled, travelable.** In A, switch to (or create) a second project
-   tab. In B: A's cursor and node chip vanish from the canvas **immediately**, and A's facepile
-   avatar goes **dimmed**, labelled with the project A is in ("Ada · api"). Click that avatar in B →
-   B switches to that project and centers on A's focused node. Switch A back → A's cursor reappears
-   on B's canvas.
-8. **Clean close leaves at once.** Close tab A normally → its cursor, chip and avatar disappear from
-   B within a moment (the WS `close`).
-9. **Vanished client leaves on the heartbeat.** Reopen A, then **kill** it without a clean close
-   (kill the browser process, or pull the network). B keeps showing A briefly, then reaps it
-   **within ~60 s** — this is the 30 s ping/pong, and is the expected worst case, not a bug.
-10. **Desktop alone is silent.** Launch the Electron app with no other client: no facepile, no
-    cursors, no name prompt — presence costs nothing when you are the only peer.
+1. ** 名称 提示,一次。 ** B 提示在第一个连接上指定名称。 进一. 它确实**不** 迅速
+重新装入时( 记住在`localStorage`下级`nodeterm.presence.me`) (中文(简体) ). 做同样的
+以别名.
+2. ** 宣传名称。 ** 每个标签都显示对方在脸皮(右上方)的颜色中的异形,
+名字输入到第1步——而不是"某人".
+3. ** 流程坐标中的规范。 ** 将鼠标移动到 A 的画布上: B 绘制 A 的光标并命名
+标签,跟踪它。 现在 ** zoom 和 pan B ** ( trackpad crip / two-finger 滚动). A 光标保留
+被钉在同一个*canvas*点上——同一个节点,同一个角落——在每个缩放水平上.
+标签中从未绘制过自己的光标 小标 。
+4. ** 课程聊天开启`/`.** 用A的空帆布上的指针,按`/`打开输入
+A 光标旁; 类型 – 文本流进入 B *per keystroke * 中的 A 泡。 输入离开
+气泡升起,在~5s后会逐渐消退;越狱立即清除.
+5. **`/`终端内部不打开光标聊天。 ** (最重要的负面案例。 ) A组
+盘旋在终端节点中,直到盘旋的警卫释放和终端集中,然后按键`/`编辑`/`包括为您提供方便。
+在一个编辑节点(摩纳哥)内重复,在节点头的重命名框内重复:相同的结果.
+6. ** 节点焦点芯片。 ** 虽然A的焦点是那个终端,B的显示A的AVatar芯片在**
+相应地,节点头**. 相应地单击 A 到 不同的节点 。 单击 A 到 空画布 ~ ,
+芯片不见了
+7. **项目同行:暗淡、贴标签、可旅行襟翼。 ** 在A中,切换到(或创建)第二个项目
+选项卡。 在B中:A的光标和节点芯片从帆布上消失 ** 立即 **,A的面孔
+avatar goes ** dimmed **,标注项目A在("Ada ^ api"). 点击 B 中的阿凡达
+B切换到那个项目 并集中在A的焦点节点上 切换后 ~ A 光标重新出现
+在B的画布。
+8.** 立即清除近叶树。 ** 关闭标签 A 通常 ~ 它的光标、 芯片和浮雕从此消失
+B在一瞬间(WS)`close`) (中文(简体) ).
+9. 受损害的客户在心跳时离开。 重新打开A,然后**杀死** 它没有干净的关闭
+(杀死浏览器进程,或拉动网络). B一直短时间显示A 然后收获它
+** 在~60 s**之内——这是30 sing/pong,是预期最坏的情况,不是虫子。
+10. ** 仅蒜头是沉默的。 **喽,没有其他客户端就推出Electron App:没有脸蛋,没有
+提供了支助吗? 光标, 无名称提示 —— 当您是唯一的对等点时, 存在成本不高 。
 
-### Manual smoke test (Stage 2 — terminal co-attach)
+* 人工烟雾测试(第2阶段——终端合用)
 
-Same two-client rig as Stage 1 above (`npm run server:dev`, one **normal** and one **private**
-window, so the two peers have distinct identities in `localStorage`). Do the Stage 1 script first —
-this one assumes **A** and **B** are logged in, named, and on the **same project**. Everything below
-is about *one terminal node*, so create one in A and let it appear in B.
+与以上第一阶段相同的双客户钻机(`npm run server:dev`一个**正常**和一个**私人**
+窗口,因此两个对等方在`localStorage`) (中文(简体) ). 首先做第一阶段的脚本——
+假设**A**和**B**已登录、命名和在**同一个项目**。 下方的东西
+大约是一个终端节点,所以在A中创建一个,让它在B中出现.
 
-Co-attach is invisible when it works, so the checks are mostly *negative*: the last one (a solo user
-sees no change) is the one that must never regress.
+共键在工作时是隐形的,所以检查大多正处于*负*:最后一个(独奏用户)
+没有看到任何变化)是永远不能倒退的。
 
-1. **One pty, two viewers.** Open the same terminal node in A and in B. Run `ls -la` in A. B shows
-   the **same live output**, in the same shell — not a second prompt in a second shell. The server
-   logs exactly **one** spawn: B's `create` subscribed to A's session (`fresh:false`) rather than
-   spawning. `tmux -L node-terminal ls` on the server shows exactly one `nt-<nodeId>` session with
-   exactly **one** client attached (co-attach does not add a tmux client; `-D` is untouched).
-2. **Both can type; characters interleave.** Type `echo hello` in A — the characters appear in B as
-   you type. Now type in **both at once**: the characters interleave in the one shell. This is
-   expected, not a bug (see [No locking](#no-locking-v1)) — the typing ring is the warning, and
-   there is no lock.
-3. **The typing ring.** While A types, B's copy of that node shows a **pulsing ring on A's avatar
-   chip** in the node header. It fades ~2 s after A stops. Type from B → A sees the ring on **B's**
-   chip. (The ring decays against the *viewer's* local receipt time, so a skewed clock on either
-   machine cannot leave a ring stuck on.)
-4. **The smaller window wins; the bigger one letterboxes.** Make B's browser window **narrower**
-   than A's. Both terminals reflow to **B's** (smaller) grid: the shell's own wrapping matches in
-   both, with no wrapping artifacts. In **A** — the larger one — the leftover space is
-   **letterboxed** (dead margin), because A is now rendering B's smaller grid. Run
-   `tput cols; tput lines` in either: it reports the **min**, not A's own size. Widen B again → both
-   grow back and A's letterbox disappears.
-5. **Parking releases the size constraint.** With B still the narrower (constraining) client, in
-   **B** switch to a different project tab. B's node unmounts and **parks** — it stays subscribed but
-   reports `null` ("subscribed, not viewing"), so it drops out of the min. **A's terminal grows back
-   to A's own size and stops letterboxing**, within a moment and without B closing anything. Switch
-   B back → the node re-adopts, re-fits, and constrains A again. (This is the fix for the obvious
-   bug: a teammate who wandered off to another tab must not hold everyone's terminal hostage at a
-   grid they can't even see.)
-6. **Delete shows "closed by", and does NOT respawn.** In **A**, delete the node (× / Delete). In
-   **B**, that terminal enters the **"closed by <A's name>"** state — and **B does not respawn it**:
-   no new shell appears, no new prompt, and `tmux -L node-terminal ls` shows the `nt-<nodeId>`
-   session **gone** and not recreated. Now the harder half: in **B**, *before* deleting, switch to
-   another project (so B has no mounted terminal for that node and cannot receive `pty:closed`), have
-   **A** delete the node, then switch **B** back. B must **still** land in the closed state — the
-   in-memory **tombstone** refuses the create — and must **not** spawn a fresh shell. **Known limit:**
-   restart the server process and repeat this — the tombstone is gone and B *will* spawn a fresh
-   session. That is the documented gap, fixed by Stage 3's canvas-delete mutation (see
-   [Known risks](#known-risks)); it is not a smoke-test failure today.
-7. **"Move into worktree" does NOT say "closed".** Restore/create a shared terminal node in a git
-   project, open it in both. In **A**, use **Move into worktree**. **B must never show "closed by
-   …"** — that would be a lie, the node is alive and on B's canvas too. Instead B's terminal
-   **restarts in place** with a `── session restarted by another user (moved to a new folder) ──`
-   separator, and it **follows the node into the new session**: `pwd` in **B** prints the
-   **worktree** path, the same one A is in, in the *same* shared session (this is `pty:recycle`, not
-   `destroy` — see [Deletion vs recycling](#deletion-vs-recycling)).
-8. **A slow client is dropped, not buffered — and lands on the current screen.** Throttle **B**'s
-   network (DevTools → Network → "Slow 3G") and run `yes | head -5000000` in the shared terminal.
-   **A must keep streaming at full speed** (B's slow socket must not pace the team), and the server
-   process's RSS must **plateau** — past 8 MB buffered, B's queued output is dropped rather than
-   queued forever. Remove the throttle: B lands on the **current screen** with a single
-   `── reconnected — earlier output skipped ──` separator. It must **not** grind through the backlog,
-   and B's screen must **never** go blank (an empty capture is never sent, and is ignored if it were).
-9. **One client leaving does not stall the other.** Close **B**'s browser entirely while output is
-   streaming. **A keeps streaming** — no stall, no stale pause left behind by B's disconnect
-   (`dropClient()`), no dead subscriber holding the grid at B's old size.
-10. **A SOLO user sees no change whatsoever.** The regression that matters most. In the desktop app
-    (`npm run dev`), alone, with no other client: open a terminal, run `yes | head -100000`, resize
-    the node, switch projects and back (park → adopt), quit and relaunch (warm reattach). The min of
-    a one-element set is your own size, so: **no letterbox ever appears**, the grid is exactly your
-    own fit, no resync separator is ever printed, no typing ring, no facepile. Nothing may look or
-    behave differently from `main`.
+1. **一个pty,两个观众。 ** 在 A 和 B 中打开同一终端节点。 运行`ls -la`A. B. 显示
+同样的活输出**,在同一弹壳中——不是第二个弹壳中的第二个迅速。 服务器
+原木完全**1**产卵:B's`create`A级会议`fresh:false`而不是
+产卵。`tmux -L node-terminal ls`在服务器上显示一个`nt-<nodeId>`页 次
+** ** 所附客户端(联合的调查不添加 tmux 客户端;`-D`不受影响凄惨。
+2. **两个字可以打字;字符互页。 ** 类型`echo hello`在A中——字符在B中显示为
+你输入。 现在在 ** 中同时输入 ** : 字符在 one shell 中交互 。 这是
+——打字环是警告,并且
+没有锁。
+3. ** 打字环。 ** A型,B型的节点 显示在A型的外形上有一个**脉冲环
+芯片** 在节点头。 它在A停机后淡出~2 s. 来自B的型号 = A在**B的上看到戒指**
+芯片。 芯片。 (戒指的衰落与观众的 当地接收时间相反, 所以一个扭曲的时钟在其中之一
+机器不能留下一个戒指。 )
+حمد الحم الك الك الك العبري الك الك الك الك الك الك الك العيري , العري , الري , الدير , الري , الدي , الري , الري , الري , الد , , الر , , ال , , , ا , , , ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; ; حير ال ال ال ال ال ال ال ال ال ال ال ال ال ال ال ال ال
+比A的还多 两个终端都重流到**B的**(更小)网格:贝壳本身的包装火柴英寸
+没有包装文物 在**A**——最大的一个——剩余空间是
+**坚定地致力于字母**(死边),因为A现在正在渲染坚定地致力于B。 运行`tput cols; tput lines`其中之一:它报告**min**,而不是A的大小。 宽B唠叨着...
+长回来,A的信箱就消失了
+5. ** 泊车释放出尺寸限制。 ** B仍然是更窄的(限制)客户端,在
+**B** 切换到不同的工程标签。 B的节点卸载和**parks**——它仍然订阅,但
+报告`null`( 60) ("订阅,不收视"),所以从分钟内退出. #A的终点站长回来#
+到A的大小 并停止信箱**, 在一个瞬间,没有B关闭任何东西。 切换
+B背 ~ 节点重新采用,重新使用,又束缚了A. (这是对明显
+促进可持续的移动。
+他们甚至看不到网格。 )
+6. ** 删除时显示“封闭”,而不重播。 ** 在**A**中,删除节点(×/删除)。 内
+**B**,该终端输入**"由<A's name>关闭"**状态——**B不重发**:
+没有新贝壳出现,没有新提示,`tmux -L node-terminal ls`显示`nt-<nodeId>`届会** 已经过去** ,没有重新创建。 现在困难的一半:在**B**中,在*删除之前,切换到
+其它工程( 所以 B 没有挂载终端 )`pty:closed`),有过
+**A**删除节点,然后将**笋切换回**B**. B必须** 仍然** 在封闭状态下的土地——
+记忆中**tombstone**拒绝创造——不能**产出新鲜的壳. ** 已知限额:**
+重新启动服务器进程,并重复一遍——墓碑已消失,B*将产生新鲜的
+届会。 这是由第3阶段的画布-删除突变所固定的有文件记载的空白(见
+[已知风险](#已知风险)];这不是今天的烟雾测试失败.
+7. **“进入工作树”并不表示“封闭”。 ** 在 git 中恢复/ 创建共享终端节点
+项目,打开两个。 在**A**中,使用**移到工作树**。 **B 绝对不能显示“由
+...**——这将是谎言,节点是活的,在B的画布上也是. B的终点站
+** 重新开始**`── session restarted by another user (moved to a new folder) ──`分隔符,它 ** 沿着节点进入新会话 **:`pwd`缩略语
+# 工作树# # 路径,同样的一个A 大使在, 在相同 * 共享的会话中(这是`pty:recycle`没有`destroy`——参见[删除vs回收](#删除vs回收).
+8. ** 一个缓慢的客户端被丢弃,而不是被缓冲——并落在目前的屏幕上。 ** 喉咙**B**'s
+网络(DevTools → 网络 → "low 3G")并运行`yes | head -5000000`在共享终端。
+**A必须保持全速流速**(B的慢插座不能让团队步调),服务器
+进程的 RSS 必须 ** plateau ** — 超过 8 MB 缓冲, B 队列输出被丢弃而不是
+永远排队。 删除节流阀: B 降落在** 当前屏幕上** 以单个`── reconnected — earlier output skipped ──`分离器。 它必须**不** 磨过积压,
+和B的屏幕必须**永远不要**去空白(一个空的捕捉从未发出,如果是,则被忽略).
+9. ** 一个离开的客户并不阻碍另一个客户。 ** 在输出时完全关闭 **B** 的浏览器
+流经. **A 保持流畅** — 没有摊位, 没有B断线留下的 Stale 暂停
+(单位:千美元)`dropClient()`),没有死用户持有B的旧尺寸的网格.
+10. ** SOLO用户没有任何变化。 ** 最关键的是倒退 在桌面应用程序中
+(单位:千美元)`npm run dev`),单独,没有其他客户端:打开终端,运行`yes | head -100000`调整大小
+节点、切换项目和返回(park ),退出并重新启动(warm reattach)。 分钟
+单元素集是您自己的大小, 所以 : ** 没有信箱出现 **, 网格完全是你的
+自己适合,没有再同步分离器 永远印刷,没有打字环,没有脸孔。 没有什么可以看或
+行为不同于`main`。 。 。
 
-### Manual smoke test (Stage 3 — canvas sync)
+· 人工烟雾测试(第3阶段——帆布同步)
 
-Same two-client rig (`npm run server:dev`, one **normal** and one **private** window). **A** and **B**
-logged in, named, and on the **same project**.
+相同的两客户钻机(`npm run server:dev`,一个**正常**和一个**私人**窗口。 **A**和**B**
+登录、命名和在**相同项目**。
 
-1. **A node created by A appears on B.** Add a terminal node in A. It appears on B's canvas at the
-   same flow coordinates, with the same title and color, within a moment — and B's canvas shows
-   **one** node, not two.
-2. **Move, rename, recolor propagate.** Drag the node in A → it moves on B. Rename it (header
-   click-to-rename) → the title updates on B. Change its color → the color updates on B. Now do the
-   same three from **B** → they land on A. (Rename and color never pass through `onNodesChange`; if
-   they fail to sync, the publisher has regressed to a change-list.)
-3. **A drag is throttled, not per-frame.** Drag a node around A for a few seconds with B's DevTools
-   Network → WS frames open. The `canvas:mut` frames arrive at roughly **20 Hz**, not one per
-   animation frame, and the **last** frame lands on the settled position (the drag-stop flush) — B's
-   node must end up exactly where A dropped it, never one frame short.
-4. **Delete propagates, and does not come back.** Delete the node in A. It disappears from B's canvas
-   (and B's terminal for it lands in the "closed by <A>" state — Stage 2). Now, in **B**, make an
-   unrelated edit (move another node) so B's canvas saves. Reload **both** tabs: the deleted node is
-   **gone** and stays gone. (Before Stage 3, B's whole-file save wrote the deleted node straight back
-   — this is the data-loss bug the stage exists to kill.)
-5. **A delete lands even on a project you are not looking at.** In **B**, switch to a *second* project
-   tab. In **A**, delete a node from the **first** project. Switch B back → the node is **already
-   gone** from B's first-project canvas (the mutation was applied to that project's serialized nodes
-   while it was inactive). Reload B: still gone.
-6. **Ephemeral subagent cards do not duplicate.** Run a prompt in a Claude node in A that spawns a
-   subagent (e.g. "use a subagent to list this repo's files"). The subagent card appears **once** in
-   A and **once** in B (each derives it from the `agent:status` stream) — never twice, and dragging
-   the card in A does not move or duplicate anything in B. Same for a `/loop` card.
-7. **No echo, no ping-pong.** With both tabs idle after an edit, watch the WS frames: `canvas:mut`
-   traffic goes **silent**. A mutation applied from a peer must not be re-published (that would be an
-   endless A→B→A loop); if you see mutation frames with nobody touching either canvas, the `adopt()`
-   loop guard has regressed.
-8. **A SOLO user sees no change whatsoever.** The regression that matters most. In the desktop app
-   (`npm run dev`), alone: add, drag, rename, recolor, group, delete nodes; undo/redo; switch projects
-   and back. With no peer attached the publisher does not even **diff** (the solo gate) — the canvas
-   must look and behave exactly as on `main`, with no extra dirty marks, no undo-stack entries you did
-   not create, and no node ever moving on its own.
-9. **Both drag the same node.** A and B grab the **same** node and drag it in opposite directions for
-   a few seconds, then both let go. It fights (expected — last write wins), but when the dust settles
-   **both canvases show it in the same place**. Reload both: still the same place. (Before the
-   ordering fix, A and B ended up holding the node at two different positions *permanently*, and
-   whoever saved last silently moved it for the other.)
-10. **Delete a node the other is dragging.** B drags a node; A deletes it mid-drag. Whatever happens
-    (it survives on both, or it dies on both — the total order decides), **A and B agree**, and after
-    a reload of both tabs the canvas is the same on each. What must never happen is one of them
-    holding a node the other does not.
-11. **Your selection survives a teammate's drag.** In B, box-select two nodes and hold the selection
-    while A drags a *third* node around. B's selection must stay selected (before the in-place apply,
-    each of A's ~20 Hz mutations wiped it). Likewise, B's relay-remote terminal nodes (if any) must
-    not vanish while A edits.
-12. **Your undo is not eaten.** In B, move a node, and within a moment have A move a *different* node
-    (so a peer mutation lands during B's undo debounce). Now press ⌘Z in **B**: it must undo **B's**
-    move — not skip past it to an older state (which would also revert A's edit).
+1. 但这是指A创建的节点出现在B.**。 在A中添加终端节点.  但这出现在B的画布上
+同样的流坐标,有相同的标题和颜色,在一瞬间——B的画布显示
+**一个**节点,不是两个。
+2. ** 移动、重命名、重彩宣传。 ** 在 A 中拖动节点。 它移动到 B 上。 重命名它( 标题)
+点击到重命名) ~ B 上的标题更新。 更改颜色 ~ B 上的颜色更新。 现在做
+同样的3个来自**B**=他们降落在A.(名字和颜色从未经过)`onNodesChange`; 如果
+他们无法同步, 出版商已经倒退到更改列表。 )
+3. ** 拖曳力被节制,而不是每帧。 ** 用 B 的 DevTools 拖动一个节点绕 A 几秒钟
+网络~WS帧打开. 那个`canvas:mut`框架大约为**20赫兹,而不是每架
+动画框,以及** last**框降落在固定位置上(拖拉式冲浪)——B's
+节点必须完全结束在 A 丢掉的地方,从不短短一个框。
+4. ** 删除宣传,不再回来。 ** 删除 A 中的节点。 从B的画布上消失
+(而B的终点站则降落在"被<A>关闭的状态——第二阶段). 现在,在**B**中,制作一个
+不相关的编辑(移动另一个节点),所以B的画布会保存. 重装 ** both ** 标签: 删除的节点是
+别走,别走 (在第三阶段之前, B 的完整文件保存后, 将删除的节点直接写回)
+——这是舞台存在要杀死的数据丢失错误. )
+5. 删去土地,甚至在你所不考虑的项目上也是如此。 在**B**中,切换到*秒*项目
+选项卡。 在**A**中,从**第一个**项目中删除一个节点。 切换B后 —— 节点已经** 了
+从B的第一项目画布中消失**(该变异被应用到该项目的系列结点上)
+)),而未活动. 重装B:仍然不见了.
+6. ** 电子亚剂卡不重复。 ** 在A的克劳德节点中运行一个提示,以生成一个
+子剂(例如"使用子剂列出此 repo 的文件"). 副剂卡出现于**年**月**日
+B中A和**项**(每个来源于`agent:status`——从不两次,拖曳
+A中的卡片不移动或复制B中的任何东西。`/loop`纸牌。
+7. ** 没有回音,没有乒乓球。 ** 两个标签在编辑后闲置, 请注意 WS 帧 :`canvas:mut`交通不畅** 不得重新公布从同行申请的变异(即:
+无尽的A B A环; 如果你看到变异的框 没有任何触摸画布,`adopt()`跛脚后退了
+8. ** SOLO用户没有任何变化。 ** 最关键的是倒退 在桌面应用程序中
+(单位:千美元)`npm run dev`),单独:添加、拖曳、重命名、重彩、组、删除节点;撤销/重做;切换工程
+回来 出版商连独家门都没有,
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}必须像现在这样`main`没有多余的污点 也没有你做过的废品
+不创建,节点 永远移动自己。
+9. **这两个节点都拖在一起。 ** A和B 抓住**s**节点 把它拖到相反的方向
+几秒钟,然后两个都放手。 看它能打得胜,但当尘埃落定的时候,
+两张帆布都在同一地方显示。 重新装入两个: 还是同一个地方。 (在
+命令修补,A和B最终在两个不同的位置上占据了节点*永久*,
+谁救了最后的默默地把它移动到另一个。 )
+10. ** 删除另一个节点拖拉。 ** B拖一个节点;A删掉它中干. 无论发生什么
+(两者并存,或两者俱亡——总顺序决定),**A和B同意**,之后
+重新装入两个标签,布画布上都是一样的。 永远不能发生的是其中之一
+持有一个节点 对方没有。
+11.**你的选择在队友的拖累中幸存。 ** 在 B 中,框选择两个节点并按住选择
+而A拖动一个 * 第三个* 节点左右。 B的选择必须保留(在就地申请之前,
+每个A的~20Hz突变将其擦除). 同样,B的中继-远程终端节点(如果有的话)必须
+A 编辑时不会消失 。
+12. ** 你的背面没有被吃掉。 在B,移动一个节点, 在一个瞬间有一个移动 一个*不同*节点
+(因此,在B的撤销休眠期间,同伴突变着陆). 现在按下QQZ在**B **:它必须取消**B的**
+移动——而不是跳傀儡到更古老的状态(它也会恢复A的编辑).
 
-## Known risks
+□ 已知的风险
 
-- **Weak identity** — anyone can claim any name.
-- **Concurrent typing garbles input** — accepted; the badge is the warning.
-- **Cross-user undo** — last-write-wins, no CRDT.
-- **Per-item last-write-wins is a resolution, not an arbitration.** Clients that saw the whole
-  exchange converge (a client that loaded after a delete may not: see the does-not-converge list), but
-  two people dragging one node fight over it and the last-ordered frame decides. (A delete no longer
-  loses that race — see rule 4 under
-  [Concurrent-edit resolution](#concurrent-edit-resolution-what-converges-and-what-does-not).)
-- ~~**A peer's edge (context link / note link) is deleted by your next save.**~~ Closed — edges are
-  in the vocabulary now ([Edge sync](#edge-sync-bridges--ropes)).
-- **The publisher's solo gate reads the presence peer table.** If a client's presence handshake never
-  completes, that client sees no peers and therefore publishes nothing (it still *applies* what it
-  receives, and the first mutation from a peer flips the gate on for good). Presence and canvas sync
-  ride the same transport, so a client that cannot say hello generally cannot cast either — but the
-  coupling is real and is the price of a solo user paying zero. A project a canvas authority governs
-  does not depend on it: its clients publish whether or not they see a peer.
-- **Cursor traffic** is 20 Hz × peers: comfortable for a 5–10 person team, not for a public room.
-- **Plain-shell (no tmux) co-attach shows a joiner a blank-but-live terminal** until the next output
-  arrives (pressing Enter paints it). A joiner gets `fresh:false`, so it skips the cold-restore
-  replay, and with no tmux there is nothing to capture its current screen from either. With tmux —
-  i.e. every normal install — the joiner IS painted: the create result carries the screen (see
-  [Painting the joiner](#painting-the-joiner)). A plain-shell session has no cross-client continuity
-  to inherit anyway; that is what "no tmux = no persistence" already means everywhere else.
-- **A deleted node can still be resurrected on the paths canvas sync does not cover.** Stage 3 closed
-  the main one: an attached client's canvas loses the node the instant a peer deletes it (active
-  project *and* loaded-but-inactive project), so it never asks to re-create it, and its next
-  whole-file save cannot write it back. The respawn guard behind that is still three layers deep,
-  because the mutation does not reach everywhere: the `pty:closed` event (subscribers only), the
-  canvas-delete mutation (clients attached at that moment), and the in-memory `tombstones` map
-  (everyone else, for as long as the core process lives). What is left:
-  - **A whole project deleted by one client is not synced** (project lifecycle is not in the mutation
-    vocabulary), so a peer can still reopen it from *its* "Recently closed" list and re-create its
-    nodes' ptys. The tombstone is what refuses those creates.
-  - **A client that was disconnected when the delete landed misses it** (no join snapshot, no replay).
-    The browser self-heals on reconnect by reloading the page — but only after the deleting client's
-    debounced save has flushed.
-  - **The tombstone remains in-memory**, so it dies with the core process; across a core restart both
-    of the above degrade to "the node comes back". Bounded and honestly named, not a promise. See
-    [What Stage 3 changed](#what-stage-3-changed-relative-to-this-spec) (item 4).
-- **A peer's node delete can still leave a dangling edge for a moment.** The delete and the edge
-  removal are two mutations, and the peer that owns the edge prunes it on its next node change, so
-  an edge whose endpoint a peer deleted can be drawn against nothing for a tick. It is dropped by
-  the same prune that has always handled a locally-deleted endpoint — the durable half (your save
-  erasing their edge) is what closed.
+-**微弱身份**——任何人都可以自称.
+- ** 同时打入格子输入** ——接受;徽章是警告.
+- ** Cross-user 撤销**——最后写赢,没有CRDT.
+- ** 最后一项是决议,而不是仲裁。 ** 客户看到整个
+交换汇合(删除后加载的客户端可能不会:见 do被指定为不连接的列表),但
+两个拖着一个节点的人争吵竺,最后命令的框架决定. (不再删除)
+输掉比赛,
+[同时编辑解析](#同时编辑解析-什么联结-什么联结-做不).
+- QQA 端点的边缘( 文本链接/ 注释链接) 被您的下个保存删除 。 @% 关闭——边缘
+现在的词汇表([Edge同步] (#edge-sync-bridges-ropes)).
+- ** 出版商的独奏门读出存在对等表。 ** 如果一个客户的出现 握手永远不会
+完成后,客户端没有看到同行,因此不发表任何内容(它仍然适用)
+然后从对等点上的第一个变异 将门打开,永远。 存在和画布同步
+所以一个不能打招呼的客户 通常不能投球
+组合是真实的,是独唱用户支付零的价格. 画布管理局管理的项目
+并不依赖它:其客户是否看到对等者都会公布。
+- **Cursor流量**为20Hz×同龄人:对于5–10个人团队来说是舒适的,而不是公共房间.
+- ** Plain- shell(无 tmux) co- attach 显示一个加盟者 一个空白但寿命的终端** 直至下次输出
+抵达(按下Enter涂料). 一个加入者得到`fresh:false`所以它跳过冷藏器
+重放, 并且没有 tmux , 也没有任何可以捕捉它当前屏幕的东西 。 与tm淑——
+即每个普通安装——加合器 IS 涂装:创建结果带屏幕(参见
+[画参 (#画-合). 平板壳会话没有跨客户的连续性
+用于继承; 这就是“ 无 tmux = 无持久性” 已经意味着其他任何地方。
+- ** 一个删除的节点仍然可以在画布同步不覆盖的路径上复活。 ** 第3阶段关闭
+主 : 绑定客户端的画布在端点删除时瞬间丢失节点( 活动)
+工程 * 和 * 会装入但未激活的项目, 因此它从不要求重新创建, 以及它的下一个
+整个文件保存不能回写 。 后面还有三层深的后卫
+因为突变不会到达任何地方:`pty:closed`事件(仅订阅者),
+画布-删除突变( 客户附着在那一刻) , 内存`tombstones`地图
+(每个人,只要核心过程存在). 还有什么:
+- ** 被一个客户删除的整个项目不同步**(项目生命周期不在变异中)
+词汇表),所以对等点仍然可以从 *its * 重新打开 "最近关闭"列表并重新创建其
+节点的ptys。 墓碑是拒绝这些创造的东西。
+- ** 删除时断开的客户端 ** (没有加入快照, 没有重播) 。
+联合国宪章:
+已卸载的保存已冲出 。
+- ** 墓碑仍为纪念物**,因此随着核心过程而死;在核心过程中重新开始做到两个部分
+上面的缩写为“节点回来了”。 名声直白,没有承诺 见
+[第3阶段改变了什么] (#什么阶段-3-改变-相对-这个类别)(项目4)。
+-** 对等点的协调一致地删除节点,仍可留下一瞬间的边缘。** 删除和边缘
+移除是两个突变,拥有边缘的对等点在它的下一个节点变化上进行推移,所以
+一个边缘,其端点被删除的对等点可以被拖动到一个勾选点上。 它被运走
+总是处理本地删除的终点的同一块圆柱——耐用部分(你的节省)
+他们的边缘被关闭。

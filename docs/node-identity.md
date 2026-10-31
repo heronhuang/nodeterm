@@ -1,18 +1,20 @@
-# Per-node hook identity
+> English: [docs/en/node-identity.md](./en/node-identity.md)
 
-Two audiences: someone changing this code in six months, and the owner deciding whether to tighten
-the cutoff. Both need the same three things — what the credential is, what it does **not** buy, and
-which properties a change must not break. The invariant checklist at the bottom is the short version.
+# 每个节点的钩子身份
 
-## What this is
+两个观众: 六个月后有人改变这个代码 主人决定是否收紧
+截断。 两者需要相同的三件事——什么是证书,什么是它做什么,**不**买,和
+不可中断。 底部的无变体核对表是短版本.
 
-Every agent session on a machine shares one hook bearer token. The bearer proves *"a session on this
-machine"*; it cannot prove **which** session. Every hook route takes a caller-supplied `nodeId`, so
-before per-node identity any session holding the bearer could post events as a sibling node, read a
-sibling's linked transcript, or drive canvas control in its name.
+∮这是什么∮
 
-Per-node identity adds a second credential: a **capability per node**, derived from one restart-stable
-secret, distributed as a 0600 file, and verified three ways.
+机器上的每一个代理会话 都有一个无记名符号 持枪人证明"关于此事的一场会议
+机器” * ; 无法证明 ** 哪个 ** 会话 。 每个钩子路线都有一个呼叫器提供`nodeId`这样
+在每个节点身份之前,任何持有持证人的会话都可以将事件作为兄弟节点张贴,读作
+或用它的名义驱动帆布控制
+
+每个节点身份增加了第二个证书:一个**每个节点的能力**,来源于一个重新启动的稳定
+秘密,作为0600文件分发, 并核实三种方式。
 
 ```
 kid   = base64url(HMAC-SHA256(secret, "nt-node-auth-kid-v1"))[0..8]
@@ -20,571 +22,534 @@ mac   = base64url(HMAC-SHA256(secret, "nt-node-auth-v1|" + nodeId))
 token = kid + "." + mac
 ```
 
-**Derived, not minted-and-stored.** tmux sessions outlive the app, so a table built at spawn is empty
-for every already-running session after a restart and cannot be rebuilt (a node's tmux session can
-exist with no record on our side). A derivation lives exactly as long as the secret.
-
-**Domain-separated.** The `nt-node-auth-v1|` prefix means the same secret can later mint other
-capability *classes* (per-project, per-relay) without one being a valid other. The `kid` is a
-non-secret routing hint: it says *whose* secret minted this, so another instance's token can be told
-apart from a forgery.
-
-### Three verdicts, not two
-
-`verifyNodeToken` (`src/core/agents/node-auth-token.ts`) answers:
-
-- **`verified`** — the caller holds the token this instance derived for that node id.
-- **`legacy`** — no token, an empty header, another instance's `kid`, or no secret at all. This is
-  *"we cannot judge this"*, **not** a failure. Every client older than the token, the phone, and the
-  documented cross-instance failover land here.
-- **`forged`** — **our** `kid` with a mac that is not this node's. Nothing legitimate produces it:
-  only a holder of a token for another node, or a mutation of one. It is a 403 on every route,
-  always, with no explanatory prose (advice would be advice to an attacker and a lie to nobody else).
-
-| File | What it owns |
-| --- | --- |
-| `src/core/agents/node-auth-secret.ts` | The secret. `safeStorage` on the desktop, raw 0600 bytes on the Server Edition. |
-| `src/core/agents/node-auth-token.ts` | The derivation, `verifyNodeToken`, `isForeignKidToken`, `isSafeNodeId`. |
-| `src/core/agents/node-token-files.ts` | The 0600 token files in their 0700 dir. |
-| `src/core/agents/node-token-service.ts` | Materialisation: boot sweep, spawn, delete sweep, collision refusal. |
-| `src/core/agents/node-identity-policy.ts` | **What a token buys, per route** — the whole decision table. |
-| `src/core/agents/hook-server.ts` | The routes that apply it, and the trust-on-first-proof latch. |
-| `src/shared/node-identity.ts` | The cutoff DATE, the one string both the server and Settings read. |
-
-**Command-bearing terminal opens (issue #653):** the shared hook-server route requires verified
-node identity whenever `open-terminal` carries `cmd`, including an empty value or a dry run.
-The strict-policy override and foreign-instance fallback cannot release this gate. Desktop plain
-terminal opens keep their existing identity policy; Server Edition still requires verification
-for every control verb. Legacy mobile/SSH callers must present this instance’s node token for
-command-bearing opens; this does not add a human-confirm dialog or change mobile transport APIs.
-
-## The threat model
-
-### What was actually wrong, measured
-
-On 2026-08-13, on a stock Linux host with no `hidepid`:
-
-- `buildPtyEnv` put `NODETERM_HOOK_TOKEN` and `NODETERM_HOOK_PORT` into the tmux `-e` argv. Those
-  ride into a long-lived tmux **client** process whose `/proc/<pid>/cmdline` is **mode 444**. Any
-  unprivileged local user — a different uid, no relationship to the victim — could read a live
-  app-wide bearer straight out of the process table.
-- The bearer is all `/control/*` required. `open-terminal --cmd C` opens a terminal running an
-  arbitrary command and is **not** in the confirm-gated `DESTRUCTIVE_VERBS` set (only `write` and
-  `close` are, `src/shared/control-verbs.ts`). So this was **arbitrary command execution as the
-  victim user**, from any account on the machine, with no prompt. (Note what that set is and is
-  not: the dialogs are hand-written per case in `Canvas.tsx`'s dispatch, and `close-worktree
-  --mode remove` is confirmed by a human without being in the set. The set is what the two `case`
-  blocks read for their `confirmBusy()` refusal, and a drift alarm over that agreement.)
-- The same shape existed on SSH hosts: `RemoteHooks.verifyTunnel` passed the bearer as `-H` on a
-  curl command line, i.e. argv on the host, readable by every other account there.
-
-`hidepid=2` was applied to the affected host and mitigates it **operationally, on that host only**.
-It is not the fix. The fix is that no credential rides argv any more (`buildPtyEnv` carries none;
-every remote curl reads its header from stdin via `curl --config -`) and that the routes now ask
-*which node* is calling, not merely *whether someone on this machine* is.
-
-### What the design is trying to buy
-
-Turning **"any session on this machine can act as any node, by default"** into **"a session that
-wants to act as another node has to do something deliberate about it."** That is a real change in
-default posture and a real reduction in blast radius. It is not isolation, and the qualifier is doing
-work — *deliberate* means different things per route:
-
-- On the routes that demand `verified` — `/codex-thread/{start,bind}`, and every `/control/*`
-  mutation once the cutoff passes — it means **harvesting that node's token file** off the disk.
-- On `/hook/*` it means nothing at all: a tokenless POST naming any node is accepted forever, by
-  contract (invariant 2).
-- On `/control/list` and `/context-link/*` it means **inventing a `kid`**. A made-up kid is a
-  *foreign* kid, therefore `legacy`, therefore never caught by the latch (invariant 3) — see the
-  latch warning below, which is pinned by a test.
-
-What actually went away is the *accident*: the credential no longer falls out of the process table
-into every account on the machine.
-
-## What this does NOT fix
-
-Reproduced deliberately, because a security doc that only lists wins is how the next person
-over-trusts it.
-
-- **A same-uid attacker can still read another node's token.** The token file is 0600 in a 0700 dir
-  under the user's data dir; any process running as that user can `cat` it. Nothing makes a token
-  secret from a determined sibling *within one uid* — that is a property of the uid boundary, not of
-  this scheme. What changed is that it now takes a deliberate act (find the dir, read the right
-  file) instead of being handed over by the process table.
-- **A compromised agent acting as ITSELF is entirely unaffected, by design.** The capability proves
-  *which node* is calling. A Claude session that has been talked into doing something destructive
-  presents its own perfectly valid token and is `verified`. Identity is not authorization, and it is
-  certainly not judgment. `write` and `close` keep their **human confirmation** for exactly this
-  reason, whatever the token says.
-- **Prompt injection is unchanged.** Nothing here inspects intent, and nothing here makes a hostile
-  instruction in a transcript less effective.
-- **A stolen token has no expiry.** There is no TTL, no nonce and no replay window: `verifyNodeToken`
-  is a pure function of (secret, nodeId). A token copied off the disk stays valid for as long as the
-  secret does. There is **no revocation mechanism** — see below for what rotating the secret actually
-  costs.
-- **The remote token dir is per host account, not per instance.** Two instances driving one
-  host+user (two desktops on a shared deploy account) mint with different secrets and overwrite each
-  other's files. The loser's sessions then present a foreign `kid`, which reads as `legacy` — never
-  as another node, never as `forged`. The cost is a silent drop to the fail-open state, not a
-  mis-verification — **but only until the cutoff.** From 2026-10-13 `legacy` is a refusal for every
-  `/control/*` mutation, so the loser does not degrade gracefully any more: it loses remote canvas
-  control outright, silently, on a date nobody will connect to the symptom.
-  `node-tokens/<kid>/<id>` would close it and needs no client change; see the `writeNodeTokens` doc
-  comment. It is also the only hardening that would give the trust-on-first-proof latch any teeth —
-  see the latch warning below.
-
-### Rotation, honestly
-
-There is no rotate command. Rotation means deleting `node-auth-key.json` / `node-auth-key.bin` from
-the data dir and restarting. What that does:
-
-- Every token minted under the old secret carries the old `kid`, so it verifies as **`legacy`** — not
-  `forged`. It stops proving anything; it does not become an attack signal.
-- The boot sweep re-materialises every node's file under the new secret, so **local live sessions
-  recover on their own** (the clients read the file per request; they do not cache). SSH hosts get
-  their new files on the next connect and are `legacy` until then.
-- It **orphans every codex thread→node record** signed with the old secret (`#167`'s shared-identity
-  spine — this is why the sealed path *adopts* a pre-existing `codex-node-auth-key.json` rather than
-  minting fresh).
-
-## At rest, per surface
-
-| Surface | Holds | How |
-| --- | --- | --- |
-| Desktop (Electron) | The **secret** | `node-auth-key.json`, sealed with `safeStorage`, 0600, tmp+rename — or, when `safeStorage` cannot seal at all (Linux with no keyring, issue #1088), `node-auth-key.bin` exactly as the Server Edition stores it. |
-| Server Edition | The **secret** | `node-auth-key.bin`, **raw 32 bytes**, 0600, tmp+rename. |
-| SSH host | Per-node **tokens** only | `$HOME/.nodeterm/node-tokens/<nodeId>`, 0600 under a 0700 dir, written over the ControlMaster with the token on **stdin**. |
-| Phone | Nothing | No secret, no token, no change. |
-
-**The desktop's honest caveat.** `safeStorage` is the right call on macOS (Keychain) and Windows
-(DPAPI). On Linux it may resolve to the **`basic` backend, which encrypts with a hard-coded key** —
-in that configuration the sealing is obfuscation, and the protection that actually holds is the
-**0600 file mode**. That is worth knowing before anyone reasons "it's encrypted at rest, therefore…".
-Two distinct file names (`.json` vs `.bin`) exist so a data dir moved between shells can never have
-one format misread as the other.
-
-**And on Linux it may not seal at all** (issue #1088, measured on Electron 42 under xvfb with no
-session bus): a session with no Secret Service or kwallet — a bare window manager — selects
-`basic_text`, reports `isEncryptionAvailable() === false`, and `encryptString` **throws**. The
-loader used to reject on every boot, so the instance ran with no secret forever: no token file was
-ever written, every session was `legacy`, and every verified-only verb (`send`, `settings`, …) was
-refused permanently, while `hook-endpoint.env` still advertised a token dir that would never fill.
-Now, when sealing throws and no sealed key exists, the desktop writes the raw 0600 `.bin` — the
-Server Edition's format, which on that backend gives up nothing real. A raw key from an earlier
-keyring-less boot is reused when a keyring appears later (never rotated); a **sealed** key that
-merely cannot be unsealed right now (keyring locked at boot) still fails the load rather than being
-replaced, because rotating the secret orphans every bound codex thread.
-
-**The Server Edition stores it raw, deliberately.** A headless Linux host has no keychain; there is
-no `safeStorage` to reach. Inventing a passphrase prompt would make the app un-bootable
-unattended, which is the entire point of that edition. The in-repo precedents are the same
-decision made before: `src/server/auth.ts` keeps the login hash and live session tokens at 0600, and
-`src/server/github-control.ts` keeps a live GitHub PAT at 0600. A secret at 0600 on a host where an
-attacker already has your uid is not the weakest link on that host.
-
-**An SSH host holds tokens but never the secret**, and that is a property worth protecting: a host
-can present the tokens it was given, but it **cannot mint one for a node it was not given** —
-including nodes on other projects, or on other people's canvases. Minting happens only where the
-secret is. The case-fold collision refusal is applied on the *minting* side for the same reason: an
-APFS host must not be a way around the local guard.
-
-**The phone needs nothing, and holds nothing — but the sessions it spawns are `verified`.** The
-phone *device* posts no hook events at all: it drives canvas control over the relay → IPC, not over
-`/control/*` at all. The sessions it SPAWNS run **on the host**, source the host's 0600 endpoint
-file, and therefore read and present the host's per-node token exactly as a desktop-spawned session
-does — a phone-spawned session is `verified`.
-
-The chain is worth stating, because it has been mis-derived twice: the phone injects only
-`NODETERM_HOOK_ENDPOINT` and `NODETERM_NODE_ID` (it types `tmux new-session -A` over its own SSH
-transport, so no `ptyManager` and no `ensureNodeToken` is involved anywhere); the endpoint file
-advertises `NODETERM_NODE_TOKEN_DIR`; the managed script reads `$DIR/$NODETERM_NODE_ID` and sends it
-on stdin. The token file is there because `refreshNodeTokens` runs on **every canvas persist**, not
-because the spawn path minted it. Narrowing that materialisation to the spawn path would silently
-drop every phone-spawned session to `legacy` — `src/core/agents/phone-spawned-identity.test.ts`
-exists to make that a red build.
-
-## Per-route policy
-
-The bearer is required everywhere; this table is about the *node* token on top of it.
-
-| Route | Missing / `legacy` token | `forged` | Notes |
-| --- | --- | --- | --- |
-| `/hook/*` | **Always accepted** — 204, listeners fired, event labelled `verified: false`. | 403 | The label is a label. This route never 403s a missing token. |
-| `/verify`, `/hook/verify` | Accepted — no identity of any kind, ever | n/a | The tunnel probe. It proves one thing: the socket reaches this server. |
-| `/context-link/*` | Accepted unless the node is latched; a refusal is **prose with a 200** | 403 | Every verb is a read, so the whole route sits in the tolerant bucket. |
-| `/control/list` | Accepted unless the node is latched | 403 | Tolerant: leaks canvas shape, changes nothing. |
-| `/control/<mutation>` | Warned during the window, refused after the cutoff, refused immediately if latched | 403 | Refusal happens **before** the handler. `write`/`close` still ask the human. |
-| `/control/browser` | **Refused** immediately — no window, no cutoff to wait for | 403 | Strict from the day it existed via `STRICT_CONTROL_VERBS`, checked **before** both the `override` escape and the dated window, so `hookIdentityStrict: false` does not soften it. Identity is only the first gate: the per-project switch (off by default) and in-memory ledger ownership still apply after it. |
-| `/codex-thread/{start,bind}` | **Refused** (403) | 403 | Strict from the day they existed — no upgrade population to protect. |
-| `/codex-thread/fallback` | **Always accepted** | 403 | It reports a DEGRADE and grants nothing; refusing it would silence it in exactly the tokenless case it exists for. |
-
-**Why `/hook/*` never 403s a missing token.** It is the fail-open contract, and it is load-bearing
-rather than timid. The legitimate tokenless callers are real and permanent: a **phone-spawned session
-whose host had no endpoint file yet** (its `NODETERM_HOOK_ENDPOINT` resolved empty, so there was no
-token dir to read — note that a phone-spawned session on a host that *does* have one is `verified`,
-see above), the **cross-instance failover** (a second instance's token is
-unjudgeable, not hostile), every session that predates the feature, and any future spawner. A 403
-there does not degrade a feature — it silently stops an agent's status, context meter and approvals,
-and the managed script's `curl -sS` has no `--fail`, so a 403 exits 0 and the node goes dark with no
-error anywhere. `forged` is the single exception because nothing legitimate can produce it.
-
-**Why the invented-`kid` escape does not reach `/control/browser`.** The "deliberate means inventing
-a `kid`" hole above is real for `/control/list` and every `/context-link/*` verb: a made-up kid is a
-*foreign* kid, therefore `legacy`, therefore it walks past the latch and the cutoff into those
-tolerant routes. It does **not** walk into `browser`. `browser` is in `STRICT_CONTROL_VERBS`, where
-`controlPolicy` demands `verified` and returns `refuse` for anything else — and `legacy` is anything
-else. A foreign or invented kid is `legacy`, `legacy` is a refusal on this route, so the escape that
-buys `/control/list` buys nothing here. This is the whole reason the strict bucket is checked before
-the `override === false` branch: that branch returns `allow-with-warning` for a non-tolerant verb,
-which would have handed browser control to any holder of the app-wide bearer forever.
-
-**A pre-upgrade codex session degrades to plain codex until it is relaunched.** Its launcher reads
-the per-node capability from an env var this build no longer sets, and the value the previous build
-put there is the OLD derivation (`base64url(HMAC(secret, nodeId))`, no dot), which the current
-verifier reads as `legacy` — a 403 on `/codex-thread/{start,bind}`. There is no compat path and no
-useful one to write: relaunching the node is the fix, and it takes one restart.
-
-**Why `/context-link/*` refuses with prose and a 200.** The shim turns any non-200 into "Could not
-read linked context (nodeterm unreachable)". That would be a lie, and it tells the agent nothing it
-can act on. A sentence it can read is the better failure.
-
-**Why no gate at all when there is no secret.** An instance that cannot mint can never verify anyone,
-so warning or refusing `legacy` there would hit **every** caller on the machine with advice that
-cannot work ("restart this node to pick up an identity" — there is none to pick up). That is the
-desktop's locked-keyring path and the Server Edition's uncreatable-key-file path; the open verbs
-keep working exactly as before. The **verified-only** verbs cannot (nothing is verified), so their
-flat refusal is followed by `identityUnavailableNote`: one sentence saying the cause is the
-INSTANCE, with the error the shell recorded via `hookServer.setNodeIdentityUnavailable` — the only
-place a refusal here carries a diagnosis, because it is a fact about the machine that no caller can
-act on. Before #1088 that cause was a `console.warn` nobody could see.
-
-## Migration
-
-### Trust on first proof
-
-`hookServer` remembers, **in memory only**, every node that has presented a valid token for itself
-(`provenNodes`). Once a node is in that set, an unverified request naming it is refused: the session
-demonstrably *can* authenticate, so one that suddenly cannot is either a different process wearing
-its node id or a forgery. The latch costs the legacy population nothing — they never prove anything,
-so they never latch.
-
-Three properties keep it from breaking people:
-
-- **A foreign `kid` never proves a node and is never caught by the latch.** Otherwise the first day a
-  second instance exists is the day failover stops working.
-- **The latch is never written to disk.** A restart re-earns it within one hook event, and a
-  persisted latch is a node one filesystem accident could brick forever.
-- **Sweeping a node's token also drops it from the latch** (`sweepToken` →
-  `hookServer.forgetProvenNode`). A latch outliving the token it was earned with is a permanent 403
-  — see the warning below.
-
-### The dated window
-
-Until **2026-10-13** (`NODE_IDENTITY_STRICT_AFTER`, built from `NODE_IDENTITY_STRICT_DATE` in
-`@shared/node-identity`), an unverified *mutation* on `/control/*` still **executes**, and the reply
-carries a sentence naming the fix and the date. On and after it, the same situation is a refusal and
-the handler never runs. The date is the owner's rule — *the second minor release or 60 days after the
-shipping release, whichever is later* — resolved to a concrete instant. A tightening with no date is
-a tightening that never happens.
-
-**Two sentences, because two populations.** The ordinary unverified node is told to restart to pick
-one up (`IDENTITY_RESTART_NOTE`) — that is the common case and the restart works. A node that can
-**never** mint (a case-fold collision member, or an id outside `isSafeNodeId` arriving from a shared
-`project.json`) is told the cause instead and is never advised to restart, in the window
-(`IDENTITY_UNMINTABLE_WARN_NOTE`) as well as after it (`IDENTITY_UNMINTABLE_NOTE`). The window is
-where that matters most: it is the *whole period* those nodes still work, so a restart loop there
-costs them the only time they had to fix the id.
-
-The cutoff is read through **`isStrictInstant`**, not a bare `>=`. A machine clock more than
-`NODE_IDENTITY_CLOCK_HORIZON_MS` (2 years) past the cutoff is not believed and the window stays open:
-a VM restored from a snapshot or a board with a bad RTC would otherwise enter strict mode on day one,
-with no window at all and a refusal naming a date "already past" — and the symptom reads as "the
-token is broken", so nobody looks at the clock. The clamp relaxes only the **date**; the latch and
-`forged` are untouched, which is what makes it cheap. (Compare `license.ts`, which anchors expiry to
-the largest observed timestamp so a clock rolled *back* cannot revive a token. Same reasoning, other
-direction: here the clock direction a user benefits from buys them nothing the escape hatch does not
-already grant.)
-
-### ⚠ The latch refuses a PROVEN node immediately, not at the cutoff
-
-**This is the single most misread thing about this feature.** The warning window only ever covered
-nodes that have **never** proven themselves. A node proves itself automatically and fast — the
-managed hook script presents the header, and the boot sweep materialises a token file for every
-persisted node — so a live Claude node is typically latched **within seconds of app start**. From
-that moment, a tokenless caller naming it gets a hard 403, today, with no grace and no date.
-
-**What makes a node `verified` is the SCRIPT, not the file.** Measured: a valid token file read by a
-managed hook script from a build that predates the header is still `legacy` — the file only counts
-once something sends it. Locally that is covered without a restart, because the boot-time hook
-install rewrites the script in the same start-up that runs the boot sweep. **An SSH host's script is
-rewritten only by `RemoteHooks.setup`, which runs on CONNECT**, so the remote nodes of a project that
-is already connected stay `legacy` until that project reconnects — for a long-lived SSH project, that
-can be a long time. Before the cutoff it costs them nothing but the note; on 2026-10-13 it becomes a
-refusal, so "reconnect the SSH project" is part of this upgrade even though "restart the node" is not.
-
-### ⚠ …and the latch is not a defence against an attacker
-
-**It catches a MISTAKE — a session that silently stopped presenting its token — and nothing else.**
-Do not re-derive a stronger claim from the code; this one is measured against the real hook server
-and pinned by a named test (`hook-identity-enforcement.test.ts`, *"an invented kid is admitted — the
-latch is not an adversary boundary"*).
-
-The probe: send `X-Nodeterm-Node-Token: AAAAAAAA.BBBB…` — eight arbitrary characters, a dot, an
-arbitrary tail. Nothing about it is ours, which is exactly the point: the `kid` does not match this
-instance's, so `verifyNodeToken` calls it **foreign**, therefore `legacy`, and invariant 3 says a
-foreign kid never proves and is never caught by the latch. The latch simply does not apply. That
-caller reaches `/control/list` and **every** `/context-link/*` verb as a latched victim node, on both
-sides of the cutoff, and is handed the victim's rendered transcript.
-
-**This is unavoidable and it is correct.** Invariant 3 requires a foreign kid to be admitted, or
-cross-instance failover dies the day a second instance appears — and the attacker is the one who
-chooses the kid, so there is no version of "judge the foreign kid" that an attacker cannot step
-around. Anyone who can set the header can present an unjudgeable one, and the app-wide bearer is all
-it takes to set the header. So: the latch is a good bug-catcher and worth keeping; it is not a
-boundary, and neither is the dated cutoff (the same probe walks past both).
-
-**The one place the probe will stop — once there is anything in it.** A verb in
-`STRICT_CONTROL_VERBS` admits `verified` and nothing else, so a foreign kid — `legacy` by invariant
-3 — is refused there with a flat sentence and no diagnosis. That will be the only route in this
-document where the invented-kid escape does not apply, and it is affordable exactly because the
-verbs it is for are new: no legacy population to strand, so nothing has to fail open. **Today the
-set names a verb that does not exist yet** (see [The escape hatch](#the-escape-hatch)), so this
-changes nothing for any route currently reachable — every claim above still holds in full, and the
-probe still reaches `/control/list` and every `/context-link/*` verb.
-
-**The real hardening, if it is ever wanted.** Scope the remote token dir as
-`node-tokens/<kid>/<nodeId>` (already sketched in `writeNodeTokens`' own doc comment). The *only*
-scenario the foreign-kid escape exists for is two instances sharing one host account overwriting
-each other's flat token dir. Remove that overwrite and a foreign kid stops being a legitimate state,
-at which point it can be judged and the latch acquires the teeth this section says it does not have.
-
-### Stranding is the cost the latch actually charges
-
-Refusing a proven node the instant it stops presenting a token is intentional, but it is also the one
-way this feature can kill a live session outright. These are what pay that down — they are what make
-the latch shippable, not the window:
-
-- every token sweep releases the latch (collision refusal, delete/re-create, remote refusal);
-- the clock clamp;
-- the shared token resolver (below), so a client cannot fail to FIND a token that exists;
-- and the escape hatch, which must be reachable **in the UI**, because a stranded user's symptom
-  never says "clock" or "collision".
-
-### ⚠ A client that cannot FIND the token is indistinguishable from one that has none — issue #384
-
-The token dir is advertised by ONE thing, the endpoint file, and a session is pinned for life to the
-endpoint **path** it was handed at tmux creation (`buildPtyEnv` / `remoteHookEnvArgs`). So a session
-whose endpoint file does not carry a `NODETERM_NODE_TOKEN_DIR` line presents nothing, forever, while
-its token file sits in the standard place. Three populations, all measured on a real host:
-
-- **A pre-v2 endpoint file that is still LIVE.** SSH hosts used to share one
-  `~/.nodeterm/hook-endpoint.env`; the current build writes per-project
-  `hook-endpoint-<projectId>.env` and never touches the old path again. The old file names
-  `~/.nodeterm/hook-<projectId>.sock` — a path **re-bound on every connect of that project** — so it
-  keeps reaching a current server while advertising no dir. Observed: a `VERSION=1` file a month old
-  pointing at a socket created minutes earlier.
-- **A session whose transport rides the env with no readable endpoint file** — what the phone hands
-  a session it spawns.
-- **A partial read** of an endpoint file being rewritten under the reader.
-
-What made it a *refusal* rather than an unverified call is that the CLIENTS DISAGREED. The managed
-hook script has an endpoint failover: on a failed POST it adopts a live sibling endpoint and re-reads
-the token from **that** endpoint's dir — so the node proves itself and latches. The two sh shims had
-no failover and no fallback, so every canvas-control and context-link call from that session was
-refused with `IDENTITY_REFUSED_NOTE` for the rest of its life. **Proven by one client, refused
-through another.**
-
-The fix is one resolver, `nt_read_node_token`, emitted by `core/agents/node-token-sh.ts` and used by
-all three clients (the codex launcher is deliberately excluded — it refuses outright on an unreadable
-endpoint and reports a named degrade, a different contract). It tries the advertised dir, then
-`<dir of the endpoint file>/node-tokens` — the layout **by construction** on all three surfaces — then
-the same well-known data dirs the hook script already walks for endpoint files.
-
-It is **monotone**, and that is the whole safety argument: the advertised dir is always first, so
-nothing that verifies today changes; the lookup is by node-id FILENAME in every candidate, so a
-session can still only present its own token; and a dir belonging to another instance mints under a
-different secret, so its token carries a foreign `kid` — `legacy`, bit-for-bit what presenting
-nothing already gave, and never `forged`. Each candidate can turn `legacy` into `verified` and
-nothing else.
-
-**The advice was wrong too.** Both notes said "Restart this node (right-click it, *Restart agent*)".
-That action re-launches the CLI **inside the same pane** and deliberately leaves the pty, the tmux
-session and therefore the whole environment untouched (`terminal/agent-restart.ts`) — so it could
-never change what a session presents. They now say *close and reopen the node* (a new tmux session is
-what picks up the current `-e` env), *reconnect the SSH project* (the only thing that rewrites the
-host's endpoint file, shim, hook script and token files), and name the escape hatch.
-
-Known and **not** fixed: two processes on one node id after a re-attach. A shell from an older app
-run, whose shim never learned to send the header, posts nothing while the re-attached session proves
-the node — and is then refused for as long as it lives. It is genuinely indistinguishable from an
-impostor; the only code answer would be giving up the latch. The escape hatch is what that case has.
-
-### ⚠ The same asymmetry one layer down: a stale ENDPOINT — issue #445
-
-#384's shape repeated at the transport level. A session is pinned for life to the endpoint *path*
-it was handed, and that path's FILE can advertise a port nothing listens on: the app quit or
-crashed and has not rewritten it yet, the hook server's `start()` failed and left a previous run's
-file standing, or the path carries a retired project id that is never rewritten again. The managed
-hook script survived all of these — its bounded candidate walk (`nt_candidates`/`nt_adopt`) adopts
-a live sibling endpoint and re-reads the token from the adopted dir — while the two sh shims posted
-once at the dead port and died with "control endpoint unreachable": hook events healed themselves,
-canvas control did not, and the field report was a reviewer launch silently dropped from a live
-worktree session.
-
-Three fixes, all in the same change:
-
-- **The walk is shared** (`core/agents/hook-endpoint-failover-sh.ts`), the same extraction
-  `node-token-sh.ts` performed for the token read: one definition, three clients. Both shims fail
-  over on a dead transport only — an HTTP answer of any code is authoritative and is never re-sent
-  to another instance — and re-read the token from each adopted endpoint (`nt_read_node_token
-  "$candidate"`). The walk is skipped under `CODEX_SANDBOX_NETWORK_DISABLED` (#367: the sandbox
-  denies every connect, so each candidate would burn a doomed curl and the sandbox hint is already
-  the right diagnosis).
-- **Publication reflects listener liveness**: `hookServer.stop()` and a FAILED `start()` now delete
-  `hook-endpoint.env` (the desktop calls `stop()` on quit), and a failed `listen()` no longer
-  wedges the singleton — it used to leave `this.server` assigned, so every later `start()` was a
-  silent no-op at port 0 under a stale advertisement. A crash skips the delete, which is exactly
-  what the client walk exists for.
-- **The refusals name the state**: "no endpoint anywhere" and "an advertised endpoint that is not
-  listening" are different facts with opposite advice, so the shims append `STALE_ENDPOINT_HINT`
-  in the second case instead of leaving one generic sentence covering both.
-
-The safety argument is the walk's own: the node id in the body identifies the session, a foreign
-instance that does not know it answers with its ordinary refusal, and a foreign token dir yields a
-foreign `kid` = `legacy`. Real /bin/sh coverage: `canvas-control-shim.failover.test.ts`,
-`context-link-shim.failover.test.ts`, `hook-server.recovery.test.ts`.
-
-### The escape hatch
-
-`settings.hookIdentityStrict` — Settings → Agents → *Require verified node identity for canvas
-control*. It is the **only optional key** in `Settings` and deliberately not in `DEFAULT_SETTINGS`,
-because it is a tri-state:
-
-| Value | UI | Effect |
-| --- | --- | --- |
-| absent | Automatic | Follow `NODE_IDENTITY_STRICT_AFTER`. |
-| `true` | Always required | Enforce now, before the date. |
-| `false` | Not required | Keep the warning window open past the date **and** release the latch. |
-
-`false` is for a user whose upgrade strands a live session: it gets the canvas back without
-downgrading the app. Neither value ever admits a `forged` token.
-
-Neither releases a verb in **`STRICT_CONTROL_VERBS`**, and as of S8 that is now a live restriction,
-not a pre-positioned one. The set contains one name, `browser`, and `browser` **is a real verb**
-(shipped over S8 PRs 7–9): it drives a real logged-in page — navigating, typing, clicking, reading
-text and cookies. So the hatch releasing it would mean handing that to any holder of the app-wide
-bearer, forever, which is exactly what must never happen. The ORDERING makes it impossible: the
-strict bucket is decided one line below the `forged` check, above every branch the hatch or the dated
-window can reach, and it admits `verified` only — so `browser` can never arrive through the
-`override === false` branch, which returns `allow-with-warning` for every non-tolerant verb. Setting
-*Require verified node identity for canvas control* to **Not required** keeps the warning window open
-and releases the latch for the ordinary verbs; it does **not** release browser control.
-
-`open-browser` stays out on purpose, and the distinction is worth stating because the sentence above
-says "browser": **opening a node is not driving one.** The threat is an agent acting inside a page
-the user is logged into (cookies, typing, script); `open-browser` only creates the surface and
-navigates it, like `show-web`. It is also a shipped verb with a live legacy population, and a strict
-gate would leave a pre-token session — or an SSH host whose project has not reconnected — unable to
-open a browser node with no way back, since the hatch by design cannot reach into this bucket. The
-residual is named rather than hidden: an unverified caller can open a node onto a logged-in page and
-the page's title then shows up in `list`. That is `list`'s tolerance, unchanged by this bucket.
-
-The cost, now that the verb has landed: cross-instance failover cannot drive a browser node, because
-another instance's token is a foreign kid and therefore `legacy`, and `legacy` is a refusal on this
-route. Both shells wire the override as a **live getter** (`setIdentityStrictOverride`), so a change
-takes effect on the next request, not the next launch — a stranded user must not have to restart the
-thing that is already broken — but no setting reaches into the strict bucket to release `browser`.
-
-## Ids are path segments
-
-`isSafeNodeId` (node ids) and `isSafeThreadId` (codex thread ids) refuse `.`, `..`, empty and
-over-length **on top of** the `[A-Za-z0-9._-]` charset, because both ids are used as path segments —
-`<tokenDir>/<nodeId>`, `<codexThreadIdentityRoot>/<threadId>` — and `.` and `..` match that charset.
-Both ids are attacker-shaped: they arrive from `project.json`, which travels in cloned and shared
-repos. One predicate each, applied before the id reaches a path join **or a hash**. Do not add a
-second copy of either rule; a rule with two copies is a rule where one copy is wrong.
-
-The same file provenance is why **case-folding collisions** are refused. On APFS (the primary desktop
-target) `<tokenDir>/Term-1` and `<tokenDir>/term-1` are one inode while `isSafeNodeId` calls them two
-nodes, so a `project.json` carrying both picks by array order whose token lands in the shared file —
-and the other node reads it. The materialiser refuses tokens for the **whole colliding set** and
-sweeps anything an earlier pass wrote for them; those nodes fall back to `legacy`, the designed
-fail-open state.
-
-## Account scoping (S6): the same secret signs Codex account-scoped records
-
-The restart-stable node-auth secret above does a second job: it signs the Codex thread→node→**account**
-ownership records (`src/core/codex-identity-proxy.ts`). S6 gives a machine the system Codex login
-(`~/.codex`) alongside managed logins, and a record now binds the full 4-tuple
-`(threadId, accountScope, nodeId, hookEndpoint)` so one account can never be made to speak for
-another's threads. The full model is [Shared Codex node identity](shared-codex-node-identity.md); the
-parts that touch this secret and the invariants here:
-
-- **The codex identity secret is armed on both shells.** Desktop and Server Edition both call
-  `setCodexThreadIdentityAuthSecret(loadOrCreateNodeAuthSecret())` at boot — the desktop in
-  `src/main/index.ts`, the Server Edition in `src/server/node-identity-arm.ts` — so **managed records
-  sign on a headless host too** (raw `0600` `node-auth-key.bin`, no keychain). This is the both-shells
-  half of Decision 1; a keychain-only secret would regress Server Edition. With **no** secret armed, a
-  record write **throws** rather than writing an unsigned record (fail-closed) — nothing is minted.
-- **The switch is owner-authorized, main-side.** Moving a running node's conversation to another
-  account is a three-phase, TTL-bounded protocol keyed off `event.sender.id` — only the WebContents
-  that reserved the switch may commit or finish it. It resumes the **same conversation id** (an atomic
-  hardlink of the rollout inode), never a fork. The phone **never originates** an add/switch/copy.
-- **Ambiguity fails closed, like the latch.** The same thread id owned by two account scopes resolves
-  to **no owner** unless `owners.size === 1` — the same house rule as the pane-ownership and
-  invented-`kid` refusals: an owner that cannot be *proven* is denied, never picked by order.
-- **Ids are path segments, still.** A managed account id is a directory scope
-  (`<codexThreadIdentityRoot>/<accountId>/<threadId>`), so it passes `isSafeAccountId` (must start
-  alphanumeric — blocks `.`/`..`/leading-separator) before it becomes a path, exactly as `isSafeNodeId`
-  / `isSafeThreadId` do. The account id travels in the launcher's POST **body**, never on an argv
-  (invariant 1 — no credential *or* scope-shaping input on a command line).
-
-Two S6 surfaces remain **owed device verifications** rather than shipped-and-verified: the imperative
-pane-recycle glue behind a live switch, and the remote-host account **lifecycle** (add/login/remove
-*on* an SSH host — wired 2026-09 from the machine panels in Settings → Accounts, unit-tested only). Both, plus the live-daemon and real-WAN legs, are in
-[the acceptance gate](codex-accounts-acceptance.md).
-
-## Invariants a future change must not break
-
-1. **No credential on any argv or command line — local or SSH.** Not tmux `-e`, not `curl -H`, not a
-   remote `ssh` command string. `/proc/<pid>/cmdline` is mode 444 on a stock Linux (measured), and a
-   remote command line is argv on both ends. Credentials travel by 0600 file or by **stdin**
-   (`curl --config -`). Guarded by `hook-server.env.test.ts` and the remote suites; if you need a
-   header on a remote curl, copy the `--config -` pattern, never add an argv fallback.
-2. **`/hook/*` never 403s for a missing token.** The phone, the cross-instance failover and every
-   pre-token session legitimately have none, and a 403 there is a silently dark node, not an error.
-   Only `forged` is refused.
-3. **A foreign `kid` is `legacy`, never `forged`, and never proves or latches a node.** It is the
-   documented cross-instance failover. Getting this wrong breaks failover on the day a second
-   instance appears.
-4. **Both raw listeners change together** — `src/main/index.ts` and `src/server/agent-status.ts`.
-   Any new field on the hook event (the `verified` flag was one) must reach both, or the Server
-   Edition silently loses the feature. Pinned by a source-level parity assertion in
-   `hook-verified-parity.test.ts`; this repo has shipped a one-shell hook-server change three times.
-5. **Node ids and thread ids are validated before any path join or hash.** `isSafeNodeId` /
-   `isSafeThreadId`, once each, at the boundary.
-6. **`write` and `close` keep the human confirmation, token or no token.** Identity may refuse
-   *before* the handler; it may never stand in for the dialog. Tolerance is the one way this feature
-   could weaken it, so neither verb is ever in `TOLERANT_CONTROL_VERBS`.
-7. **A sweep releases the latch.** Any new code path that removes a token file must also call
-   `hookServer.forgetProvenNode`, or it strands the node it was protecting.
-8. **Fail-open directions, per failure mode.** Every one of these is a deliberate choice, not an
-   oversight:
-
-   | Failure | Direction |
-   | --- | --- |
-   | No secret (no keychain, unwritable key file) | No gate at all — every route behaves pre-feature |
-   | Token file unwritable / unreadable | `legacy` — never a blocked terminal, never a throw into a pty spawn |
-   | Remote write fails for one node | That node is `legacy`; the others keep their tokens |
-   | Case-folding collision | The whole set is `legacy`, and their files are swept |
-   | Unsafe node id | No token, no file, no hash — and no path join |
-   | Clock implausibly far ahead | Window stays open (`isStrictInstant`) |
-   | Hook handler throws | Still 204 |
-   | `forged` | **The one fail-closed case.** 403, every route, no prose |
-
-   **Every row that lands on `legacy` is only fail-OPEN until 2026-10-13.** On and after the cutoff
-   `legacy` is a refusal for every `/control/*` mutation, so a degradation nobody notices today
-   becomes a node that cannot drive the canvas at all — e.g. two instances sharing one remote host
-   account overwrite each other's token dir (§What this does NOT fix) and the loser loses remote
-   canvas control outright, on a date nobody will connect to the symptom. Each `legacy` row is a
-   thing to fix *before* the date, not a permanently safe landing.
+** 已启用, 不是铸造和存储。 ** tmux 会话比应用程序有效, 所以产卵时建造的桌子是空的
+用于重启后已运行且无法重建的每个会话( 节点的 tmux 会话可以
+我们方面没有任何记录。 一个衍生物和秘密一样长
+
+** 已分开。 ** 那个`nt-node-auth-v1|`前缀表示同样的秘密,以后可以将其他的薄荷
+*类*(按项目、每段),其中一种不是有效另一种。 这个`kid`是一个
+非秘密的路由提示: 上面写着,谁的秘密 做了这个,所以可以告诉另一个实例的标志
+除了伪造
+
+三个判决,不是两个
+
+`verifyNodeToken`(单位:千美元)`src/core/agents/node-auth-token.ts`回答:
+
+- ****`verified`** ——呼叫者持有该节点代号衍生出的这个实例。
+- ****`legacy`——没有标志,一个空头,另一个实例`kid`或者没有秘密 这是
+"我们不能判断这个" "不是失败" 每一个客户都比代号、电话和
+记录到这里的交叉入侵失败
+- ****`forged`** -- -- 我们**`kid`一个不是这个节点的mac 没有任何合法结果:
+只持有另一个节点的符号,或一个的变异. 每条路线都有403辆
+编撰的论文中,
+
+,的 , 的 。。的。。。的。的。的。。。。的。。。。的。。。。。。。。。。的。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。的。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。的。。。。。。。。。。。。。。。。。。。。。。。。。。。。ام。依旧。。。。。。。。。。。。。。。。的。。。。。。。。。。。。。。的。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。。的。。。。。。。。。。。。。。的。。。的,                                                                                                                                ,                   ام的依旧    ,                                              ,                  ,                 , , 。 的 。 , 。 , 
+| | | |
+|                              `src/core/agents/node-auth-secret.ts`这个秘密`safeStorage`桌面上,服务器版上原始的0600字节。 |
+|`src/core/agents/node-auth-token.ts`- 推论,`verifyNodeToken`, (中文).`isForeignKidToken`, (中文).`isSafeNodeId`。 。 。 。
+|`src/core/agents/node-token-files.ts`0600令牌文件在他们的0700 dir.
+|`src/core/agents/node-token-service.ts`• 物质化:靴子扫描、产卵、删除扫描、拒绝碰撞。
+|`src/core/agents/node-identity-policy.ts`** **************************************曾多次购买。
+|`src/core/agents/hook-server.ts`应用它的路线, 和信任第一防锁。
+|`src/shared/node-identity.ts`QQ 截断 DA轿车, 服务器和设置都读取的字符串 。 XQ
+
+** 载有指令的终端打开(问题653):** 共享的钩-服务器线路需要验证
+节点身份`open-terminal`携带`cmd`,包括空值或空运行。
+严政凌驾 和外国势力的退缩 无法释放这个大门。 桌面平面
+终端打开时保留其现有的身份政策; 服务器版仍然需要验证
+对于每个控制动词。 传统移动/”(SSH)呼叫者必须提供此实例的节点符号
+含有命令的打开;这不添加人-确认对话框或更改移动运输 API。
+
+□ 威胁模型
+
+到底什么是错的,测量头衔
+
+2026-08-13日,在Linux主机没有的股票上`hidepid`编号 :
+
+- 怎么样?`buildPtyEnv`设置`NODETERM_HOOK_TOKEN`和`NODETERM_HOOK_PORT`输入 tmux`-e`rg. 这些
+运行到长寿命 tmux ** 客户端** 进程`/proc/<pid>/cmdline`为** mode 444**。 任意
+无特权的当地用户——一个不同的用户,与受害人没有关系——可以读到现场
+整个应用程序的无记名者直接退出进程表。
+- 携带者就是所有`/control/*`所需经费。`open-terminal --cmd C`打开运行中的终端
+任意命令,在已确认的`DESTRUCTIVE_VERBS`设定(仅包含)`write`和协 协 施`close`这是,`src/shared/control-verbs.ts`) (中文(简体) ). 因此,这是**任意命令执行作为
+受害人用户**,来自机器上的任何账户,没有迅速。 (注意那套是和是)
+不是: 对话框是手写的, 以`Canvas.tsx`和`近工树'
+-- 模式删除` is confirmed by a human without being in the set. The set is what the two `案例
+块读取`confirmBusy()`拒绝, 和漂移的警报 因为协议。 )
+إ,在SSH主机上也存在同样的形状:`RemoteHooks.verifyTunnel`传承人作为`-H`时间:
+卷曲命令行,即主机上的argv,可由那里的其他账户读取.
+
+`hidepid=2`适用于受影响的东道方,并在业务上减轻影响,仅适用于该东道方**。
+这不是修复。 修补是不再有证书驾驶了`buildPtyEnv`无载;
+每个远程卷轴都读其标题`curl --config -`而现在的路线要求
+{\fn方正黑体简体\fs18\b1\bord1\shad1\3cH2F2F2F}[Constitute] {\fn方正黑体简体\fs18\b1\bord1\shad1\3cH2F2F2F} 我们走
+
+设计要买什么?
+
+将 **"任何关于此机的会话都可以作为任何节点,默认情况下"**"变成 **"一个会话"
+想要像另一个节点一样 做一些深思熟虑的事情。” 这是一个真正的变化
+默认姿态和爆炸半径的实际缩小。 这不是孤立, 修饰者正在做
+工作——* 故意* 是指每个路线的不同的东西:
+
+- 在需要的路线上`verified`. . . . . .`/codex-thread/{start,bind}`和每个`/control/*`一旦断层通过,即发生变异——意味着**收割节点的符号文件**从磁盘中脱落.
+- 打开`/hook/*`没有任何意义: 一个没有象征意义的 POST 命名任何节点都被永远接受,通过
+的唯一途径是:
+- 打开`/control/list`和`/context-link/*`意思是发明`kid`**. 一个化妆的孩子是一个
+外国孩子,所以`legacy`因此,从未被锁锁(不定的3)抓住——见:
+应通过测试进行标记
+
+实际损失的是“事故”:证书不再从进程表中掉下来。
+进入机器的每个账户
+
+□ 这不能解决
+
+故意复制的,因为只列出胜诉的担保文件是下一个人
+过度信任它。
+
+- 一个同样的攻击者仍然可以读到另一个节点的符号。 签名文件为 0600 dir
+在用户的数据目录下; 任何运行的进程`cat`这个 没有什么能证明什么
+、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、ض、、、、、、、、、、、、、、、、、、、、、、向会员国提供、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、萤、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、、
+这一计划。 改变之处是,它现在需要一种蓄意的行为(找到目录,读读右边)
+而不是由进程表移交。
+- ** 以ISTELF身份行事的受损代理人在设计上完全不受影响。 ** 能力证明
+* 节点* 正在呼叫。 克劳德会议 被说服做一些破坏性的事情
+显示其完全有效的标志`verified`身份不是授权,
+当然不是判断。`write`和`close`保持他们的** 人类确认** 正因为这个
+理由,不管什么标志。
+- ** 快速注射没有变化。 ** 这里没有任何东西能检查意图, 这里没有任何东西能制造敌意
+记录中的指示效果较差。
+- ** 失窃的证物没有过期。 ** 没有 TTL 、 无 Nonce 和 没有重播窗口 :`verifyNodeToken`是(机密、节点)的纯函数。 如果你不使用该函数,则该函数将自动执行。 从磁盘上复制的令牌只要
+秘密确实如此 没有任何撤销机制**-见下文关于实际旋转的秘密。
+费用。
+- ** 远程代号目录是每个主机账户,而不是每个实例。 ** 两次驾驶一次
+主机+用户(共享部署账户上的两台桌面)薄荷,有不同的秘密,每个都覆盖
+其他档案。 输家的会话会呈现一个外国人`kid`,其内容如下:`legacy`从来没有
+作为另一个节点,从来没有`forged`。成本是默默下降到失败状态,而不是
+错误核查——**但直到停产。 ** 从2026-10-13年。`legacy`是拒绝每个`/control/*`变异,所以失败者不再优雅地退化:它失去了远程画布
+完全控制,默默地,在一个日期 没有人会连接到症状。`node-tokens/<kid>/<id>`将关闭,无需更改客户端;见`writeNodeTokens`医生
+评论。 这也是我唯一吝啬的,就是让第一防守者 抓住任何牙齿
+见下面的锁链警告。
+
+老实说,旋转
+
+没有旋转命令 。 旋转表示删除`node-auth-key.json`编号`node-auth-key.bin`从
+数据目录并重新启动。 这有什么作用:
+
+- 每一个在旧的秘密下铸造的纪念品都带着旧的`kid`,所以它被校的记录`legacy`** ——没有`forged`它停止证明任何事情;它不会成为攻击信号。
+- 靴子扫荡将每个节点的档案 重新编织在新的秘密之下,所以 ** 本地直播会话
+自行回收**(客户端按请求阅读文件;不缓存). SSH 主机获得
+它们在下一个连接上的新文件`legacy`直到那时。
+- 它======================================================================================================================================= 太棒了============================================================================================================ح ========`#167`共享标识
+脊椎,这就是为什么 密封的路径 * 采纳 * 一个先前存在`codex-node-auth-key.json`而不是说
+薄荷新鲜。
+
+□ 在休息,每表面
+
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}看在上帝的份上 {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}看样子
+| | |
+* 桌面(电子) * ** 秘密** * * *`node-auth-key.json`,用`safeStorage`,0600, tmp+重命名 - 或当`safeStorage`完全无法封存(无密钥环的Linux,第1088期),`node-auth-key.bin`恰好是服务器版存储它。
+* 服务器版* * ** 机密** * *`node-auth-key.bin`, ** raw 32 字宣传材料**, 0600, tmp+ rename. QQ
+SSH主机 ============================================================================================= ========================================================================================================================是按照=滔=================================`$HOME/.nodeterm/node-tokens/<nodeId>`, 0600 在0700 dir 下, 写在控制 Master 上, 上面写预期将在**stdin **.
+没有秘密,没有标志,没有变化。
+
+** 此桌面的诚实提醒。 **`safeStorage`是对 macOS (Keychain) 和 Windows 的正确调用
+(中文(简体) ). 在Linux上,它可能决心`basic`后端,用硬码密钥加密** —
+在这种配置中,封印是模糊的,而实际上的保护是
+**0600 文件模式**. 这是值得知道之前,任何人的理由 "它是加密的休息,因此..."。
+两个不同的文件名( E)`.json`数字`.bin`)存在,所以在贝 瞧之间移动的数据目录永远不会有
+一种格式误读为另一种格式。
+
+** 在Linux上,它可能根本不密封**(第1088期,在xvfb下的42号电上测量,没有)
+会话总线:没有特勤局或kwallet的会话——一个赤裸的窗口管理器——选择`basic_text`报告`isEncryptionAvailable() === false`,以及`encryptString`推车**. 那个
+装填器曾经在每个靴子上拒绝,所以这个实例永远没有秘密:没有符号文件
+曾经写过,每次会议都是`legacy`,以及每个经核实的唯一动词(`send`, (中文).`settings`,(...) 曾经
+永久拒绝, 而`hook-endpoint.env`仍然在广告上宣传一个永远不会填满的符号目录.
+现在, 这是怎么回事, 当密封抛出和没有密封的密钥存在时, 桌面会写出原始的 0600`.bin`- 那个
+服务器版的格式,在后端上,它没有放弃任何真实性. 早期的原始密钥
+当键环出现后(从未旋转过),将重用无键环的靴子 我没有键; ** 密封** 键,
+只是现在不能被解封(键锁在靴子上) 仍然无法完成负载而不是成为
+替换,因为旋转 秘密孤儿 每一个绑定的代码线。
+
+** 服务器版刻意地将它原橱储存起来。 ** 无头的 Linux 主机没有键橱链; 有
+无`safeStorage`到达。 创建密码句提示会让应用程序无法启动
+无人关注,这是该版的全部要点. 内幕的先例是一样的
+此前作出的决定:`src/server/auth.ts`将登录散列和直播会话符号保留在 0600,以及`src/server/github-control.ts`保持一个活的GitHub PAT在06:00。 6: 00在主机上的秘密
+攻击者已经拥有你的UID不是主机上最弱创设环节.
+
+** SSH主机持有符号,但从来不是秘密**,这是一个值得保护的财产:一个主机
+它可以显示它给的标志,但它不能为它没有给的节点薄荷1** -
+歌手,包括其他项目的节点,或者其他人的画布上的节点.歌手们,
+秘诀是 案件重叠的碰撞拒绝适用于*小*方,理由相同:a
+APFS主机一定不能绕过当地守卫.
+
+** 电话不需要任何东西,也没有任何东西——但是它所产生的会议是`verified`. ** 说明
+电话*device* 贴出完全没有钩子事件: 它驱动对中继器的帆布控制 → IPC,而不是结束`/control/*`一点也不 SPAWNS在主机上运行的会话**,来源于主机的0600端点
+文件,并因此读取和呈现主机的每个节点符号 完全作为桌面映射的会话
+does ——电话发售会话是`verified`。 。 。
+
+连锁店值得一提,因为它两次被误传:电话只注射`NODETERM_HOOK_ENDPOINT`和`NODETERM_NODE_ID`(类型)`tmux new-session -A`超过它自己的SSH
+运输,所以不`ptyManager`且无`ensureNodeToken`; 端点文件
+广告`NODETERM_NODE_TOKEN_DIR`; 管理脚本读取`$DIR/$NODETERM_NODE_ID`送来
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}在斯丁岛 符号文件存在,因为`refreshNodeTokens`运行在**每张画布持续**,而不是
+因为产卵路径把它磨碎了 将现实化缩小到产卵之路上 将默默无声
+将每段电话发到`legacy`. . . . . .`src/core/agents/phone-spawned-identity.test.ts`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}现在已经存在 {\fn黑体\fs22\bord1\shad0\3aHBE\4 这就是红色建筑
+
+□ 每条路线的政策
+
+随处需要携带者;这个表格是关于上面的*node*符号.
+
+社群 缺少/`legacy`符号QQ`forged`|  Notes  Notes
+| | | | |
+|`/hook/*`** 始终接受** -- -- 204人,听众被开除,事件被贴上标签`verified: false`. QQ 403 QQ 标签是一个标签. 这条路从来就不是失踪的标志 |
+页: 1`/verify`, (中文).`/hook/verify`–接受–没有任何身份,从未出现过隧道探测器. 它证明了一件事: 套接字到达了服务器 。 @ @ info
+|`/context-link/*`除非节点被绑住,否则接受;拒绝用200**|403|每个动词是读数,所以整个路线坐落在宽容的桶中. |
+|`/control/list`除非节点是固定的 403 = Tolerant: 漏掉画布形状, |
+|`/control/<mutation>`在窗口中警告,在截断后拒绝,如果出现拒绝,则立即拒绝。`write`页:1`close`仍然问人类。
+|`/control/browser`** 立即删除** ——没有窗口,没有截断等待####403 严格地说,从存在之日开始通过`STRICT_CONTROL_VERBS`,在 ** 之前检查`override`逃脱和旧窗,所以`hookIdentityStrict: false`不要软化它。 身份只是第一个门:每个项目的开关(默认关闭)和内存分类账的拥有权在它之后仍然适用. |
+|`/codex-thread/{start,bind}`*** 参考**(403)******************咚********************************************************************************方面具有***************************************************************************************************************************************************
+|`/codex-thread/fallback`总是接受** 403 | 它报告一个DEGRADE,却一文不值;拒绝它会完全在它存在的无意义的情况下保持沉默。
+
+*为什么`/hook/*`从来没有403s 一个缺失的标志。 ** 这是未完成的合同,它有载荷
+而不是胆小。 合法的无象征的呼叫者是真实的和永久的:一个 ** 手机喷射的会话
+其主机 envoy尚未有端点文件**(其`NODETERM_HOOK_ENDPOINT`解析为空,所以没有
+要读的符号目录——请注意,在主机上的电话发声会话 * does * 拥有一个是`verified`, (中文).
+(二审标志是)
+无法判断的,不是敌对的, 每一个在特征之前的会话, 以及任何未来的产物。 a 403个
+没有贬低一个特征——它静静地停止了代理人 你是不是在阻止它的地位、上下文表和批准,
+和管理的脚本`curl -sS`没有`--fail`,所以一个403出口0, 节点会变暗,没有
+任何地方都出错。`forged`这是唯一的例外,因为没有任何合法的东西能够产生它。
+
+为什么发明了...`kid`逃跑没有到达`/control/browser`.** “故意”是指发明
+(单位:千美元)`kid`"上面的洞是真实的`/control/list`和每个`/context-link/*`动词:一个化妆的孩子是一个
+外国孩子,所以`legacy`因此,它走过锁 和切入
+宽容的道路。 它确实没有**** 走进`browser`。 。 。`browser`进入`STRICT_CONTROL_VERBS`时,`controlPolicy`需求`verified`返回时`refuse`用于其他一切——和`legacy`任何东西
+别的 一个外国或发明的孩子`legacy`, (中文).`legacy`是这条路线上的拒绝,所以逃跑就是
+购买`/control/list`这里什么也不买 这整件事情都是因为这个才被检查的
+联合国`override === false`分支: 该分支返回`allow-with-warning`对于不宽容的动词,
+它会永远将浏览器控制权 交给全应用的持卡人
+
+** 升级前的编码会话可降解为普通编码,直至重新启动。 ** 它的发射器读作:
+此构建不再设定, 以及先前构建的值 天啊!
+在那里,有老的派生。`base64url(HMAC(secret, nodeId))`,无点),当前
+核查者读作:`legacy`- 403开`/codex-thread/{start,bind}`。没有类似路径,也没有
+有用的一个写法: 重新启动节点是固定的, 它需要一个重新启动 。
+
+*为什么`/context-link/*`以传言和200元拒绝。 ** 烟雾把任何非200变成"可能不会"
+读取链接上下文(节点无法到达)”。 那将是一个谎言, 它告诉特工什么
+可以继续 它能读到的句子是更好的失败。
+
+*为什么没有颜料* 薄荷颜料无法证实任何人
+警告或拒绝`legacy`{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}所有打电话的人 {\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}建议
+无法工作("重新启动这个节点来拾取身份"——没有可以拾取的). 这是
+桌面的锁定键盘路径和服务器版的不可创建键文件路径; 打开的动词
+继续像以前一样工作 仅用**验证的**动词不能(无一经核实),所以它们
+在拒绝之后`identityUnavailableNote`一句话说原因就是
+由空空空空空空空空空空空空實 空空實 空實 空實 通過 通過 通過 通過 通過 中 通過 中 通過 中 中 通過 中 中 通過 中   通過   通過 通過    通過    中   通過   中   中               通過      中          中     中                    這  這        這                          這        這  纯属                          這                   這        `hookServer.setNodeIdentityUnavailable`唯一一个
+拒绝 50)\fn方正黑体简体\fs18\b1\bord1\shad1\3 106.2F2F2F}美国海军陆战队
+行动起来。 在1088年之前,这个原因是一个`console.warn`没有人能看到。
+
+□ 迁徙
+
+* 信任第一个证据
+
+`hookServer`记住,**在记忆中**,每一个节点 已经为自己提供了有效的标志
+(单位:千美元)`provenNodes`) (中文(简体) ). 一旦一个节点在那个集中,一个未经核实的命名请求就会被拒绝:会话
+证明 * 能够 * 认证, 所以突然不能是一个不同的过程
+其节点标识或伪造。 批量浪费了遗产人口 什么都没有——他们从来没有证明什么,
+所以他们从不挂接。
+
+三个地产能防止它破坏人:
+
+- ** 外国`kid`从来没有证明一个节点,也没有被锁锁抓住。 ** 否则第一天a
+第二例是故障停止工作的ệ痛日。
+-** 锁链从不写在磁盘上。 在一个钩子事件内重启它,和一个
+持续的锁链是一个节点 一个文件系统事故 可能永远砖砌。
+停止 停止 停止 停止求助于`sweepToken`→`hookServer.forgetProvenNode`. 先生, 先生, 先生, 先生, 先生, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们们, 先生们们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们, 先生们先生们, 先生们, 先生们, 先生们, 先生们, 先生们先生们, 先生们, 先生先生们, 先生们, 先生先生们, 先生先生先生们, 先生先生们, 先生先生 先生们, 先生先生们, 先生们, 先生先生们, 先生先生先生先生先生先生先生, 先生 , 先生 先生先生先生先生, 先生先生
+- 见下文警告。
+
+++ 日期窗口
+
+直至**2026-10-13** (中文(简体) ).`NODE_IDENTITY_STRICT_AFTER`从`NODE_IDENTITY_STRICT_DATE`输入`@shared/node-identity`),未验证的 * mutation * on.`/control/*`执行** 和答复
+带一句来命名固定和日期。 同样的情况是拒绝和拒绝
+处理者从不运行。 后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后嗓后后后后后后后后后后后后后后后后后 你是怎么后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后后:“后后后后后后后后后后后后后后后ẽ后后后后后后后后后后后后后后后后后
+(b) 运输释放,以较晚者为准*——立即解决。 收紧没有日期就是
+收紧是永远不会发生的。
+
+** 两个句子,因为两个人口。 ** 普通未验证的节点被告知要重新开始选择
+一个上( O)`IDENTITY_RESTART_NOTE`——这是常见的情况和重启工程. 一个可以
+** 从未** 薄荷(个案式碰撞成员,或外部的id)`isSafeNodeId`从一个共享的`project.json`) 转而被告知原因,并且从不建议在窗口重启
+(单位:千美元)`IDENTITY_UNMINTABLE_WARN_NOTE`以及之后的(为女性)`IDENTITY_UNMINTABLE_NOTE`) (中文(简体) ). 窗户是
+其中最重要的: 这是 * 整个周期 * 这些节点仍然工作, 所以一个重新启动的循环
+花了他们唯一的时间 他们需要修复身份。
+
+截断通过**`isStrictInstant`**,不是光线`>=`。一个比`NODE_IDENTITY_CLOCK_HORIZON_MS`(2年)经过截断后,不相信会打开窗口:
+从快照中恢复的VM 或带坏RTC的芸香板 否则会在第一天进入严格模式,
+完全没有窗户,拒绝给日期命名“已经过去”,症状读作“the
+象征的关键要素被打破了 所以没人看钟表 契约的关键要素是:`forged`毫无动静,这才聪颖 (比较)`license.ts`,该锁定过期
+最大的时间戳 所以一个时钟 滚动 * 回* 不能恢复一个符号。 同样的推理,其他
+方向 : 这里的时钟方向 一个用户从购买中得益 任何逃生舱门都没有
+已经拨款。 )
+
+### 门锁立即拒绝一个PROVEN节点 而不是在断路口
+
+** 这是关于这个功能的最错误之处。 ** 警告窗口只盖过
+从未证明自己的节点。 一个节点自动快速地证明了自己——
+管理钩脚本呈现标题,靴子扫描会为每个符号文件提供符号文件
+持续节点——所以一个活的克劳德节点一般在应用启动的秒内被绑**. 从
+一个无名无姓的来电者 命名它得到一个硬403 今天,没有恩典和日期。
+
+*什么是节点 *`verified`是STRIPT,不是文件。 ** 测量: 由 a 读取的有效符号文件
+管理 hook 脚本, 该脚本在信头之前是`legacy`——文件只计数
+一旦有东西发出它。 就当地而言,没有重新开始,因为时空的钩子
+在运行靴子扫描的同一启动中安装重写脚本. ** SSH 主机的脚本是
+只有`RemoteHooks.setup`,它运行于 CONNECT **,所以一个项目的远程节点
+已经连接到暂停`legacy`直到该项目重新连接——对于一个长寿的SSH项目,即
+可能会很长一段时间。 在停产前,它只花费了纸条; 在2026-10-13年,它变成了一个
+拒绝,所以"重新连接SSH项目"是这次升级的一部分,尽管"重新启动节点"不是.
+
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}而锁链不是用来对付攻击者的
+
+** 它抓住了一个MISTAKE——这个默默地停止展示其标志的会议——而别无其他。 **
+不要从代码中重新找到更强烈的主张; 这是用真正的钩子服务器来测量的
+以一个有名的试验为依托。`hook-identity-enforcement.test.ts`一个发明出来的小孩被录取了...
+锁链不是对立的边界。”
+
+探测器: 发送`X-Nodeterm-Node-Token: AAAAAAAA.BBBB…`- 八个任意角色,一个点,一个
+专横的尾巴 问题不在于我们,`kid`与此不符
+{\fn黑体\fs20\shad2\2aH82\3aH20\4aH33\fscx95\3cH592001\be1}所以 {\fn黑体\fs20\shad2\2aH82\3aH20\4aH33\fscx95\3cH592001\be1}所以 {\fn黑体\fs20\shad2\2aH82\3aH20\4aH33\fscx95\3cH592001\be1}所以 {\fn黑体\fs20\shad2\2aH82\3aH20\4aH33\fscx95\3 t`verifyNodeToken`因此,它称为**外国**。`legacy`3说
+外国孩子从来没有证明 也从来没有被锁。 锁链根本不适用。 那个
+联系人到达`/control/list`和** 每个人**`/context-link/*`动词作为 固定的受害者节点, 在两个
+截断部分的两侧 交给了受害人的笔录
+
+** 这是不可避免的,而且是正确的。 ** 变体3要求允许外国儿童入境,或
+越狱失败在二审出现之日死亡ppe
+选择孩子,所以没有"审判外国孩子"的版本 攻击者不能步
+周围 任何能设定标题的人都可以呈现一个无法判断的,而全应用的持信人就是所有
+它需要设置标题。 因此,锁链是一个很好的捕虫器,值得保存;它不是一个
+边界 , 和 日期 的 截断 也 不 是 ( 同一 探测器 穿过 两者 ) 。
+
+** 探测器将停止的地方——一旦发现任何情况。 ** 动词`STRICT_CONTROL_VERBS`承认`verified`没有什么,所以一个外国孩子...`legacy`由变化无常
+3 - 在那里被拒绝,判以平刑,没有诊断. 这是唯一的路线
+文档中不存在被发明的子嗣逃脱,而且它完全可以负担得起,因为
+它的动词是新的:没有遗留下来的人群可以支撑,所以没有什么可以不开放的。 ** 今天
+若设置一个尚未存在的动词**(见[逃生舱门](#逃生舱门)),则此选项
+对于目前可到达的任何路线来说,没有任何变化——以上每一项要求仍然完全有效,
+探测器仍然到达`/control/list`每个`/context-link/*`动词.
+
+如果有人想要的话,真正的硬化。 将远程符号目录范围为`node-tokens/<kid>/<nodeId>`(已绘制)`writeNodeTokens`'自己的医生评论). 仅此而已
+假想外国孩子的越狱是两例共享一个主机账户覆盖
+对方的平面符号 dir. 取消这个封面 一个外国孩子不再是一个合法的国家,
+此时它可以被判断 和锁链获得牙齿 本节说它没有。
+
+{\fn黑体\fs22\bord1\shad0\3aHBE\4aH00\fscx67\fscy66\2cHFFFFFF\3cH808080}斯特兰丁是实际费用
+
+拒绝一个已经证明的节点,当它停止显示一个符号时,是故意的,但它也是一个
+这个功能可以直接杀死现场直播 这些是给钱的,是给钱的
+锁船,而不是窗户:
+
+- 每一次标记扫描都会释放批量(拒绝连接、删除/重建、远程拒绝);
+- 钟夹;
+- 共享符号解析器(以下),所以客户端不能不查找存在的符号;
+- 和逃生舱门,必须能够到达** UI**,因为一个搁浅的用户症状
+从来没有说"时间"或"collision"。
+
+QQQ 无法查找符号的客户端与一个没有符号的客户端是分不开的——第384期.
+
+符号目录通过较早的广告, 端点文件, 一个会话被固定终身
+端点 ** path** 它是在 tmux 创建时交接的 (`buildPtyEnv`页:1`remoteHookEnvArgs`) (中文(简体) ).提供关于汉字. 所以有个会话
+其端点文件不包含`NODETERM_NODE_TOKEN_DIR`线条永远不显示任何东西,而
+它的标志文件坐落在标准位置。 三组人,都用真正的宿主测量:
+
+- ** 一个仍然为LIVE的pre-v2端点文件。 ** SSH 主机用来共享一个`~/.nodeterm/hook-endpoint.env`; 当前构建每个项目`hook-endpoint-<projectId>.env`永远不要碰旧路 旧文件名`~/.nodeterm/hook-<projectId>.sock`——这条路径**在该项目的每一条连接线**——因此
+持续到达当前服务器,同时广告缔造和平。 观察:a`VERSION=1`一个月的文件
+指向先前创建的插座 。
+- ** 在一个没有可读端点文件的情况下搭乘掩体的会话**——电话处理什么
+它会产生一个场景
+- ** 在阅读器下重写端点文件的一部分读**。
+
+使得它成为一个* 反驳 * 而不是一个未经证实的呼叫 是CLIENTS 解散。 管理
+钩脚本有一个结束点失效: 在失败的 POST 上, 它采用一个活 我也是兄弟端点并重新读取
+从** 端点的 dir —— 所以节点证明了自己和节点。 两个Shims有
+没有故障,也没有回落,所以从该会话中调用的所有帆布控制和上下文链接都是
+拒绝使用`IDENTITY_REFUSED_NOTE`一辈子 ** 一名客户证明,被拒绝。
+通过另一个。 **
+
+修复是一个解析器,`nt_read_node_token`,由`core/agents/node-token-sh.ts`用于
+所有三个客户端( 密码发射器被故意排除) —— 它在无法读取时直接拒绝
+终止点和报告一个有名的退化,不同的合同)。 它尝试了广告目录,然后`<dir of the endpoint file>/node-tokens`——布局**通过建筑**所有三个表面——然后.
+相同的著名数据 dirs 钩脚本已经行走到端点文件。
+
+这是**monoone**, 这就是整个安全论点: 广告目录总是第一,所以
+今天没有任何变化;每个候选人的视线都是节点编号FILENAME,所以
+语句仍然只能显示自己的符号;和 属于另一个实例薄荷的目录在一个
+不同的秘密,所以它的标志 携带外国`kid`. . . . . .`legacy`,以比特表示什么显示
+没有已经付出,从来没有`forged`。每个候选人可以转身`legacy`输入`verified`和
+没有别的。
+
+** 咨询意见也是错误的。 ** 两个音符都说"重新开始这个节点(右键点击它,*重新开始代理*)".
+这个动作重新启动了CLI 在同一面板上 并故意离开pty,tmux
+因而,整个环境没有受到影响。`terminal/agent-restart.ts`)——这样可以.
+永远不要改变一个会场的呈现。 他们现在说“关闭并重新打开节 8. (一个新的 tm 凯旋会话是)
+是什么捡起电流`-e`), * 重联 SSH 项目 * (唯一重写
+主机的端点文件,shim,钩脚本和令牌文件),并命名逃跑舱门.
+
+已知和**不**固定:一个节点id上的两个过程在重排后. 旧应用程序的外壳
+运行中, shim从未学会发送信头, 在重新附图的会话证明时, 没有任何文章 。
+节点——然后被拒绝,只要它活着。 它确实与
+冒牌货 唯一的密码是放弃锁链 逃生舱就是那个案子的
+
+###的的的 的 的 的 的 的 的 的 的  的  的    的   的     的      的         的                                  的                                                                                的                                                                鹊  的               
+
+#384的形状在运输层面重复. 一场会话会持续到终点
+这个路径的FILE可以给一个端口做广告 任何声音都听不到:应用程序退出或
+已崩溃, 尚未重写, 钩服务器的`start()`失败并留下了上一个运行
+file standing, 或路径带有一个不再重写过的已退休工程 ID。 管理
+钩脚本幸存下来——它有界限的候选人行走(`nt_candidates`页:1`nt_adopt`通过
+一个现场兄弟会的终点, 并重新读取被采纳的目录的符号—— 而两个shims张贴
+一次在枯燥的港口, 并且以"无法到达的" 死亡: 钩子事件治愈了自己,
+帆布控制没有, 现场报告是审查员的发射 静悄悄地从直播
+工作树会议。
+
+三个修正,都在同一变化中:
+
+- ** 行走是共享的**(`core/agents/hook-endpoint-failover-sh.ts`),同样提取`node-token-sh.ts`代号为:一个定义,三个客户端。 都失败了
+仅仅在死运上——任何代码的HTTP回答是权威的,永远不能重发
+到另一个实例 —— 并重读每个通过端点( `n  read  node  token' ) 的符号
+(美国广告)`). The walk is skipped under `(# 367:沙盒)
+拒绝每个连接, 所以每个候选人都会烧掉一个注定的卷曲, 沙盒提示已经
+诊断正确).
+- ** 出版物反映了听众的活泼性**:`hookServer.stop()`和失败`start()`现在删除`hook-endpoint.env`(桌面通话)`stop()`退出)和失败`listen()`不再继续
+单胞胎 曾经离开`this.server`进行改革,所以以后`start()`是一个
+0号端口的无声广告 崩溃会跳过删除, 这恰恰是
+客户行走是为了什么 呃...
+- **拒绝者将州命名为**:"没有终点"和"没有终点的广告终点"
+不同的事实 与相反的建议, 所以shims附件`STALE_ENDPOINT_HINT`在第二种情况下,而不是留下一个涵盖两者的通用句子。
+
+安全论据是行走者自己的:身体中的节点ID识别会话,一个外国人
+以普通拒绝方式回答,而外国代号目录则产生
+外国`kid`=`legacy`. 实际/bin/sh覆盖率:`canvas-control-shim.failover.test.ts`, (中文).`context-link-shim.failover.test.ts`, (中文).`hook-server.recovery.test.ts`。 。 。
+
+逃生舱门
+
+`settings.hookIdentityStrict`* 画布需要经核实的节点身份
+控制*。 这是**唯一的可选键** in`Settings`故意不进去`DEFAULT_SETTINGS`, (中文).
+因为它是一个三态:
+
+QQ 值 UI 效果 QQ
+| | |
+QQ 缺席QQ 自动QQ 跟随`NODE_IDENTITY_STRICT_AFTER`。 。 。 。
+|`true`总是要求现在,在日期之前执行。
+|`false`不需要 将警告窗口打开过日期 ** 并** 释放锁条。
+
+`false`用于用户, 其升级时会显示一个动态会话: 它可以在没有
+降低应用程序的等级。 任何价值都不会承认`forged`符号 。
+
+也没有在**中释放动词。`STRICT_CONTROL_VERBS`以及S8现在的现场限制
+不是预设的 里面有一个名字,`browser`,还有`browser`**是一个真正的动词**
+(通过S8 PRs 7–9):它驱动一个真正的登录页面——导航,打字,点击,读取
+短信和饼干。 所以,舱门释放它 意味着将它交给任何持有 应用全
+无记名,永远, 这正是永远不能发生的。 命令使得它不可能:
+严格桶由下方一行决定`forged`检查每个分支上方的舱门或日期
+窗口可以到达,它承认`verified`只是,这样`browser`永远无法通过`override === false`分支,该分支返回`allow-with-warning`每个不宽容的动词。 设置
+* 需要经核实的节点身份来控制画布 * 以** 不需** 保持警告窗口的打开
+并释放普通动词的锁链;它执行**不**释放浏览器控制。
+
+`open-browser`故意离开, 区别是值得说明的, 因为上面的句子
+说"浏览器":**打开一个节点不是驱动一个。** 威胁是一页内的人
+用户登录(cookie、打字、脚本);`open-browser`只创建表面
+导航,像`show-web`它也是一个运来的动词,有活的遗产人口,而且严格
+闸门将留下一个预选会话——或其项目没有重新连接的SSH主机——无法
+打开一个没有回路的浏览器节点,因为按设计,舱门无法到达这个桶. 这个
+剩余部分被命名而不是隐藏:未经核实的呼叫器可以在登录的页面上打开一个节点,
+页面的标题然后出现在`list`这是`list`容忍,没有改变 在这个桶。
+
+成本,现在动词已经着陆了: 交叉失败无法驱动浏览器节点, 因为
+另外一个案子的标语是外国孩子,所以`legacy`,以及`legacy`这是拒绝
+路线。 两枚炮弹都将超载电线装为**活体计**(`setIdentityStrictOverride`),所以改变
+在下一个请求时生效,而不是下一个发射时生效。
+已经破碎的东西——但是没有设定进入严格的桶中释放`browser`。 。 。
+
+□ Ids是路径段
+
+`isSafeNodeId`(节点编号)和`isSafeThreadId`拒绝`.`, (中文).`..`时,空和
+超长** 顶部**`[A-Za-z0-9._-]`字符集,因为两个 ids 都被用作路径段 Valerie-`<tokenDir>/<nodeId>`, (中文).`<codexThreadIdentityRoot>/<threadId>`——和`.`和`..`跟那个字符组匹配
+两个身份是攻击者的形状:他们从`project.json`,在克隆和共享中运行
+重现。 每个上方一个,在id到达路径前应用,加入**或散列茹**. 不添加一个
+两项规则的第二次副本;一项规则有两份副本,是一份副本有误的规则。
+
+现在我们拒绝** 案件重叠碰撞** 的原因是同一文件来源。 在 APFS (主桌面) 上
+目标)`<tokenDir>/Term-1`和`<tokenDir>/term-1`是一个inode 同时`isSafeNodeId`叫他们两个
+节点,所以`project.json`两者均按数组顺序选择,其象征土地位于共享文件中——
+而另一个节点读它。 材料商拒绝为** 整个碰撞器件发信号**和
+扫荡早先写给他们的通行证;这些节点会回到`legacy`, 设计出来的,
+失败打开状态 。
+
+□ 账户范围界定 (S6): 相同的暗号 Codex 账户范围 我想看看
+
+突然倒闭的节点 -- -- auth 秘密是第二点工作:它负责Dexx bread node  account**
+所有权记录(`src/core/codex-identity-proxy.ts`) (中文(简体) ). S6 给一机器系统编码登录
+(单位:千美元)`~/.codex`)与管理下的登录并列,记录现在将全部4图绑定`(threadId, accountScope, nodeId, hookEndpoint)`因此,一个账户永远不能 说话
+另一条线 完整的模型是[共享编码节点身份](共享编码-节点识别.md);
+触摸这个秘密的部位 和这里的变异者:
+
+- ** 两枚炮弹上都有密码身份秘密。 ** 桌面和服务器版两个调用`setCodexThreadIdentityAuthSecret(loadOrCreateNodeAuthSecret())`启动时的桌面`src/main/index.ts`,服务器版`src/server/node-identity-arm.ts`所以,**管理记录
+在无头主机上也签名**(raw)`0600` `node-auth-key.bin`(注5)(第5条),(第5条),(第5条),(第5条),(第5条),(第5条),(第5条),(第5条),(第5条),(第5条),(第5条),(第7条),(第7条),(第7条),(第7条),(第7条),(第7条),(第7条),(第5条),(第7条),(第7条),(第7条),(第7条),(第7条),(第7条),(第7条),(第憬,第7条),(第7条),(第,第,第(第,第,第)))),(第,(第,(第,第,第,(第,第(第,第,第,))))),(第,(第(第,(第,(第(第,第,第,第,第,第,第,第,第(第,从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从 Vicente从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从
+决定1的一半; 仅键链密钥会倒退服务器版 。 秘密武装,a
+记录书写**扔**而不是写一个没有签名的记录(未关闭)——没有任何内容是刻制的。
+- ** 开关由业主授权,主侧。 ** 将一个运行中的节点的对话移到另一个
+帐号是一个韵母为三相, TTL 绑定的协议`event.sender.id`——只有网络内容
+保留开关的开关可能承诺或完成。 它恢复了同样的对话 id**(原子)
+硬链的推出inode, 从来没有叉。 电话**从未发售**加/开/拷贝.
+- 类似锁链一样的闭塞故障 两个账户范围拥有的相同线程 ID 解决
+除非`owners.size === 1`- 与面额所有权相同的房屋规则和
+发明了...`kid`拒绝:不能被*证明*的所有人被拒绝,从未被命令选择.
+-** Id是路径部分,仍然是。 ** 管理账户 id 是目录范围
+(单位:千美元)`<codexThreadIdentityRoot>/<accountId>/<threadId>`),所以通过`isSafeAccountId`(必须开始)
+字母数字-块`.`页:1`..`在它成为一条道路之前, 确切地说,`isSafeNodeId`页:1`isSafeThreadId`说吧 账号ID在发射台的POST中运行**body**,从未在agv上运行
+(变体1——在命令行上没有证书*或*范围形状输入).
+
+两个S6表面仍为**负载装置核查** 而不是装运和核查:当务之急
+实时开关后面的泛循环胶水,以及远程主机账户**生命周期**(添加/登录/删除)
+*在*一个SSH主机上——从Sets → counts的机器面板上接线2026-09,仅测试单位. 两者,加上现场守护者 和真实的WAN腿,都是在
+[验收门] (codex-counts-accept.md).
+
+□ 变化不定 未来改变好几年
+
+1. ** 任何参数或命令行——当地或SSH——无证书。 ** 没有 tmux`-e`没有`curl -H`,而不是一个
+远程`ssh`命令字符串。`/proc/<pid>/cmdline`模式 444 在股票 Linux (测量),和 a
+远程指令线是两端的 argv 。 6:00档案或**stdin**的证件旅行
+(单位:千美元)`curl --config -`) (中文(简体) ). 守卫`hook-server.env.test.ts`和远程套房。
+远程卷轴上的页眉,复制`--config -`模式,从不添加 argv 折返。
+2. ** 经常预算:`/hook/*`永远不要403s 一个缺失的标志。 ** 电话,交叉干扰故障 和每一个
+预选会议是没有的,一个403有一个沉默的黑暗节点,而不是一个错误。
+仅`forged`被拒绝。
+3. ** 外国`kid`这是`legacy`永远`forged`,并且从未证明或固定一个节点。 ** 这是
+有记录的交叉事件失败。 一天一秒就弄错故障
+实例出现。
+4. ** 两个原始听众一起变化** -`src/main/index.ts`和`src/server/agent-status.ts`。 。 。
+钩子事件上的任何新字段`verified`旗帜为之一)必须到达两者,或者服务器
+版无声地失去了这个功能. 由源级对等断言所决定`hook-verified-parity.test.ts`;此Repo已运出单壳钩服务器更改三次.
+5. **在任何路径加入或散列之前,将验证节点标识和线程标识。 **`isSafeNodeId`页:1`isSafeThreadId`在边界上
+6. ** 国家`write`和`close`保持人类的确认, 标志或没有标志。 ** 身份可以拒绝
+* 在 * 处理器之前; 它可能永远不会站在对话框中 。 容忍是这个特点的唯一方式
+可能削弱它, 所以动词从来没有在`TOLERANT_CONTROL_VERBS`。 。 。
+7. ** 扫描释放锁。 ** 任何删除符号文件的新代码路径也必须调用`hookServer.forgetProvenNode`或者它会拖着它保护的节点
+8. **每个故障模式的故障方向。 ** 每一个都是故意的选择,不是
+监督:
+
+失败 方向
+| | | |
+无密钥( 无密钥链, 不可写入密钥文件) QQ 完全没有大门——乍到乍到,
+QQ 无法写入文件/ 无法读取 QQ`legacy`从来没有被封锁的终端公民资格 从来没有被扔进母卵
+一个节点的远程写入失败 {} 那个节点是`legacy`;其他人保留着他们的象征
+案件重叠碰撞 整个集`legacy`,则他们的文件被扫描  你这是谁?
+============================================================冉================================================================================================================
+QQ 时钟在 QQ 窗口前方不可能打开(`isStrictInstant`) (中文(简体) ).
+虎克手丢 仍然204 |
+|`forged`一个失败的案件。 。 。
+
+** 每排降落在`legacy`在2026-10-13. 之前只能使用失败的OPEN。 ** 断线后`legacy`是拒绝每个`/control/*`变异,所以今天没有人注意到
+成为完全无法驱动画布的节畸——例如共享一个远程主机的两个实例
+账户覆盖对方的代号目录( § 此不修复 ) , 失败者丢失远程
+彻底控制帆布 约会时没人会和症状有关 每个`legacy`单行是一个
+在日期之前 而不是永久安全着陆

@@ -1,22 +1,22 @@
-# Mobile Usages & Inbox — protocol contract (v1)
+> English: [docs/en/mobile-usage-inbox.md](./en/mobile-usage-inbox.md)
 
-The iOS companion's Inbox sheet has two tabs — **Agents** (inbox feed) and **Usages** — that
-were designed empty states until now. This doc is the cross-repo contract that activates them.
-Everything rides in the **existing agent-status mirror file** (`agent-status.json` /
-`agent-status-<projectId>.json`) — no new files, no new transport: the phone already batch-reads
-these over SSH (and gets the same blob over the relay `projects.list` RPC).
+# 移动用户和收件箱——协议合同(v1)
 
-## Transport recap
+iOS 同伴的Inbox 工作表有两个标签—— ** Agents ** (inbox feed) 和 ** U体现了 ——
+被设计为空所作的承诺 这个医生是激活他们的所作的承诺
+在** 现有代理状态镜像文件中,每样东西都载着**(`agent-status.json`页:1`agent-status-<projectId>.json`)——没有新文件,沒有新運輸: 手機已經分批讀
+这些通过SSH(在中继器上得到同样的blob)`projects.list`(原始内容存档于2018-09-26). RPC.
 
-- Desktop/server writes `<userData>/agent-status.json` (atomic, 0600, 300 ms debounce) —
-  `src/core/agent-status-mirror.ts`.
-- For connected SSH projects, `src/main/remote-ssh/remote-status-push.ts` pushes per-project
-  slices to `~/.nodeterm/agent-status-<projectId>.json` on the host (2 s throttle, 60 s heartbeat).
-- iOS polls these every 8 s while foregrounded (`AgentStatusMonitor` → `NodetermProjects.swift`).
+□ 运输回顾
 
-`MirrorFile.v` stays `1` — all additions are optional fields; old readers ignore them.
+- 桌面/服务器写入`<userData>/agent-status.json`(原子,0600,300毫秒脱落) -`src/core/agent-status-mirror.ts`。 。 。 。
+- 对于相连的SSH项目,`src/main/remote-ssh/remote-status-push.ts`推动每个项目
+切片为`~/.nodeterm/agent-status-<projectId>.json`在主机上(2节油门,60节心跳)
+- iOS的民调,每8秒一次`AgentStatusMonitor`→`NodetermProjects.swift`) (中文(简体) ).
 
-## MirrorFile additions
+`MirrorFile.v`留下来`1`——所有添加都是可选字段;老读者忽略了.
+
+□ 镜像文件
 
 ```ts
 export interface MirrorFile {
@@ -29,7 +29,7 @@ export interface MirrorFile {
 }
 ```
 
-### Usage
+使用量
 
 ```ts
 export interface MirrorUsage {
@@ -60,16 +60,16 @@ export interface MirrorUsageLimit {
 }
 ```
 
-Rules:
-- Source is `src/core/usage/usage-service.ts` caches. The service now proactively polls **all
-  local accounts** (system + non-pending local managed accounts) on its existing 15-min cadence,
-  not just the system account, and notifies the mirror on every cache update.
-- **SSH slices carry no `usage`** in v1 (`filterMirrorForNodes` drops it, like `settings`):
-  a remote host's account credentials live on that host, so the desktop cannot answer for them.
-  A host that runs nodeterm itself (server edition) writes its own mirror with its own usage.
-- Remote accounts stay excluded (same rule as the desktop usage indicator).
+规则:
+- 来源是:`src/core/usage/usage-service.ts`缓存。 服务现在主动投票 **
+* 当地账户**(系统账户和未用当地管理账户),现有15分钟账户,
+不仅仅是系统账户,而是在每个缓存更新上通知镜像.
+-** SSH切片没有`usage`** 在v1中(`filterMirrorForNodes`掉下来,像`settings`:
+一个远程主机的账户证书正在该主机上直播衲子,所以桌面无法回答它们.
+一个运行节点本身(服务器版)的主机会用自己的用法写出自己的镜像.
+- 排除远程账户(规则与桌面使用指标相同)。
 
-### Inbox
+输入
 
 ```ts
 export interface MirrorInbox {
@@ -96,48 +96,41 @@ export interface InboxNodeNow {
 }
 ```
 
-Event production (all inside/next to `agent-status-mirror.ts`, fed by the listeners the shells
-already wire):
+活动制作(全部在内/外)`agent-status-mirror.ts`由听众喂养的贝壳
+已接线 :
 
-- Normalized `state:'blocked'` → `approval` event (title = first line of `lastMessage`, else
-  "Needs approval"). `state:'waiting'` → `question` event. Dedup: if the node's newest
-  unresolved approval/question has the same title, bump nothing — do not append a duplicate.
-- Normalized `state:'done'` → `done` event with `detail` = `lastMessage` snippet and
-  `interrupted` passed through. A done following an `interrupted` Esc spam should still be one
-  event per turn (the normalizer already collapses this).
-- When a node leaves blocked/waiting (any newer state event), mark its unresolved
-  approval/question events `resolved: true` (they move to the phone's archive).
-- Node removal (`dropNode`) removes its `nodes` entry; its events stay (feed history) but get
-  `resolved: true`.
-- **Activity** comes from the RAW hook listener (`setRawListener` already sees `tool_name` /
-  `tool_input`): `Edit|Write|NotebookEdit → "Editing <basename>"`, `Read → "Reading <basename>"`,
-  `Bash → "Running <command ≤60ch>"`, `Grep|Glob → "Searching <pattern>"`,
-  `Task → "Delegating: <description>"`, `WebFetch|WebSearch → "Fetching <host|query>"`, else
-  `"Using <tool>"`. Cleared on Stop/done/session-end.
-- **contextPercent** is recorded where the shells broadcast `IPC.contextUpdate` (both
-  `src/main/index.ts` and `src/server/agent-status.ts` `wireAgentStatus`).
-- SSH slices (`filterMirrorForNodes`) keep `inbox` but filter `events` and `nodes` to the
-  project's node ids.
+- 正常化`state:'blocked'`→`approval`事件(标题=`lastMessage`,则
+"需要审批").`state:'waiting'`→`question`活动。 Dedup:如果节点是最新的
+未解决的核准/问题的标题相同,没有任何问题——不附加重复。
+- 正常化`state:'done'`→`done`事件为`detail`=`lastMessage`片断和`interrupted`路过 之后完成的`interrupted`Esc垃圾邮件应该还是一个
+每个转弯的事件(  我们现在已经崩溃了 ) 。
+- 当一个节点离开被阻断/等待(任何新的状态事件)时,标记它尚未解决
+核准/问题事项`resolved: true`(他们移动到手机的存档).
+- 节点清除(`dropNode`删除其`nodes`条目; 事件保留( 历史资料) 但获取`resolved: true`。 。 。
+- ** 活动**来自RAW钩听器(`setRawListener`已经看到`tool_name`页:1`tool_input`:`Edit|Write|NotebookEdit → "Editing <basename>"`,(提供便利)`Read → "Reading <basename>"`,(提供便利)`Bash → "Running <command ≤60ch>"`,(提供便利)`Grep|Glob → "Searching <pattern>"`,(提供便利)`Task → "Delegating: <description>"`,(提供便利)`WebFetch|WebSearch → "Fetching <host|query>"`,则`"Using <tool>"`。清除了 Stop/done/会话结束。
+- ** 弹壳广播时记录的文字`IPC.contextUpdate`(两者)`src/main/index.ts`和`src/server/agent-status.ts` `wireAgentStatus`) (中文(简体) ).
+- SSH切片(`filterMirrorForNodes`保留`inbox`但过滤器`events`和`nodes`页:1
+工程的节点标识 。
 
-## iOS behavior (v1)
+□ iOS 行为 (v1)
 
-- **Usages tab**: one section per paired connection that reports `usage` (header: host name +
-  relative `updatedAt`). Per account: label/email, per-limit bars — session window and weekly
-  window (scoped limits listed under). Right side: `usedPercent` + reset countdown
-  (`<24h → "16:40"` clock time, else `"3d 16h"`). Colour: severity when present, else derive
-  (≥90 red, ≥70 amber, else green). Pace line: compare `usedPercent` vs elapsed fraction of the
-  window (`windowMinutes` else 300/10080 by kind) → "5h usage pace slower/faster".
-- **Agents tab (feed)**: merged events across connections, newest first; unresolved
-  approval/question cards on top, `done`/resolved under **Archived** (collapsible). Cards show
-  the node's `contextPercent` ring when known, activity line for working nodes, agent chip +
-  relative time. Working sessions with an `activity` string render as live cards even with no
-  event yet.
-- **Quick approve (claude only, v1)**: approval cards for `agentId == 'claude'` get
-  **Approve** / **Deny** buttons: Approve sends the single key `1`, Deny sends `Escape`, to the
-  node's tmux session (`nt-<nodeId>`) over the connection's existing command channel
-  (`tmux send-keys` on the host's nodeterm socket). Before sending, re-read the status file and
-  only send when the node is still `blocked`; otherwise show "already handled". Non-claude
-  approvals fall back to **Open session**.
-- Read/unread + archive state are phone-local (as designed); `resolved` from the host only
-  moves cards out of the actionable list.
-- Live Activities / Dynamic Island / APNs: **out of scope for v1** (still "coming soon").
+- ** 用户标签**:每对连接一节,报告`usage`(标题:主机名称+)
+相对`updatedAt`) (中文(简体) ). 每个账户:标签/电子邮件、每个限制栏-会话窗口和每周
+窗口(下面列出范围限制)。 右边:`usedPercent`+ 重设倒计时
+(单位:千美元)`<24h → "16:40"`时钟时间,否则`"3d 16h"`) (中文(简体) ). 颜色: 存在时的重度, 其他来源
+(≥90红,≥70琥珀,另作绿). 派斯行: 比较`usedPercent`超过
+窗口 (`windowMinutes`其他300/10080按种类计算) →"在联合国主持下,使用速度慢/快".
+- ** 代理标签(feed)**:跨连接合并事件,最先更新;未解决
+上面是批准/问卡,`done`/溶于**Archived**(可缩合)。 卡片显示
+节点`contextPercent`当确实是已知时,工作节点的活动线,代理芯片+
+相对时间。 工作会议`activity`字符串渲染为活牌, 即使没有
+事件还没有结束。
+- 快速批准(仅声明,v1)**:批准卡`agentId == 'claude'`有助于实现
+** 证明** / ** Deny ** 按钮: 批准发送单键`1`,拒绝发送`Escape`,改为
+节点 tmux 会话( T)`nt-<nodeId>`书面材料
+(单位:千美元)`tmux send-keys`在主机节点套接字上)。 发送前, 重新读取状态文件和
+只当节点还在时发送`blocked`;否则显示"已处理". 非克劳德
+核准时间可追溯到**开幕会议**。
+- 读/不读+存档状态为电话本地化(按设计);`resolved`只从主机
+从可操作列表中移出牌。
+- 现场活动/动态岛/APNs:** 超出v1的范围**(仍然"即将到来").
