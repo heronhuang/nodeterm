@@ -14,9 +14,16 @@ name: Windows package smoke
 # an unsigned auto-update is a trust downgrade, and this smoke build (`dist:win`) never polls.
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build (branch, tag, or SHA)
+        required: false
+        default: cursor/i18n-zh-default-v1-8544
 
 permissions:
   contents: read
+
+# Upload only — never publishes to the update feed or creates a GitHub Release.
 
 jobs:
   package-win:
