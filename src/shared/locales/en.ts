@@ -261,6 +261,53 @@ export const enMessages = {
     allowAndCheck: 'Allow and check',
     upgradeCta: 'Unlimited with Pro — $10/mo'
   },
+  integrationConsent: {
+    prompt: {
+      title: 'Integrate nodeterm with your agent CLIs?',
+      writes:
+        'nodeterm adds a status hook to each agent’s own settings and installs two small skills ' +
+        '(canvas control, reading linked nodes) in its skills folder. Nothing is added to your ' +
+        'AGENTS.md / GEMINI.md, and turning an agent off removes exactly what nodeterm added.',
+      unavailable:
+        'Terminals always work. Without an integration, that agent has no running / needs-you status badges, unread dots and completion notifications; no session names, the context meter and subagent cards; no canvas control (agents opening and organizing nodes) and reading linked nodes.',
+      enableAll: 'Enable all',
+      choose: 'Choose…',
+      notNow: 'Not now'
+    },
+    grandfather: {
+      title: 'Agent integrations are now a choice',
+      body:
+        'They stay on for every agent, as before. You can turn any agent (or any SSH host) off in Settings → Agents — nodeterm then removes exactly what it added.',
+      review: 'Review'
+    },
+    host: {
+      title: 'Integrate with the agents on {hostKey}?',
+      bodyPrefix:
+        'nodeterm writes the same hooks and skills into your agent config on that host. Nothing is installed there until you say.',
+      allow: 'Allow on this host',
+      decline: 'Not on this host'
+    },
+    choice: {
+      installed: 'Installed',
+      notInstalled: 'Not installed',
+      notSetUp: 'Not set up yet'
+    },
+    actions: {
+      install: 'Install',
+      remove: 'Remove',
+      dontInstall: 'Don’t install',
+      installAria: 'Install the {label} integration',
+      removeAria: 'Remove the {label} integration and what nodeterm added',
+      dontInstallAria: "Don't install the {label} integration"
+    },
+    settings: {
+      serverVetoed:
+        'This server was started with agent installs disabled, so nothing is written regardless of these choices.',
+      onSshHosts: 'On SSH hosts',
+      retainedIntro:
+        'Kept because you changed them since nodeterm wrote them (remove by hand if you no longer want them):'
+    }
+  },
   announcement: {
     learnMore: 'Learn more'
   },
