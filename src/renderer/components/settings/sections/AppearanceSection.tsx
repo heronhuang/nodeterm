@@ -148,11 +148,23 @@ function withShown(hidden: readonly string[], id: string, shown: boolean): strin
   return next
 }
 
+function localizedHideableLabel(
+  row: HideableRow,
+  kind: 'menu' | 'header',
+  t: (key: string, params?: Record<string, string | number | undefined>) => string
+): string {
+  const prefix = kind === 'menu' ? 'settings.appearance.hideableMenu.' : 'settings.appearance.hideableHeader.'
+  const key = `${prefix}${row.id}`
+  const localized = t(key)
+  return localized !== key ? localized : row.label
+}
+
 /** One switch per hideable row, checked when the row is visible. */
 function VisibilityToggles({
   rows,
   hidden,
   where,
+  kind,
   onChange
 }: {
   rows: readonly HideableRow[]
@@ -160,24 +172,28 @@ function VisibilityToggles({
   /** Completes the aria-label ("Show Duplicate in the node menu") — the label alone is ambiguous
    *  once both lists are on screen and a screen reader reads them out of context. */
   where: string
+  kind: 'menu' | 'header'
   onChange: (next: string[]) => void
 }): React.JSX.Element {
   const { t } = useI18n()
   return (
     <div className="mt-3 space-y-3 border-l border-border pl-4">
-      {rows.map((row) => (
-        <FieldRow
-          key={row.id}
-          label={row.label}
-          control={
-            <Switch
-              checked={!isHidden(row.id, hidden)}
-              onChange={(shown) => onChange(withShown(hidden, row.id, shown))}
-              ariaLabel={t('settings.appearance.showVisibilityAria', { label: row.label, where })}
-            />
-          }
-        />
-      ))}
+      {rows.map((row) => {
+        const label = localizedHideableLabel(row, kind, t)
+        return (
+          <FieldRow
+            key={row.id}
+            label={label}
+            control={
+              <Switch
+                checked={!isHidden(row.id, hidden)}
+                onChange={(shown) => onChange(withShown(hidden, row.id, shown))}
+                ariaLabel={t('settings.appearance.showVisibilityAria', { label, where })}
+              />
+            }
+          />
+        )
+      })}
     </div>
   )
 }
@@ -719,6 +735,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
             rows={HIDEABLE_MENU_ITEMS}
             hidden={hiddenNodeMenuItems}
             where={t('settings.appearance.menuItemsVisibilityWhere')}
+            kind="menu"
             onChange={(next) => update({ hiddenNodeMenuItems: next })}
           />
         </div>
@@ -733,6 +750,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
             rows={HIDEABLE_HEADER_BUTTONS}
             hidden={hiddenHeaderButtons}
             where={t('settings.appearance.headerButtonsVisibilityWhere')}
+            kind="header"
             onChange={(next) => update({ hiddenHeaderButtons: next })}
           />
         </div>

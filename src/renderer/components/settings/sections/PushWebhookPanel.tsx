@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { Button } from '@renderer/ui/Button'
 import { ConfirmDialog } from '../../ConfirmDialog'
 import {
@@ -51,6 +52,7 @@ function formatWhen(iso: string | null): string {
  * or logs (the backend keeps only its hash, and there is no way to show it again: rotate instead).
  */
 export function PushWebhookPanel(): React.JSX.Element {
+  const { t } = useI18n()
   const api = window.nodeTerminal.pairing
   const cached = lastStatus && Date.now() - lastStatus.at < STATUS_REUSE_MS ? lastStatus.result : null
   const [loading, setLoading] = useState(cached === null)
@@ -134,12 +136,12 @@ export function PushWebhookPanel(): React.JSX.Element {
 
   return (
     <div className="space-y-3">
-      <h4 className="text-[13px] font-medium text-text">Push webhook</h4>
+      <h4 className="text-[13px] font-medium text-text">{t('settings.phone.rows.webhook.title')}</h4>
       <p className="text-sm text-muted">
-        Let a script, a CI job or a long build ring your phone when it finishes. It sends a plain
-        text notification to the phones paired with this machine, marked as coming from a webhook —
-        not from an agent. Title up to {PUSH_WEBHOOK_TITLE_MAX} characters, body up to{' '}
-        {PUSH_WEBHOOK_BODY_MAX}; links are not opened.
+        {t('settings.phone.pushWebhookDescription', {
+          titleMax: PUSH_WEBHOOK_TITLE_MAX,
+          bodyMax: PUSH_WEBHOOK_BODY_MAX
+        })}
       </p>
 
       {loading ? <p className="text-sm text-muted">Checking…</p> : null}
@@ -196,10 +198,12 @@ export function PushWebhookPanel(): React.JSX.Element {
       {error ? (
         <div className="space-y-2">
           <p className="text-sm" style={{ color: 'var(--warn)' }}>
-            {pushWebhookErrorText(error)}
+            {error === 'no-paired-phone'
+              ? t('settings.phone.pairPhoneForWebhook')
+              : pushWebhookErrorText(error)}
           </p>
           <Button disabled={busy} onClick={() => void refresh()}>
-            Retry
+            {t('settings.phone.retry')}
           </Button>
         </div>
       ) : null}

@@ -108,21 +108,19 @@ export function RemoteSection({
     >
       <SearchableRow {...rows.allow}>
         <div className="space-y-3">
-          <h4 className="text-[13px] font-medium text-text">Allow remote access</h4>
+          <h4 className="text-[13px] font-medium text-text">{rows.allow.title}</h4>
           {isPremium ? (
             hostOffer ? (
               <div className="space-y-2">
                 <p className="text-sm text-muted">
                   {sharedName ? (
-                    <>
-                      Sharing <strong className="text-text">{sharedName}</strong>.{' '}
-                    </>
+                    <span>{t('settings.remote.sharingProject', { name: sharedName })} </span>
                   ) : null}
-                  {relayShareGrantCopy(sharedName || null, thisMachine())} Share this pairing code
-                  with the other device (single use):
+                  {relayShareGrantCopy(sharedName || null, thisMachine())}{' '}
+                  {t('settings.remote.sharePairingCode')}
                 </p>
                 <FieldRow
-                  label="Pairing code"
+                  label={t('settings.remote.pairingCode')}
                   control={
                     <Input
                       className="w-72"
@@ -133,15 +131,15 @@ export function RemoteSection({
                   }
                 />
                 <div className="flex gap-2">
-                  <CopyButton text={hostOffer} label="Copy code" />
-                  <Button onClick={() => void stopHosting()}>Stop sharing</Button>
+                  <CopyButton text={hostOffer} label={t('settings.remote.copyCode')} />
+                  <Button onClick={() => void stopHosting()}>{t('settings.remote.stopSharing')}</Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-2">
                 {shareOptions.length > 1 ? (
                   <FieldRow
-                    label="Project to share"
+                    label={t('settings.remote.projectToShare')}
                     control={
                       <Select
                         className="w-72"
@@ -150,7 +148,9 @@ export function RemoteSection({
                       >
                         {shareOptions.map((o) => (
                           <option key={o.id} value={o.id} disabled={!!o.refusal}>
-                            {o.refusal ? `${o.name} (cannot be shared)` : o.name}
+                            {o.refusal
+                              ? t('settings.remote.projectCannotShare', { name: o.name })
+                              : o.name}
                           </option>
                         ))}
                       </Select>
@@ -159,35 +159,30 @@ export function RemoteSection({
                 ) : null}
                 <p className="text-sm text-muted">
                   {sharedName && shareOptions.length <= 1 ? (
-                    <>
-                      Sharing <strong className="text-text">{sharedName}</strong>.{' '}
-                    </>
+                    <span>{t('settings.remote.sharingProject', { name: sharedName })} </span>
                   ) : null}
                   {relayShareGrantCopy(sharedName || null, thisMachine())}
                 </p>
                 {shareRefusal ? <p className="text-sm text-danger">{shareRefusal}</p> : null}
                 <Button disabled={hostBusy || !!shareRefusal} onClick={() => void startHosting()}>
-                  {hostBusy ? 'Starting…' : 'Allow remote access'}
+                  {hostBusy ? t('settings.remote.starting') : rows.allow.title}
                 </Button>
               </div>
             )
           ) : (
-            <p className="text-sm text-muted">
-              Hosting this machine requires nodeterm Pro — upgrade above. Connecting to a host you
-              were given a code for is free.
-            </p>
+            <p className="text-sm text-muted">{t('settings.remote.hostingRequiresPro')}</p>
           )}
         </div>
       </SearchableRow>
       <SearchableRow {...rows.connect}>
         <div className="mt-4 space-y-3">
-          <h4 className="text-[13px] font-medium text-text">Connect to a host</h4>
+          <h4 className="text-[13px] font-medium text-text">{rows.connect.title}</h4>
           <FieldRow
-            label="Pairing code"
+            label={t('settings.remote.pairingCode')}
             control={
               <Input
                 className="w-72"
-                placeholder="paste the host's code"
+                placeholder={t('settings.remote.pasteHostCode')}
                 value={clientCode}
                 onChange={(e) => setClientCode(e.target.value)}
               />
@@ -196,10 +191,10 @@ export function RemoteSection({
           <Button disabled={connecting || !clientCode.trim()} onClick={() => void connectToHost()}>
             {connecting ? (
               <>
-                <span className="ui-spinner" aria-hidden /> Connecting…
+                <span className="ui-spinner" aria-hidden /> {t('settings.remote.connecting')}
               </>
             ) : (
-              'Connect'
+              t('settings.remote.connect')
             )}
           </Button>
           {remoteError ? (

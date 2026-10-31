@@ -471,15 +471,17 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
     <SettingsSection
       id="agents"
       title={t('settings.agents.title')}
-      description={agentChip
-        ? `Choose which agents the Add menus show and the default (${agentChip}), and whether nodeterm installs its hooks and skills into each agent.`
-        : 'Choose which agents the Add menus show and the default, and whether nodeterm installs its hooks and skills into each agent.'}
+      description={
+        agentChip
+          ? t('settings.agents.sectionDescriptionWithDefault', { agent: agentChip })
+          : t('settings.agents.sectionDescription')
+      }
       isActive={isActive}
       searchEntries={entries}
     >
       <SearchableRow {...rows.agents}>
         <FieldRow
-          label="Show in Add menus"
+          label={t('settings.agents.rows.agents.title')}
           description={t('settings.agents.description')}
           control={null}
         />
@@ -498,14 +500,14 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
                   aria-pressed={isDefault}
                   onClick={() => update(setDefaultAgent(settings, row.id))}
                 >
-                  {isDefault ? 'Default' : 'Set default'}
+                  {isDefault ? t('settings.agents.defaultAgentBadge') : t('settings.agents.setDefaultAgent')}
                 </Button>
                 <SegmentedPill<'enabled' | 'disabled'>
                   value={enabled ? 'enabled' : 'disabled'}
-                  ariaLabel={`Show ${row.label} in the Add menus`}
+                  ariaLabel={t('settings.agents.showAgentInMenusAria', { agent: row.label })}
                   options={[
-                    { value: 'enabled', label: 'Shown' },
-                    { value: 'disabled', label: 'Hidden' }
+                    { value: 'enabled', label: t('settings.agents.shownInMenus') },
+                    { value: 'disabled', label: t('settings.agents.hiddenInMenus') }
                   ]}
                   onChange={(v) => update(setAgentEnabled(settings, row.id, v === 'enabled'))}
                 />
@@ -516,26 +518,16 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
       </SearchableRow>
       <SearchableRow {...rows.integrations}>
         <FieldRow
-          label="Hooks & skills (integrations)"
-          description={
-            'Files nodeterm installs into each agent CLI’s own config: a status hook (RUNNING / NEEDS YOU badges, notifications) ' +
-            'and two skills (canvas control, reading linked nodes). Remove deletes exactly what nodeterm added. ' +
-            'Without it the agent still runs in a terminal, just without those features. This is separate from the menu list above.'
-          }
+          label={t('settings.agents.rows.integrations.title')}
+          description={t('settings.agents.integrationsDescription')}
           control={null}
         />
         <IntegrationSettings />
       </SearchableRow>
       <SearchableRow {...rows.launchCommands}>
         <FieldRow
-          label="Launch commands"
-          description={
-            'Launch an agent with your own command — e.g. a wrapper script that switches accounts or sets env vars. ' +
-            'Used everywhere the agent is launched (new sessions, resumes, restarts), with flags like --resume appended after it, ' +
-            'so the command must pass its arguments through — a shell script should end with `exec claude "$@"`. ' +
-            'A flag your command already spells is left alone: write the permission mode here and it wins over the start-up mode below. ' +
-            'Leave empty for the default. SSH projects run the same command on the remote host.'
-          }
+          label={t('settings.agents.rows.launchCommands.title')}
+          description={t('settings.agents.launchCommandsDescription')}
           control={null}
         />
         <div className="space-y-2">
@@ -573,35 +565,35 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
       </SearchableRow>
       <SearchableRow {...rows.vanillaLaunch}>
         <FieldRow
-          label="Launch mode"
-          description="The default provider behavior for a fresh canvas agent session. “Gateway (CLI default)” injects the model gateway but lets the CLI pick its own default model. “Gateway (default model)” additionally launches on the default model chosen in Settings → Model gateway. “Subscription” strips the gateway + inherited provider env so the agent runs against its OWN provider (Claude’s subscription, Copilot’s GitHub routing) — the global counterpart of the per-node “Restart on subscription” action. The managed-account config dir is kept, so account isolation survives."
+          label={t('settings.agents.rows.vanillaLaunch.title')}
+          description={t('settings.agents.launchModeDescription')}
           control={
             <Select
-              aria-label="Agent launch mode"
+              aria-label={t('settings.agents.launchModeAria')}
               value={settings.agentLaunchMode}
               onChange={(e) =>
                 update({ agentLaunchMode: e.target.value as AgentLaunchMode })
               }
             >
-              <option value="gateway">Gateway (CLI default model)</option>
+              <option value="gateway">{t('settings.agents.launchGateway')}</option>
               <option value="gateway-model">
                 {settings.modelGatewayDefaultModel
-                  ? `Gateway (default model: ${settings.modelGatewayDefaultModel})`
-                  : 'Gateway (default model — none configured)'}
+                  ? t('settings.agents.launchGatewayModel', { model: settings.modelGatewayDefaultModel })
+                  : t('settings.agents.launchGatewayUnconfigured')}
               </option>
-              <option value="subscription">Subscription (own provider credentials)</option>
+              <option value="subscription">{t('settings.agents.launchSubscription')}</option>
             </Select>
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.permissionMode}>
         <FieldRow
-          label="Permission mode"
+          label={t('settings.agents.rows.permissionMode.title')}
           note={autoNote}
           description={permissionModeDescription()}
           control={
             <Select
-              aria-label="Agent permission mode"
+              aria-label={t('settings.agents.rows.permissionMode.title')}
               value={settings.claudePermissionMode}
               onChange={(e) =>
                 update({ claudePermissionMode: e.target.value as AgentPermissionMode })
@@ -620,7 +612,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
       </SearchableRow>
       <SearchableRow {...rows.hookReplyApprovals}>
         <FieldRow
-          label="One-click approvals"
+          label={t('settings.agents.rows.hookReplyApprovals.title')}
           description="Phone/canvas Approve & Deny answer Claude's permission hook directly; the interactive prompt appears after 45s if unanswered. Claude terminal sessions only."
           control={
             <Switch
@@ -633,7 +625,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
       </SearchableRow>
       <SearchableRow {...rows.autoHideFinishedSubagentCards}>
         <FieldRow
-          label="Hide finished subagent cards"
+          label={t('settings.agents.rows.autoHideFinishedSubagentCards.title')}
           description="Remove a subagent's card from the canvas as soon as that subagent finishes, instead of keeping it until the agent's next turn. Cards for subagents that are still running are never removed."
           control={
             <Switch

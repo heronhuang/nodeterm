@@ -189,7 +189,7 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
     >
       <SearchableRow {...rows.notify}>
         <FieldRow
-          label="Notify when a turn finishes in the background"
+          label={rows.notify.title}
           control={
             <Switch
               checked={notifyOnClaudeDone}
@@ -226,8 +226,8 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
       </SearchableRow>
       <SearchableRow {...rows.sound}>
         <FieldRow
-          label="Play a sound when a turn finishes or needs you"
-          description="A short retro chirp for a finished turn and a crackly one when a session needs you — or your own sound file for either. Plays whether or not the window is focused, so you catch a finish while looking at another node."
+          label={rows.sound.title}
+          description={t('settings.notifications.soundDescription')}
           control={
             <Switch
               checked={soundEffects}
@@ -249,7 +249,7 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
           aria-disabled={!soundEffects}
         >
           <FieldRow
-            label="Volume"
+            label={t('settings.notifications.volumeLabel')}
             control={
               <div className="flex items-center gap-3">
                 <input
@@ -275,8 +275,8 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
       </SearchableRow>
       <SearchableRow {...rows.mobilePush}>
         <FieldRow
-          label="Send push notifications to your paired phone"
-          description="Fires when an agent needs approval, asks a question, or finishes — only if you've paired a phone."
+          label={rows.mobilePush.title}
+          description={t('settings.notifications.mobilePushDescription')}
           control={
             <Switch
               checked={mobilePushEnabled}
@@ -294,7 +294,7 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
           aria-disabled={!mobilePushEnabled}
         >
           <FieldRow
-            label="Needs you (approvals & questions)"
+            label={t('settings.notifications.pushNeedsYou')}
             control={
               <Switch
                 checked={mobilePushNeedsYou}
@@ -304,7 +304,7 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
             }
           />
           <FieldRow
-            label="Task completed"
+            label={t('settings.notifications.pushDone')}
             control={
               <Switch
                 checked={mobilePushDone}
@@ -314,8 +314,8 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
             }
           />
           <FieldRow
-            label="Live updates on phone"
-            description="Keep a live status on your phone's lock screen updated as a session works, needs you, or finishes."
+            label={t('settings.notifications.liveUpdatesOnPhone')}
+            description={t('settings.notifications.liveUpdatesDescription')}
             control={
               <Switch
                 checked={mobileLiveActivities}
@@ -325,8 +325,8 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
             }
           />
           <FieldRow
-            label="Hold phone alerts while you're at this computer"
-            description="Defer approval, question, and completed alerts while you're active here, then send them the moment you go idle or lock the screen. Live updates are never held."
+            label={t('settings.notifications.holdPhoneAlerts')}
+            description={t('settings.notifications.holdPhoneAlertsDescription')}
             control={
               <Switch
                 checked={mobilePushPresenceAware}

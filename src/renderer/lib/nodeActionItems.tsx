@@ -880,7 +880,7 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
           return [
             {
               type: 'submenu',
-              label: 'Switch Claude account',
+              label: t('nodeActions.switchClaudeAccount'),
               icon: <IconSwitch />,
               children: [
                 row(undefined, systemLabel),

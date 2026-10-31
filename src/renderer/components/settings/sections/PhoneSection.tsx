@@ -16,7 +16,7 @@ import {
   relayGateMessage,
   relayOnlyExplanation
 } from '@shared/pairing-gate'
-import { thisMachine } from '../../../lib/machineName'
+import { localizedThisMachine } from '../../../lib/localizedMachine'
 import { isBrowserRuntime } from '@renderer/bridge/runtime'
 import { PushWebhookPanel } from './PushWebhookPanel'
 
@@ -203,18 +203,15 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h4 className="text-[13px] font-medium text-text">Remote access from your phone</h4>
+              <h4 className="text-[13px] font-medium text-text">{t('settings.phone.remoteAccessTitle')}</h4>
               <p className="mt-1 text-sm text-muted">
-                Reach {thisMachine()} from anywhere — not just your local network — end-to-end
-                encrypted
-                over the relay. Your paired phone connects through the relay; the connection is
-                verified with a code the first time.
+                {t('settings.phone.remoteAccessDescription', { machine: localizedThisMachine(t) })}
               </p>
             </div>
             <Switch
               checked={phoneAccessEnabled}
               onChange={togglePhoneAccess}
-              ariaLabel="Remote access from your phone"
+              ariaLabel={t('settings.phone.remoteAccessAria')}
             />
           </div>
         </div>
@@ -222,13 +219,10 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
 
       <SearchableRow {...rows.pair}>
         <div className="space-y-4">
-          <h4 className="text-[13px] font-medium text-text">Pair phone</h4>
+          <h4 className="text-[13px] font-medium text-text">{t('settings.phone.pairHeading')}</h4>
+          <p className="text-sm text-muted">{t('settings.phone.pairDescription')}</p>
           <p className="text-sm text-muted">
-            Pair the nodeterm mobile app: scan this QR with your phone. Your phone generates its own
-            key on-device — nothing secret leaves this machine except a single-use pairing token.
-          </p>
-          <p className="text-sm text-muted">
-            Don&apos;t have the app yet?{' '}
+            {t('settings.phone.noAppYet')}{' '}
             {mobileStoreLinks().map((store, i) => (
               <span key={store.id}>
                 {i > 0 ? ' · ' : null}
@@ -253,7 +247,7 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
                 </p>
               ) : null}
               <Button variant="primary" disabled={busy} onClick={() => void start()}>
-                {busy ? 'Starting…' : 'Start pairing'}
+                {busy ? t('settings.phone.starting') : t('settings.phone.startPairing')}
               </Button>
             </div>
           ) : null}
@@ -387,9 +381,9 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
 
       <SearchableRow {...rows.devices}>
         <div className="space-y-3">
-          <h4 className="text-[13px] font-medium text-text">Paired devices</h4>
+          <h4 className="text-[13px] font-medium text-text">{t('settings.phone.pairedDevicesHeading')}</h4>
           {devices.length === 0 ? (
-            <p className="text-sm text-muted">No devices paired yet</p>
+            <p className="text-sm text-muted">{t('settings.phone.noDevicesPaired')}</p>
           ) : (
             <ul className="space-y-2">
               {devices.map((device) => (
@@ -401,11 +395,11 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
                     <div className="truncate text-sm font-medium text-text">{device.name}</div>
                     {device.pairedAt ? (
                       <div className="text-[12px] text-muted">
-                        Paired {formatPairedAt(device.pairedAt)}
+                        {t('settings.phone.pairedAt', { date: formatPairedAt(device.pairedAt) })}
                       </div>
                     ) : null}
                   </div>
-                  <Button onClick={() => setPendingRevoke(device)}>Revoke</Button>
+                  <Button onClick={() => setPendingRevoke(device)}>{t('settings.phone.revoke')}</Button>
                 </li>
               ))}
             </ul>
@@ -432,7 +426,7 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           // Both legs, and the timing of the one that is not instant. "If" rather than a flat
           // claim: a free-tier desktop has no Pro of ours on that phone to take back, and this
           // dialog cannot tell — the server leg reports that only after the fact ('skipped').
-          message={`Revoke “${pendingRevoke.name}”? Its key is removed from this machine and it will no longer be able to connect. If its Pro comes from ${thisMachine()}’s license, that is revoked too — the phone loses Pro within 7 days.`}
+          message={`Revoke “${pendingRevoke.name}”? Its key is removed from this machine and it will no longer be able to connect. If its Pro comes from ${localizedThisMachine(t)}’s license, that is revoked too — the phone loses Pro within 7 days.`}
           confirmLabel="Revoke"
           onConfirm={() => void revokeDevice(pendingRevoke)}
           onCancel={() => setPendingRevoke(null)}

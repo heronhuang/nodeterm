@@ -190,7 +190,7 @@ export function SpeechSection({
     } catch (err) {
       setRowError((e) => ({
         ...e,
-        [m.id]: err instanceof Error ? err.message : 'Download failed.'
+        [m.id]: err instanceof Error ? err.message : t('settings.speech.downloadFailed')
       }))
     } finally {
       setBusy((b) => ({ ...b, [m.id]: false }))
@@ -213,7 +213,10 @@ export function SpeechSection({
       const adopt = modelAfterDelete(fresh, live.model)
       if (adopt) update({ speech: { ...live, model: adopt } })
     } catch (err) {
-      setRowError((e) => ({ ...e, [m.id]: err instanceof Error ? err.message : 'Delete failed.' }))
+      setRowError((e) => ({
+        ...e,
+        [m.id]: err instanceof Error ? err.message : t('settings.speech.deleteFailed')
+      }))
     } finally {
       setBusy((b) => ({ ...b, [m.id]: false }))
     }
@@ -229,15 +232,15 @@ export function SpeechSection({
     >
       <SearchableRow {...rows.engine}>
         <FieldRow
-          label="Engine"
-          description="Local Whisper transcribes on-device. Cloud requires the nodeterm backend · not available yet."
+          label={rows.engine.title}
+          description={t('settings.speech.engineDescription')}
           control={
             <SegmentedPill<'whisper' | 'cloud'>
               value={settings.speech.engine}
-              ariaLabel="Speech engine"
+              ariaLabel={t('settings.speech.engineAria')}
               options={[
-                { value: 'whisper', label: 'Local Whisper' },
-                { value: 'cloud', label: 'Cloud' }
+                { value: 'whisper', label: t('settings.speech.engineLocal') },
+                { value: 'cloud', label: t('settings.speech.engineCloud') }
               ]}
               onChange={setEngine}
             />
@@ -247,18 +250,22 @@ export function SpeechSection({
 
       <SearchableRow {...rows.shortcut}>
         <FieldRow
-          label="Shortcut"
-          description="Dictation's shortcut is managed with every other keyboard shortcut."
+          label={rows.shortcut.title}
+          description={t('settings.speech.shortcutDescription')}
           note={
             dictationChord === ''
-              ? 'Currently disabled.'
+              ? t('settings.speech.shortcutDisabled')
               : isHoldChord(dictationChord)
-                ? `Currently hold-to-talk: hold ${formatShortcut(dictationChord, isMac)}.`
-                : `Currently toggle: press ${formatShortcut(dictationChord, isMac)}.`
+                ? t('settings.speech.shortcutHoldToTalk', {
+                    chord: formatShortcut(dictationChord, isMac)
+                  })
+                : t('settings.speech.shortcutToggle', {
+                    chord: formatShortcut(dictationChord, isMac)
+                  })
           }
           control={
             <Button variant="ghost" onClick={() => onNavigate('shortcuts')}>
-              Open Keyboard Shortcuts
+              {t('settings.speech.openKeyboardShortcuts')}
             </Button>
           }
         />
@@ -266,9 +273,9 @@ export function SpeechSection({
 
       <SearchableRow {...rows.models}>
         <div className="space-y-3">
-          <h4 className="text-[13px] font-medium text-text">Whisper models</h4>
+          <h4 className="text-[13px] font-medium text-text">{t('settings.speech.modelsHeading')}</h4>
           {models.length === 0 ? (
-            <p className="text-[12px] text-muted">Loading models…</p>
+            <p className="text-[12px] text-muted">{t('settings.speech.modelsLoading')}</p>
           ) : (
             <div className="space-y-2">
               {/* The honest off switch (issue #143): dictation is optional, and None is a real row
@@ -283,11 +290,8 @@ export function SpeechSection({
                     onChange={() => update({ speech: { ...settings.speech, model: SPEECH_MODEL_NONE } })}
                   />
                   <div className="min-w-0">
-                    <span className="text-[13px] font-medium text-text">None</span>
-                    <p className="text-[12px] text-muted">
-                      Dictation off — the shortcut and the Dock mic explain instead of recording.
-                      Downloading a model below turns it on.
-                    </p>
+                    <span className="text-[13px] font-medium text-text">{t('settings.speech.modelNone')}</span>
+                    <p className="text-[12px] text-muted">{t('settings.speech.modelNoneDescription')}</p>
                   </div>
                 </label>
               </div>
@@ -320,7 +324,7 @@ export function SpeechSection({
                                 : 'rounded-full bg-fill-weak px-2 py-0.5 text-[11px] font-medium text-muted'
                             }
                           >
-                            {m.pro ? 'PRO' : 'FREE'}
+                            {m.pro ? t('settings.speech.proBadge') : t('settings.speech.freeBadge')}
                           </span>
                         </div>
                         <p className="text-[12px] text-muted">
@@ -341,13 +345,17 @@ export function SpeechSection({
                           disabled={busy[m.id]}
                           onClick={() => void deleteModel(m)}
                         >
-                          Delete
+                          {t('settings.speech.delete')}
                         </Button>
                       ) : locked ? (
-                        <Button onClick={() => onNavigate('license')}>Unlock with Pro</Button>
+                        <Button onClick={() => onNavigate('license')}>
+                          {t('settings.speech.unlockWithPro')}
+                        </Button>
                       ) : (
                         <Button disabled={busy[m.id]} onClick={() => void downloadModel(m)}>
-                          {downloading ? `${pct}%` : 'Download'}
+                          {downloading
+                            ? t('settings.speech.downloading', { pct: String(pct) })
+                            : t('settings.speech.download')}
                         </Button>
                       )}
                     </div>
@@ -361,7 +369,7 @@ export function SpeechSection({
 
       <SearchableRow {...rows.language}>
         <FieldRow
-          label="Language"
+          label={t('settings.speech.languageLabel')}
           // The copy names what is SELECTED, not just what the field is for: with a searchable
           // menu of 100 languages the trigger is the only other place that says so.
           description={speechLanguageSummary(settings.speech.language)}

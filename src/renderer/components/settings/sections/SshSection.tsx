@@ -309,10 +309,10 @@ export function SshSection({ isActive }: { isActive: boolean }): React.JSX.Eleme
                   })
                 }
               >
-                Add server
+                {t('settings.ssh.addServer')}
               </Button>
               <Button variant="ghost" onClick={() => void importFromConfig()}>
-                Import from ~/.ssh/config
+                {t('settings.ssh.importSshConfig')}
               </Button>
               {importMsg && <span className="text-xs text-muted">{importMsg}</span>}
             </div>
@@ -323,13 +323,13 @@ export function SshSection({ isActive }: { isActive: boolean }): React.JSX.Eleme
       {showsWindowsAgentRow() ? (
         <SearchableRow {...rows.windowsAgent}>
           <FieldRow
-            label="Keep unlocked keys in the Windows ssh-agent"
-            description="Off by default. On, a key you unlock with its passphrase for an SSH project is also added to the Windows OpenSSH Authentication Agent service (when it is running), so later connections — and your own ssh — stop asking. Windows stores the key, encrypted for your account, until you remove it (ssh-add -d, or ssh-add -D for all); it stays after nodeterm quits and after a restart. Hosts whose ~/.ssh/config says AddKeysToAgent yes get this without the switch."
+            label={rows.windowsAgent.title}
+            description={t('settings.ssh.windowsAgentDescription')}
             control={
               <Switch
                 checked={agentAddKeys === true}
                 onChange={(v) => void updateSettings({ windowsSshAgentAddKeys: v })}
-                ariaLabel="Keep unlocked keys in the Windows ssh-agent"
+                ariaLabel={rows.windowsAgent.title}
               />
             }
           />

@@ -53,11 +53,11 @@ type CredentialMode = 'environment' | 'stored'
 function credentialMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   if (message.includes('invalid-api-key') || message.includes('invalid-token')) {
-    return 'Enter a non-empty API key without line breaks.'
+    return 'settings.modelGateway.invalidKey'
   }
-  if (message.includes('keyring-locked')) return 'Unlock the OS keyring and try again.'
-  if (message.includes('unavailable')) return 'Secret storage is unavailable in this session.'
-  return 'The API key could not be saved. Please try again.'
+  if (message.includes('keyring-locked')) return 'settings.modelGateway.keyringLocked'
+  if (message.includes('unavailable')) return 'settings.modelGateway.unavailableStorage'
+  return 'settings.modelGateway.saveFailed'
 }
 
 export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.JSX.Element {
@@ -172,7 +172,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
       ) {
         void discover({ ...current, apiKey: MODEL_GATEWAY_SECRET_REF })
       }
-      setCredentialNotice('API key saved securely.')
+      setCredentialNotice('settings.modelGateway.keySaved')
     } catch (saveError) {
       setCredentialNotice(credentialMessage(saveError))
     } finally {
@@ -189,7 +189,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
       setLiteralKey('')
       patchGateway({ apiKey: '' })
       clearModels()
-      setCredentialNotice('Saved API key cleared.')
+      setCredentialNotice('settings.modelGateway.keyCleared')
     } catch (clearError) {
       setCredentialNotice(credentialMessage(clearError))
     } finally {
@@ -213,8 +213,8 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
     >
       <SearchableRow {...rows.endpoint}>
         <FieldRow
-          label="Gateway URL"
-          description="Enter the server root. Discovery uses the OpenAI-compatible /v1/models endpoint; agent launches use the configured provider routes."
+          label={t('settings.modelGateway.rows.endpoint.title')}
+          description={t('settings.modelGateway.endpointDescription')}
           htmlFor="model-gateway-url"
           control={
             <Input
@@ -229,11 +229,11 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
         />
         {gateway.baseUrl && !routes ? (
           <p className="mt-2 text-right text-xs text-[color:var(--warn)]">
-            Enter a valid HTTP(S) URL without embedded credentials.
+            {t('settings.modelGateway.invalidUrl')}
           </p>
         ) : routes ? (
           <div className="mt-3 space-y-1 text-right font-mono text-[11px] text-muted">
-            <div>Discovery: {routes.discovery}</div>
+            <div>{t('settings.modelGateway.discoveryLabel')} {routes.discovery}</div>
             <div>OpenAI: {routes.openai}</div>
             <div>Anthropic: {routes.anthropic}</div>
           </div>
@@ -244,16 +244,14 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
         <div className="space-y-2">
           <div className="flex items-start justify-between gap-6">
             <div>
-              <div className="text-sm font-medium text-text">Model discovery endpoint</div>
+              <div className="text-sm font-medium text-text">{t('settings.modelGateway.discoveryPathTitle')}</div>
               <p className="mt-1 max-w-xl text-[13px] text-muted">
-                Which gateway endpoint the model catalogue is read from. Only the discovery request
-                changes — agent launches keep using the OpenAI and Anthropic routes shown under the
-                Gateway URL.
+                {t('settings.modelGateway.discoveryPathDescription')}
               </p>
             </div>
             {routes ? (
               <div className="shrink-0 font-mono text-[11px] text-muted">
-                Discovery: {routes.discovery}
+                {t('settings.modelGateway.discoveryLabel')} {routes.discovery}
               </div>
             ) : null}
           </div>
@@ -268,25 +266,25 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
               gateway.discoveryPath !== '/openai/v1/models' &&
               gateway.discoveryPath !== '/anthropic/v1/models'
             return (
-              <div role="radiogroup" aria-label="Model discovery endpoint" className="space-y-2">
+              <div role="radiogroup" aria-label={t('settings.modelGateway.discoveryPathTitle')} className="space-y-2">
                 {(
                   [
                     {
                       option: '/v1/models',
                       label: '/v1/models',
-                      hint: 'OpenAI convention — the default.'
+                      hint: t('settings.modelGateway.defaultPathHint')
                     },
                     {
                       option: '/openai/v1/models',
                       label: '/openai/v1/models',
-                      hint: 'Same catalogue under the OpenAI launch-route prefix.'
+                      hint: t('settings.modelGateway.openaiPathHint')
                     },
                     {
                       option: '/anthropic/v1/models',
                       label: '/anthropic/v1/models',
-                      hint: 'Same catalogue under the Anthropic launch-route prefix.'
+                      hint: t('settings.modelGateway.anthropicPathHint')
                     },
-                    { option: 'custom', label: 'Custom path…', hint: 'Enter an exact path below.' }
+                    { option: 'custom', label: t('settings.modelGateway.customPath'), hint: t('settings.modelGateway.customPathHint') }
                   ] as const
                 ).map((opt) => {
                   // Custom is a MODE, not a stored alias value: `customMode` (this render
@@ -374,8 +372,8 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
       <SearchableRow {...rows.key}>
         <div className="space-y-3">
           <FieldRow
-            label="Credential source"
-            description="Reference an environment variable or save a literal key in protected local storage."
+            label={t('settings.modelGateway.credentialSource')}
+            description={t('settings.modelGateway.credentialDescription')}
             htmlFor="model-gateway-credential-source"
             control={
               <Select
@@ -385,19 +383,19 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
                   changeCredentialMode(event.target.value as CredentialMode)
                 }
               >
-                <option value="environment">Environment variable</option>
-                <option value="stored">Stored API key</option>
+                <option value="environment">{t('settings.modelGateway.environment')}</option>
+                <option value="stored">{t('settings.modelGateway.storedKey')}</option>
               </Select>
             }
           />
 
           {credentialMode === 'environment' ? (
             <FieldRow
-              label="Environment variable"
-              description="Enter the variable name only. settings.json stores it as ${env:VAR}; the secret itself is never saved."
+              label={t('settings.modelGateway.environment')}
+              description={t('settings.modelGateway.environmentDescription')}
               note={
                 envName && !envNameValid
-                  ? 'Use letters, numbers, and underscores; the first character cannot be a number.'
+                  ? t('settings.modelGateway.invalidEnvironment')
                   : undefined
               }
               htmlFor="model-gateway-env-name"
@@ -416,13 +414,13 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
             />
           ) : (
             <FieldRow
-              label="API key"
-              description="The key is write-only here and never appears in settings.json or restart commands."
+              label={t('settings.modelGateway.apiKey')}
+              description={t('settings.modelGateway.keyDescription')}
               note={
                 credentialStatus?.storage === 'restricted-file'
-                  ? 'Encrypted key storage is unavailable. The key is protected in a mode 0600 local file.'
+                  ? t('settings.modelGateway.restrictedStorage')
                   : credentialStatus?.storage === 'unavailable'
-                    ? 'Secret storage is unavailable in this session.'
+                    ? t('settings.modelGateway.unavailableStorage')
                     : undefined
               }
               htmlFor="model-gateway-key"
@@ -433,7 +431,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
                     className="w-56"
                     type="password"
                     autoComplete="off"
-                    placeholder={credentialStatus?.hasStoredKey ? 'API key saved' : 'API key'}
+                    placeholder={credentialStatus?.hasStoredKey ? t('settings.modelGateway.keySavedPlaceholder') : t('settings.modelGateway.apiKey')}
                     value={literalKey}
                     onChange={(event) => {
                       setLiteralKey(event.target.value)
@@ -448,14 +446,14 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
                     }
                     onClick={() => void saveLiteralKey()}
                   >
-                    Save key
+                    {t('settings.modelGateway.saveKey')}
                   </Button>
                   {credentialStatus?.hasStoredKey ? (
                     <Button
                       disabled={credentialBusy}
                       onClick={() => void clearLiteralKey()}
                     >
-                      Clear
+                      {t('settings.modelGateway.clearKey')}
                     </Button>
                   ) : null}
                 </div>
@@ -463,7 +461,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
             />
           )}
           {credentialNotice ? (
-            <p className="text-right text-xs text-muted">{credentialNotice}</p>
+            <p className="text-right text-xs text-muted">{t(credentialNotice)}</p>
           ) : null}
         </div>
       </SearchableRow>
@@ -471,13 +469,13 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
       <SearchableRow {...rows.discovery}>
         <div className="flex items-center justify-between gap-6">
           <div>
-            <div className="text-sm font-medium text-text">Available models</div>
+            <div className="text-sm font-medium text-text">{t('settings.modelGateway.rows.discovery.title')}</div>
             <p className="mt-1 text-[13px] text-muted">
               {status === 'loading'
-                ? 'Discovering models…'
+                ? t('settings.modelGateway.discoveringModels')
                 : status === 'ready'
-                  ? `${models.length} model${models.length === 1 ? '' : 's'} available.`
-                  : 'Models are also refreshed automatically when these settings change.'}
+                  ? t(models.length === 1 ? 'settings.modelGateway.modelAvailable' : 'settings.modelGateway.modelsAvailable', { count: models.length })
+                  : t('settings.modelGateway.autoRefresh')}
             </p>
             {error ? <p className="mt-1 text-xs text-[color:var(--warn)]">{error}</p> : null}
           </div>
@@ -485,7 +483,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
             disabled={!routes || !credentialReady || status === 'loading'}
             onClick={() => void discover(gateway)}
           >
-            {status === 'loading' ? 'Discovering…' : models.length ? 'Refresh' : 'Discover models'}
+            {status === 'loading' ? t('settings.modelGateway.discovering') : models.length ? t('settings.modelGateway.refresh') : t('settings.modelGateway.discoverModels')}
           </Button>
         </div>
         {models.length ? (
@@ -499,11 +497,11 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
 
       <SearchableRow {...rows.defaultModel}>
         <FieldRow
-          label="Default model"
-          description="New canvas agent sessions launch on this model when Settings → Agents → Launch mode is “Gateway (default model)”. Picked from the discovered catalogue — discover models first."
+          label={t('settings.modelGateway.rows.defaultModel.title')}
+          description={t('settings.modelGateway.defaultModelDescription')}
           control={
             <Select
-              aria-label="Default gateway model"
+              aria-label={t('settings.modelGateway.defaultModelAria')}
               value={defaultModel ?? ''}
               disabled={!models.length}
               onChange={(e) => {
@@ -514,7 +512,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
                 update({ modelGatewayDefaultModel: id || undefined })
               }}
             >
-              <option value="">(none — CLI default model)</option>
+              <option value="">{t('settings.modelGateway.noDefaultModel')}</option>
               {models.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.id}

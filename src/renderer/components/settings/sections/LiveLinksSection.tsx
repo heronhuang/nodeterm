@@ -170,12 +170,9 @@ export function LiveLinksSection({ isActive }: { isActive: boolean }): React.JSX
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-muted">
-              Share a terminal live with anyone — a teammate, a customer, a reviewer — as a link that ends
-              by itself.
-            </p>
+            <p className="text-sm text-muted">{t('settings.liveLinks.upgradePitch')}</p>
             <Button variant="primary" onClick={() => void useEntitlement.getState().upgrade('pro')}>
-              Upgrade to Pro
+              {t('common.upgradeToPro')}
             </Button>
           </div>
         )}

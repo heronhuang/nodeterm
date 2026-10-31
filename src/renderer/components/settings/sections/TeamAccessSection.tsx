@@ -8,7 +8,7 @@ import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
 import { FieldRow } from '../FieldRow'
 import { Button } from '@renderer/ui/Button'
-import { thisMachine } from '@renderer/lib/machineName'
+import { localizedThisMachine } from '@renderer/lib/localizedMachine'
 import { CopyButton } from '@renderer/ui/CopyButton'
 import { Input } from '@renderer/ui/Input'
 
@@ -99,7 +99,7 @@ export function TeamAccessSection({
     <SettingsSection
       id="team-access"
       title={t('settings.teamAccess.title')}
-      description={t('settings.teamAccess.description', { machine: thisMachine() })}
+      description={t('settings.teamAccess.description', { machine: localizedThisMachine(t) })}
       isActive={isActive}
       searchEntries={entries}
     >
@@ -134,7 +134,7 @@ export function TeamAccessSection({
             <div className="space-y-3">
               <h4 className="text-[13px] font-medium text-text">Invite a teammate</h4>
               <p className="text-sm text-muted">
-                A teammate on a seat gets full access to {thisMachine()} as you — every project,
+                A teammate on a seat gets full access to {localizedThisMachine(t)} as you — every project,
                 and commands in any folder — the same as giving them SSH access. Only invite people
                 you trust.
               </p>
@@ -200,21 +200,15 @@ export function TeamAccessSection({
           </div>
         ) : (
           <div className="space-y-3">
-            <h4 className="text-[13px] font-medium text-text">
-              Upgrade to Pro — 3 collaborator seats included
-            </h4>
+            <h4 className="text-[13px] font-medium text-text">{t('settings.teamAccess.upgradeTitle')}</h4>
             <p className="text-sm text-muted">
-              Pro comes with 3 seats to share {thisMachine()} with your team. Need more? Extra
-              seats are $5/seat/month. Each teammate connects from their own device over the
-              end-to-end encrypted relay.
+              {t('settings.teamAccess.upgradeBody1', { machine: localizedThisMachine(t) })}
             </p>
             <p className="text-sm text-muted">
-              A seat grants full access: a teammate on a seat can run commands on{' '}
-              {thisMachine()} as you, in every project — the same as giving them SSH access. Every connection is still
-              verified with a one-time pairing code you compare together.
+              {t('settings.teamAccess.upgradeBody2', { machine: localizedThisMachine(t) })}
             </p>
             <Button variant="primary" onClick={() => void ent.upgrade()}>
-              Upgrade to Pro — get 3 free seats
+              {t('settings.teamAccess.upgradeCta')}
             </Button>
           </div>
         )}

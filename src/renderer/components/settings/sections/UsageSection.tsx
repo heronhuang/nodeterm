@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from 'react'
 import { useI18n } from '@renderer/i18n/useI18n'
+import type { TranslateFn } from '@shared/i18n/types'
 import { useSettings } from '../../../state/settings'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -44,62 +45,37 @@ const ROW_DEFS = {
   }
 } as const
 
+const COOKIE_PROVIDER_IDS = ['minimax', 'opencode'] as const
+
 /** AGENT_CONFIG is keyed by builtin ids; billing-only providers fall through to the label table. */
 function labelFor(provider: string): string {
   const agentLabel = (AGENT_CONFIG as Record<string, { label?: string } | undefined>)[provider]?.label
   return providerLabel(provider, agentLabel)
 }
 
-const PROVIDER_BLURBS: Record<string, string> = {
-  claude: 'Session, weekly and per-model limits from your Claude subscription.',
-  'claude-remote':
-    "Limits for the Claude accounts on your connected SSH projects' hosts. Each read runs on the host itself over the existing connection — the credential never leaves it.",
-  codex: 'Session and weekly limits from your ChatGPT (Codex) subscription.',
-  cursor: 'Monthly included usage (total, Auto and API) from the Cursor Agent CLI sign-in.',
-  gemini: 'Per-model hourly quota from the Gemini CLI sign-in.',
-  grok: 'Weekly credits and monthly budget from the Grok CLI sign-in.',
-  kimi: 'Session and weekly quota from the Kimi Code sign-in.',
-  minimax: 'Per-model session quota — needs the cookie below.',
-  opencode: 'Session, weekly and monthly usage — needs the cookie below.'
+function usageProviderDisplayName(provider: string, t: TranslateFn): string {
+  const key = `settings.usage.providers.${provider}.displayName`
+  const localized = t(key)
+  if (localized !== key) return localized
+  return labelFor(provider)
 }
 
-/**
- * Providers that publish no CLI credential — their quota lives behind a web console session, so
- * the user pastes a cookie. Each row is write-only: it can store or clear a value and can see
- * WHETHER one is stored, but the secret is never read back into the UI.
- */
-const COOKIE_PROVIDER_ROWS = [
-  {
-    id: 'minimax',
-    label: 'MiniMax',
-    description:
-      "MiniMax exposes no CLI credential, so its quota is read with your console session. Open platform.minimax.io/console/usage, copy the request's Cookie header from DevTools, and paste it here.",
-    placeholder: 'Cookie: _token=…'
-  },
-  {
-    id: 'opencode',
-    label: 'opencode',
-    description:
-      'opencode publishes no usage API, so the numbers are read from your dashboard page. Open opencode.ai, copy the Cookie header from DevTools, and paste it here. Because this reads a page rather than an API, it can stop working when opencode changes their site — it will report an error rather than silently showing nothing.',
-    placeholder: 'auth=…'
-  }
-] as const
+function usageProviderBlurb(provider: string, t: TranslateFn): string {
+  const key = `settings.usage.providers.${provider}.blurb`
+  const localized = t(key)
+  return localized !== key ? localized : ''
+}
 
 function CookieProviderRow({
   id,
-  label,
-  description,
-  placeholder,
   stored,
   onChange
 }: {
-  id: string
-  label: string
-  description: string
-  placeholder: string
+  id: (typeof COOKIE_PROVIDER_IDS)[number]
   stored: boolean
   onChange: (stored: boolean) => void
 }): React.JSX.Element {
+  const { t } = useI18n()
   const [value, setValue] = useState('')
   const save = async (next: string): Promise<void> => {
     onChange(await window.nodeTerminal.usage.setProviderCookie(id, next))
@@ -108,28 +84,28 @@ function CookieProviderRow({
   }
   return (
     <FieldRow
-      label={label}
-      description={description}
-      note={
-        stored
-          ? 'Stored in a file only your user can read, never in settings.json. It is not shown again — paste a fresh one when your session expires.'
-          : 'This is a live session credential. It is stored in a 0600 file, not in settings.json, and is never read back into the UI.'
-      }
+      label={t(`settings.usage.cookies.${id}.label`)}
+      description={t(`settings.usage.cookies.${id}.description`)}
+      note={stored ? t('settings.usage.cookies.noteStored') : t('settings.usage.cookies.noteEmpty')}
       control={
         <div className="flex items-center gap-2">
           <input
             type="password"
             className="input w-64"
-            placeholder={stored ? '•••••••• stored' : placeholder}
+            placeholder={
+              stored ? t('settings.usage.cookies.storedPlaceholder') : t(`settings.usage.cookies.${id}.placeholder`)
+            }
             value={value}
             onChange={(e) => setValue(e.target.value)}
             autoComplete="off"
             spellCheck={false}
           />
           <Button onClick={() => void save(value)} disabled={!value.trim()}>
-            Save
+            {t('common.save')}
           </Button>
-          {stored && <Button onClick={() => void save('')}>Clear</Button>}
+          {stored && (
+            <Button onClick={() => void save('')}>{t('common.clear')}</Button>
+          )}
         </div>
       }
     />
@@ -183,48 +159,51 @@ export function UsageSection({ isActive }: { isActive: boolean }): React.JSX.Ele
     >
       <SearchableRow {...rows.percentMode}>
         <FieldRow
-          label="Usage percentages"
-          description="Whether provider limits and context meters show percentage used, percentage remaining, or (context meters only) raw token counts. Provider limits have no token count and fall back to Used."
+          label={t('settings.usage.percentModeLabel')}
+          description={t('settings.usage.percentModeDescription')}
           control={
             <SegmentedPill
               value={settings.usagePercentMode}
               options={[
-                { value: 'used', label: 'Used' },
-                { value: 'remaining', label: 'Remaining' },
-                { value: 'tokens', label: 'Tokens' }
+                { value: 'used', label: t('settings.usage.percentUsed') },
+                { value: 'remaining', label: t('settings.usage.percentRemaining') },
+                { value: 'tokens', label: t('settings.usage.percentTokens') }
               ]}
               onChange={(v) => update({ usagePercentMode: v })}
-              ariaLabel="Usage percentage display"
+              ariaLabel={t('settings.usage.percentModeAria')}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.visibility}>
         <div className="space-y-5">
-          {USAGE_PROVIDER_IDS.map((id) => (
-            <FieldRow
-              key={id}
-              label={`${labelFor(id)} usage`}
-              description={PROVIDER_BLURBS[id] ?? ''}
-              control={
-                <Switch
-                  checked={!hidden.has(id)}
-                  onChange={(v) => setShown(id, v)}
-                  ariaLabel={`Show ${labelFor(id)} usage`}
-                />
-              }
-            />
-          ))}
+          {USAGE_PROVIDER_IDS.map((id) => {
+            const displayName = usageProviderDisplayName(id, t)
+            return (
+              <FieldRow
+                key={id}
+                label={t('settings.usage.providerRowLabel', { provider: displayName })}
+                description={usageProviderBlurb(id, t)}
+                control={
+                  <Switch
+                    checked={!hidden.has(id)}
+                    onChange={(v) => setShown(id, v)}
+                    ariaLabel={t('settings.usage.showProviderAria', { provider: displayName })}
+                  />
+                }
+              />
+            )
+          })}
         </div>
       </SearchableRow>
       <SearchableRow {...rows.cookies}>
         <div className="space-y-5">
-          {COOKIE_PROVIDER_ROWS.map((p) => (
+          {COOKIE_PROVIDER_IDS.map((id) => (
             <CookieProviderRow
-              key={p.id}
-              {...p}
-              stored={!!cookieStored[p.id]}
-              onChange={(stored) => setCookieStored((m) => ({ ...m, [p.id]: stored }))}
+              key={id}
+              id={id}
+              stored={!!cookieStored[id]}
+              onChange={(stored) => setCookieStored((m) => ({ ...m, [id]: stored }))}
             />
           ))}
         </div>

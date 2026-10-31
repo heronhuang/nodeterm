@@ -68,6 +68,8 @@ import { Tooltip } from '../../Tooltip'
 import { Input } from '@renderer/ui/Input'
 import { SegmentedPill } from '@renderer/ui/SegmentedPill'
 import { useSettingsSearch } from '../context'
+import { localizedCommandGroup, localizedCommandTitle } from '../../../lib/i18nKeybinding'
+import type { TranslateFn } from '@shared/i18n/types'
 import { matchesQuery, type SettingsSearchEntry } from '../search'
 import {
   matchesShortcutQuery,
@@ -100,9 +102,9 @@ const POLICY_ROW: SettingsSearchEntry = {
   keywords: ['shortcut', 'terminal', 'tui', 'shell', 'policy', 'first', 'capture', 'minimize']
 }
 
-function rowEntry(def: CommandDefinition): SettingsSearchEntry {
+function rowEntry(def: CommandDefinition, t: TranslateFn): SettingsSearchEntry {
   return {
-    title: def.title,
+    title: localizedCommandTitle(def, t),
     description: NOTES[def.id],
     keywords: ['shortcut', 'keybinding', 'hotkey', 'key', def.group, def.id]
   }
@@ -157,10 +159,16 @@ function groupEntry(group: CommandGroup, defs: CommandDefinition[]): SettingsSea
  *  the group's presence, which is why the heading is not a `SearchableRow` of its own: a row can
  *  match on its per-command note (`NOTES`) — query "tmux" hits Copy terminal selection — and a
  *  heading filtered independently would then leave that row standing under no heading at all. */
-function groupVisible(query: string, group: CommandGroup, defs: CommandDefinition[]): boolean {
+function groupVisible(
+  query: string,
+  group: CommandGroup,
+  defs: CommandDefinition[],
+  t: TranslateFn
+): boolean {
   if (query.trim() === '') return true
   return (
-    matchesQuery(query, groupEntry(group, defs)) || defs.some((d) => matchesQuery(query, rowEntry(d)))
+    matchesQuery(query, groupEntry(group, defs)) ||
+    defs.some((d) => matchesQuery(query, rowEntry(d, t)))
   )
 }
 
@@ -373,7 +381,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
   const policyRow = useMemo(
     (): SettingsSearchEntry => ({
       title: t('settings.shortcuts.rows.policy.title'),
-      description: POLICY_DESCRIPTION,
+      description: t('settings.shortcuts.policyDescription'),
       keywords: POLICY_ROW.keywords
     }),
     [t]
@@ -390,9 +398,9 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
       policyRow,
       railRow,
       ...groups.map(([group, defs]) => groupEntry(group, defs)),
-      ...COMMAND_DEFINITIONS.map(rowEntry)
+      ...COMMAND_DEFINITIONS.map((d) => rowEntry(d, t))
     ],
-    [groups, policyRow, railRow]
+    [groups, policyRow, railRow, t]
   )
 
   /**
@@ -427,7 +435,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
   const models = useMemo<RowModel[]>(
     () =>
       COMMAND_DEFINITIONS.map((def) => {
-        const entry = rowEntry(def)
+        const entry = rowEntry(def, t)
         const chords = commandKeysFor(def.id)
         return {
           def,
@@ -437,7 +445,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
           status: shortcutRowStatus(def.id, listOverrides, chords.length)
         }
       }),
-    [listOverrides]
+    [listOverrides, t]
   )
   const modelById = useMemo(() => new Map(models.map((m) => [m.def.id, m])), [models])
 
@@ -486,7 +494,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
     matchesShortcutQuery(m.def, m.keywords, m.chords, filterQuery) &&
     rowPassesStatus(m.status, statusFilter)
   const visibleGroups = groups.flatMap(([group, defs]) => {
-    if (!groupVisible(query, group, defs)) return []
+    if (!groupVisible(query, group, defs, t)) return []
     const rows = defs.map((d) => modelById.get(d.id)!).filter(localVisible)
     // The global leg is asked here only to COUNT; `SearchableRow` below is what actually mounts
     // or drops the row (and with it its recorder — see ShortcutRecorderButton's release note).
@@ -508,7 +516,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
         >
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-text">{def.title}</span>
+              <span className="text-sm font-medium text-text">{localizedCommandTitle(def, t)}</span>
               {status.modified ? (
                 <span
                   data-badge="modified"
@@ -613,14 +621,14 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
         <div data-setting="terminal-shortcut-policy">
           <FieldRow
             label={t('settings.shortcuts.rows.policy.title')}
-            description={POLICY_DESCRIPTION}
+            description={t('settings.shortcuts.policyDescription')}
             control={
               <SegmentedPill<TerminalShortcutPolicy>
                 value={policy}
                 ariaLabel={t('settings.shortcuts.rows.policy.title')}
                 options={[
-                  { value: 'app-first', label: 'App shortcuts first' },
-                  { value: 'terminal-first', label: 'Terminal first' }
+                  { value: 'app-first', label: t('settings.shortcuts.policyAppFirst') },
+                  { value: 'terminal-first', label: t('settings.shortcuts.policyTerminalFirst') }
                 ]}
                 onChange={(v) => update({ terminalShortcutPolicy: v })}
               />
@@ -657,12 +665,21 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
           </div>
           <SegmentedPill<ShortcutStatusFilter>
             value={statusFilter}
-            ariaLabel="Filter shortcuts by status"
+            ariaLabel={t('settings.shortcuts.filterStatusAria')}
             options={[
-              { value: 'all', label: `All ${counts.all}` },
-              { value: 'modified', label: `Modified ${counts.modified}` },
-              { value: 'unassigned', label: `Unassigned ${counts.unassigned}` },
-              { value: 'disabled', label: `Disabled ${counts.disabled}` }
+              { value: 'all', label: t('settings.shortcuts.filterAll', { count: counts.all }) },
+              {
+                value: 'modified',
+                label: t('settings.shortcuts.filterModified', { count: counts.modified })
+              },
+              {
+                value: 'unassigned',
+                label: t('settings.shortcuts.filterUnassigned', { count: counts.unassigned })
+              },
+              {
+                value: 'disabled',
+                label: t('settings.shortcuts.filterDisabled', { count: counts.disabled })
+              }
             ]}
             onChange={setStatusFilter}
           />
@@ -673,7 +690,9 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
           single row — 21 dividers is a table, not a list. */}
       {visibleGroups.map(({ group, rows }) => (
         <div key={group} className="space-y-1">
-          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted">{group}</h3>
+          <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted">
+            {localizedCommandGroup(group, t)}
+          </h3>
           {rows.map(renderRow)}
         </div>
       ))}
@@ -685,7 +704,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
           that is not on screen, in a section showing exactly what was asked for. */}
       <SearchableRow {...railRow}>
         {visibleGroups.length === 0 ? (
-          <p className="text-[13px] text-muted">No shortcuts match.</p>
+          <p className="text-[13px] text-muted">{t('settings.shortcuts.noShortcutsMatch')}</p>
         ) : null}
       </SearchableRow>
     </SettingsSection>

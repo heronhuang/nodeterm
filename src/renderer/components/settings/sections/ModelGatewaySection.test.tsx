@@ -7,6 +7,7 @@ import { DEFAULT_SETTINGS } from '@shared/types'
 import { useSettings } from '../../../state/settings'
 import { useModelGateway } from '../../../state/modelGateway'
 import { ModelGatewaySection } from './ModelGatewaySection'
+import { setUiLanguage } from '@renderer/i18n/runtime'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -50,6 +51,7 @@ describe('ModelGatewaySection credential modes', () => {
   afterEach(() => {
     act(() => root?.unmount())
     host.remove()
+    setUiLanguage('en')
   })
 
   const mount = async (): Promise<void> => {
@@ -58,6 +60,50 @@ describe('ModelGatewaySection credential modes', () => {
       root.render(<ModelGatewaySection isActive />)
     })
   }
+
+  it('renders gateway controls in Chinese and updates them when the locale changes', async () => {
+    setUiLanguage('zh')
+    await mount()
+    for (const text of ['模型发现接口', '自定义路径…', '凭据来源', '环境变量', '获取模型', '默认模型']) {
+      expect(host.textContent).toContain(text)
+    }
+    expect(host.textContent).toContain('settings.json 中保存的是 ${env:VAR} 引用')
+    expect(host.textContent).not.toMatch(/Model discovery endpoint|Enter the server root|Credential source|Available models|Custom path/)
+    expect(host.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe('模型发现接口')
+
+    await act(async () => {
+      useModelGateway.setState({ models: [{ id: 'example-model' }], status: 'ready' })
+    })
+    expect(host.textContent).toContain('共 1 个可用模型。')
+    await act(async () => { setUiLanguage('en') })
+    expect(host.textContent).toContain('1 model available.')
+    expect(host.textContent).toContain('Model discovery endpoint')
+  })
+
+  it('localizes stored-key feedback without displaying the secret', async () => {
+    setUiLanguage('zh')
+    await mount()
+    const source = host.querySelector<HTMLSelectElement>('#model-gateway-credential-source')!
+    await act(async () => {
+      source.value = 'stored'
+      source.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    const input = host.querySelector<HTMLInputElement>('#model-gateway-key')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'test-secret')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '保存密钥')!
+    saveCredential.mockRejectedValueOnce(new Error('keyring-locked'))
+    await act(async () => { save.click() })
+    expect(host.textContent).toContain('请解锁系统密钥环后重试。')
+    await act(async () => { save.click() })
+    expect(host.textContent).toContain('API 密钥已安全保存。')
+    expect(host.textContent).not.toContain('test-secret')
+    expect(input.value).toBe('')
+    await act(async () => { setUiLanguage('en') })
+    expect(host.textContent).toContain('API key saved securely.')
+  })
 
   it('shows an environment name as ordinary text while persisting the expansion token', async () => {
     await mount()

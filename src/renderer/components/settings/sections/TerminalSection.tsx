@@ -197,7 +197,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         <div className="space-y-3">
           <TerminalPreview />
           <FieldRow
-            label="Colour theme"
+            label={rows.theme.title}
             description={t('settings.terminal.description')}
             control={
               <ThemeSelect
@@ -211,9 +211,9 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
 
       <SearchableRow {...rows.fontFamily}>
         <div className="space-y-3">
-          <GroupHeading>Font</GroupHeading>
+          <GroupHeading>{rows.fontFamily.title}</GroupHeading>
           <FieldRow
-            label="Font"
+            label={rows.fontFamily.title}
             description="Only fonts installed on this machine are listed. The field below is the full CSS stack — keep a generic monospace last, so the setting still works on a machine without your font."
             control={
               <FontPicker
@@ -226,7 +226,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.fontSize}>
         <FieldRow
-          label="Size and weight"
+          label={rows.fontSize.title}
           control={
             <span className="flex items-center gap-2">
               <NumberField
@@ -269,7 +269,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           middle-click paste), so the section's reset button does not flip a key binding. */}
       <SearchableRow {...rows.fontZoomKeys}>
         <FieldRow
-          label="Font size keys"
+          label={rows.fontZoomKeys.title}
           description={t('settings.terminal.description')}
           control={
             <Switch
@@ -282,7 +282,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.spacing}>
         <FieldRow
-          label="Spacing"
+          label={rows.spacing.title}
           description="Line height multiplies the font size; letter spacing adds pixels between characters. Push either far and the box-drawing characters agent CLIs frame their output with stop meeting."
           control={
             <span className="flex items-center gap-2">
@@ -311,9 +311,9 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
 
       <SearchableRow {...rows.cursor}>
         <div className="space-y-3">
-          <GroupHeading>Cursor</GroupHeading>
+          <GroupHeading>{rows.cursor.title}</GroupHeading>
           <FieldRow
-            label="Cursor"
+            label={rows.cursor.title}
             control={
               <span className="flex items-center gap-3">
                 <SegmentedPill
@@ -335,7 +335,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.cursorInactive}>
         <FieldRow
-          label="When unfocused"
+          label={rows.cursorInactive.title}
           description="What the cursor looks like in a terminal that isn't taking your keystrokes — the quickest way to tell which of a canvas full of terminals is focused."
           control={
             <Select
@@ -358,9 +358,9 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
 
       <SearchableRow {...rows.middleClickPaste}>
         <div className="space-y-3">
-          <GroupHeading>Advanced</GroupHeading>
+          <GroupHeading>{t('settings.terminal.groupAdvanced')}</GroupHeading>
           <FieldRow
-            label="Middle click pastes the selection"
+            label={rows.middleClickPaste.title}
             description="Linux only. Off by default — and off makes the middle button do nothing at all inside a terminal, tmux's own middle-click paste included: the paste happens beyond the app (tmux, or the running program reading the selection), so the only way to stop it is to swallow the click before the terminal forwards it. On, a stray middle click can drop whatever was last selected into a running agent's prompt."
             control={
               <Switch
@@ -375,7 +375,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
 
       <SearchableRow {...rows.copyOnSelect}>
         <FieldRow
-          label="Copy on select"
+          label={rows.copyOnSelect.title}
           description="Off by default. On, finishing a mouse selection in the terminal itself — a drag, a double or triple click, or inside an app that grabs the mouse an Option-drag (macOS) or Shift-drag (Windows, Linux) — copies it to the clipboard. It cannot copy a selection an app draws itself. Copies a program sends on its own (tmux copy mode, vim) reach the clipboard whether this is on or off."
           control={
             <Switch
@@ -389,7 +389,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
 
       <SearchableRow {...rows.wordSeparator}>
         <FieldRow
-          label="Word separators"
+          label={rows.wordSeparator.title}
           description="Characters that end a word when you double-click terminal text. Remove a character to keep it inside selections; for example, leave hyphen out to select a full issue ID."
           control={
             <Input
@@ -405,7 +405,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.boldBright}>
         <div className="space-y-3">
           <FieldRow
-            label="Bold text uses bright colours"
+            label={rows.boldBright.title}
             description="The historical terminal convention, and xterm's default. Turn it off to keep bold purely a weight, so a program's colour choice survives."
             control={
               <Switch
@@ -419,7 +419,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.minContrast}>
         <FieldRow
-          label="Minimum contrast"
+          label={rows.minContrast.title}
           description="Lightens or darkens foreground colours that fall below the ratio against their background — the fix for a theme whose dark blue is unreadable. Costs per-cell work in the renderer, so it is off by default."
           control={
             <Select
@@ -439,7 +439,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.gpu}>
         <FieldRow
-          label="Terminal rendering"
+          label={rows.gpu.title}
           description={
             'Auto uses one GPU context per terminal; switch to Off if the window flickers. ' +
             'Shared GPU draws every terminal into a single canvas-wide context, which lifts the ' +
@@ -468,8 +468,8 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.reset}>
         <SectionReset
           keys={TERMINAL_RESET_KEYS}
-          label="Reset terminal appearance"
-          what="the terminal appearance settings"
+          label={rows.reset.title}
+          what={t('settings.terminal.resetAppearanceWhat')}
         />
       </SearchableRow>
     </SettingsSection>

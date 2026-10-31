@@ -1,4 +1,5 @@
 import { settingsSectionZh } from './settings-zh'
+import { keybindingsZh } from './keybindings-zh'
 
 const { language: languageSectionZh, ...settingsRestZh } = settingsSectionZh
 
@@ -8,13 +9,17 @@ export const zhMessages = {
     cancel: '取消',
     ok: '确定',
     save: '保存',
+    clear: '清除',
     close: '关闭',
     delete: '删除',
     confirm: '确认',
     back: '返回',
     search: '搜索',
-    dismiss: '关闭'
+    dismiss: '关闭',
+    thisMachine: '本机',
+    upgradeToPro: '升级到 Pro'
   },
+  keybindings: keybindingsZh,
   confirm: {
     cancel: '取消',
     ok: '确定',

@@ -8,6 +8,7 @@ export const enMessages = {
     cancel: 'Cancel',
     ok: 'OK',
     save: 'Save',
+    clear: 'Clear',
     close: 'Close',
     delete: 'Delete',
     confirm: 'Confirm',
