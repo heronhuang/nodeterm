@@ -44,6 +44,10 @@ describe('release.yml release-mac', () => {
     expect(job).not.toContain('CSC_LINK')
   })
 
+  it('raises the Node heap for electron-vite on hosted macOS runners', () => {
+    expect(block).toContain('NODE_OPTIONS: --max-old-space-size=8192')
+  })
+
   it('fails the job when latest-mac.yml was not produced', () => {
     expect(job).toContain('test -f dist/latest-mac.yml')
   })
