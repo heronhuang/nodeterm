@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 // Which rows of the node right-click menu and the terminal node header the user is allowed to
 // hide (Settings → the visibility toggles), plus the predicate both call sites share.
 //
@@ -19,19 +20,19 @@ export interface HideableRow {
 
 /** Hideable node right-click menu entries, in menu order. */
 export const HIDEABLE_MENU_ITEMS: readonly HideableRow[] = [
-  { id: 'group', label: 'Group node / Group selection' },
-  { id: 'remove-from-group', label: 'Remove from group' },
-  { id: 'colors', label: 'Colors' },
-  { id: 'icon', label: 'Set icon' },
-  { id: 'duplicate', label: 'Duplicate' },
-  { id: 'snap-zone', label: 'Snap to zone' },
-  { id: 'collapse', label: 'Collapse / Expand' },
-  { id: 'markdown-view', label: 'Markdown view' },
-  { id: 'refresh-terminal', label: 'Refresh terminal' },
+  { id: 'group', get label() { return menuT('menuItems.groupNodeGroupSelection') } },
+  { id: 'remove-from-group', get label() { return menuT('menuItems.removeFromGroup') } },
+  { id: 'colors', get label() { return menuT('menuItems.colors') } },
+  { id: 'icon', get label() { return menuT('menuItems.setIcon') } },
+  { id: 'duplicate', get label() { return menuT('menuItems.duplicate') } },
+  { id: 'snap-zone', get label() { return menuT('menuItems.snapToZone') } },
+  { id: 'collapse', get label() { return menuT('menuItems.collapseExpand') } },
+  { id: 'markdown-view', get label() { return menuT('menuItems.markdownView') } },
+  { id: 'refresh-terminal', get label() { return menuT('menuItems.refreshTerminal') } },
   // The ROW that opens the create dialog. The LIVE chip that says a terminal IS being broadcast is
   // deliberately in neither inventory (lib/live-link.guard.test.ts).
-  { id: 'live-link', label: 'Share live link' },
-  { id: 'vanilla-restart', label: 'Restart on subscription' }
+  { id: 'live-link', get label() { return menuT('menuItems.shareLiveLink') } },
+  { id: 'vanilla-restart', get label() { return menuT('menuItems.restartOnSubscription') } }
 ]
 
 /** Hideable terminal node header buttons, in header order. */
@@ -39,20 +40,20 @@ export const HIDEABLE_HEADER_BUTTONS: readonly HideableRow[] = [
   // Not a button but the model + context-usage pill (issue #1141). `ContextMeter` asks this id
   // itself, so it hides on all three places the pill is drawn: node header, kanban card, card
   // modal. Display only — usage tracking and the ⌘M composer's model label are unaffected.
-  { id: 'context-meter', label: 'Model & context meter' },
-  { id: 'maximize', label: 'Maximize' },
-  { id: 'refresh', label: 'Refresh' },
-  { id: 'mic', label: 'Dictate' },
-  { id: 'ai-name', label: 'Name with AI' },
-  { id: 'comments', label: 'Comments' },
+  { id: 'context-meter', get label() { return menuT('menuItems.modelContextMeter') } },
+  { id: 'maximize', get label() { return menuT('menuItems.maximize') } },
+  { id: 'refresh', get label() { return menuT('menuItems.refresh') } },
+  { id: 'mic', get label() { return menuT('menuItems.dictate') } },
+  { id: 'ai-name', get label() { return menuT('menuItems.nameWithAi') } },
+  { id: 'comments', get label() { return menuT('menuItems.comments') } },
   // The header twin of the node menu's "Share live link…" row. The button may be hidden; the LIVE
   // chip it leads to never can (renderer/lib/live-link.guard.test.ts).
-  { id: 'share-link', label: 'Share live link' },
-  { id: 'hide-fanout', label: 'Hide cards & connections' },
-  { id: 'tidy-fanout', label: 'Tidy subagent cards' },
+  { id: 'share-link', get label() { return menuT('menuItems.shareLiveLink') } },
+  { id: 'hide-fanout', get label() { return menuT('menuItems.hideCardsConnections') } },
+  { id: 'tidy-fanout', get label() { return menuT('menuItems.tidySubagentCards') } },
   // Not in the header proper but the label row right under it (`lib/mdViewHint.ts`); it is the
   // same kind of quiet per-node affordance, so it lives in the same Settings list.
-  { id: 'md-hint', label: 'Markdown / chat view hint' }
+  { id: 'md-hint', get label() { return menuT('menuItems.markdownChatViewHint') } }
 ]
 
 /** Every id the user may hide — the guard that makes everything else unhideable. */

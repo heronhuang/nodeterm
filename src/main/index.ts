@@ -1082,9 +1082,9 @@ function buildAppMenu(win: BrowserWindow): void {
     // because a renderer wedged badly enough to stop dispatching keys is exactly when the user
     // needs the lever — and the reload is also what resets `terminalFocused` / `shortcutRecording`
     // in main. Do not "complete" the suspend list with them.
-    { role: 'reload' },
-    { role: 'forceReload' },
-    { role: 'toggleDevTools' },
+    { role: 'reload', label: t('menuItems.reload') },
+    { role: 'forceReload', label: t('menuItems.forceReload') },
+    { role: 'toggleDevTools', label: t('menuItems.toggleDeveloperTools') },
     { type: 'separator' },
     {
       label: t('menu.snapToGrid'),
@@ -1112,38 +1112,38 @@ function buildAppMenu(win: BrowserWindow): void {
     },
     { type: 'separator' },
     // Also restored from the default menu: Enter Full Screen (Ctrl+⌘F on mac, F11 on Linux).
-    { role: 'togglefullscreen' }
+    { role: 'togglefullscreen', label: t('menuItems.toggleFullScreen') }
   ]
   const template: Electron.MenuItemConstructorOptions[] = isMac
     ? [
         {
           label: app.name,
           submenu: [
-            { role: 'about' },
+            { role: 'about', label: t('menuItems.aboutNodeterm') },
             { type: 'separator' },
             settingsItem,
             { type: 'separator' },
-            { role: 'services' },
+            { role: 'services', label: t('menuItems.services') },
             { type: 'separator' },
-            { role: 'hide' },
-            { role: 'hideOthers' },
-            { role: 'unhide' },
+            { role: 'hide', label: t('menuItems.hideNodeterm') },
+            { role: 'hideOthers', label: t('menuItems.hideOthers') },
+            { role: 'unhide', label: t('menuItems.showAll') },
             { type: 'separator' },
-            { role: 'quit' }
+            { role: 'quit', label: t('menuItems.quit') }
           ]
         },
         {
           label: t('menu.edit'),
           submenu: [
-            { role: 'undo' },
-            { role: 'redo' },
+            { role: 'undo', label: t('menuItems.undo') },
+            { role: 'redo', label: t('menuItems.redo') },
             { type: 'separator' },
-            { role: 'cut' },
-            { role: 'copy' },
-            { role: 'paste' },
-            { role: 'pasteAndMatchStyle' },
-            { role: 'delete' },
-            { role: 'selectAll' }
+            { role: 'cut', label: t('menuItems.cut') },
+            { role: 'copy', label: t('menuItems.copy') },
+            { role: 'paste', label: t('menuItems.paste') },
+            { role: 'pasteAndMatchStyle', label: t('menuItems.pasteAndMatchStyle') },
+            { role: 'delete', label: t('menuItems.delete') },
+            { role: 'selectAll', label: t('menuItems.selectAll2') }
           ]
         },
         { label: t('menu.view'), submenu: viewSubmenu },
@@ -1155,26 +1155,26 @@ function buildAppMenu(win: BrowserWindow): void {
           // window. mac has no `{role:'close'}` here at all — which is why the intercept is ⌘W's
           // only handler on mac.
           submenu: [
-            { role: 'minimize', id: MENU_ITEM_ID_MINIMIZE },
-            { role: 'zoom' },
+            { role: 'minimize', label: t('menuItems.minimize'), id: MENU_ITEM_ID_MINIMIZE },
+            { role: 'zoom', label: t('menuItems.zoom') },
             { type: 'separator' },
-            { role: 'front' }
+            { role: 'front', label: t('menuItems.bringAllToFront') }
           ]
         }
       ]
     : [
-        { label: t('menu.file'), submenu: [{ role: 'quit' }] },
+        { label: t('menu.file'), submenu: [{ role: 'quit', label: t('menuItems.quit') }] },
         {
           label: t('menu.edit'),
           submenu: [
-            { role: 'undo' },
-            { role: 'redo' },
+            { role: 'undo', label: t('menuItems.undo') },
+            { role: 'redo', label: t('menuItems.redo') },
             { type: 'separator' },
-            { role: 'cut' },
-            { role: 'copy' },
-            { role: 'paste' },
-            { role: 'delete' },
-            { role: 'selectAll' }
+            { role: 'cut', label: t('menuItems.cut') },
+            { role: 'copy', label: t('menuItems.copy') },
+            { role: 'paste', label: t('menuItems.paste') },
+            { role: 'delete', label: t('menuItems.delete') },
+            { role: 'selectAll', label: t('menuItems.selectAll2') }
           ]
         },
         { label: t('menu.view'), submenu: viewSubmenu },
@@ -1185,8 +1185,8 @@ function buildAppMenu(win: BrowserWindow): void {
         {
           label: t('menu.window'),
           submenu: [
-            { role: 'minimize', id: MENU_ITEM_ID_MINIMIZE },
-            { role: 'close', id: MENU_ITEM_ID_CLOSE }
+            { role: 'minimize', label: t('menuItems.minimize'), id: MENU_ITEM_ID_MINIMIZE },
+            { role: 'close', label: t('menuItems.close'), id: MENU_ITEM_ID_CLOSE }
           ]
         }
       ]
@@ -1661,7 +1661,8 @@ app.whenReady().then(async () => {
           copyImage: () => contents.copyImageAt(params.x, params.y),
           replaceMisspelling: (word) => contents.replaceMisspelling(word),
           inspect: () => contents.inspectElement(params.x, params.y)
-        }
+        },
+        mainT(settingsStore.get())
       )
       // `frame` is null once the frame navigated away or died; the menu still opens, just without
       // the AppKit additions.

@@ -1,11 +1,15 @@
+import { createTranslator } from '@shared/i18n/translate'
 import { describe, expect, it, vi } from 'vitest'
 import type { MenuItemConstructorOptions } from 'electron'
 import {
-  guestContextMenuTemplate,
+  guestContextMenuTemplate as buildGuestMenu,
   SPELLING_SUGGESTION_MAX,
   type GuestMenuContext,
   type GuestMenuHandlers
 } from './webview-context-menu'
+
+const guestContextMenuTemplate = (ctx: GuestMenuContext, h: GuestMenuHandlers) =>
+  buildGuestMenu(ctx, h, createTranslator('en'))
 
 const handlers = (): GuestMenuHandlers => ({
   back: vi.fn(),
@@ -42,9 +46,17 @@ const ctx = (over: Partial<GuestMenuContext> = {}): GuestMenuContext => ({
 })
 
 const labels = (items: MenuItemConstructorOptions[]): string[] =>
-  items.map((item) => item.label ?? item.role ?? item.type ?? '')
+  items.map((item) => item.role ?? item.label ?? item.type ?? '')
 
 describe('guestContextMenuTemplate', () => {
+  it('uses Chinese app labels for native roles even on an English OS', () => {
+    const items = buildGuestMenu(ctx({ isEditable: true, linkURL: 'https://example.com' }), handlers(), createTranslator('zh'))
+    expect(items.find((item) => item.role === 'copy')?.label).toBe('复制')
+    expect(items.find((item) => item.role === 'selectAll')?.label).toBe('全选')
+    expect(items[0].label).toBe('在新浏览器节点中打开链接')
+    expect(items.at(-1)?.label).toBe('检查元素')
+  })
+
   it('offers the editing roles on an editable field', () => {
     const items = guestContextMenuTemplate(ctx({ isEditable: true }), handlers())
     expect(labels(items)).toEqual([

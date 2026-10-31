@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { isMacPlatform, isWindowsPlatform } from '@shared/platform-utils'
 
 /**
@@ -23,9 +24,9 @@ export function osFileManagerName(os: RevealOs = viewerRevealOs()): string {
  * Explorer", which is the link menu's row for the in-app Explorer DRAWER.
  */
 export function osRevealLabel(os: RevealOs = viewerRevealOs()): string {
-  if (os === 'darwin') return 'Reveal in Finder'
-  if (os === 'win32') return 'Show in File Explorer'
-  return 'Reveal in file manager'
+  if (os === 'darwin') return menuT('menuItems.revealInFinder')
+  if (os === 'win32') return menuT('menuItems.showInFileExplorer')
+  return menuT('menuItems.revealInFileManager')
 }
 
 /**

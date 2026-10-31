@@ -1,3 +1,4 @@
+import { t as menuT } from '../../i18n/runtime'
 import { KanbanScopeSwitch } from './KanbanScopeSwitch'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KanbanColumnCategory, KanbanLabel, KanbanSavedView, KanbanViewQuery, PendingLaunch, ProjectKanban } from '@shared/types'
@@ -518,9 +519,9 @@ export const KanbanView = memo(function KanbanView({
         choice: { kind: 'agent', agentId: a.id } as KanbanCreateChoice,
         icon: <IconAgent />
       })),
-      { key: 'terminal', label: 'Terminal', choice: { kind: 'terminal' }, icon: <IconTerminal /> },
-      { key: 'browser', label: 'Browser', choice: { kind: 'browser' }, icon: <IconWeb /> },
-      { key: 'sticky', label: 'Sticky note', choice: { kind: 'sticky' }, icon: <IconNote /> }
+      { key: 'terminal', label: menuT('menuItems.terminal'), choice: { kind: 'terminal' }, icon: <IconTerminal /> },
+      { key: 'browser', label: menuT('menuItems.browser'), choice: { kind: 'browser' }, icon: <IconWeb /> },
+      { key: 'sticky', label: menuT('menuItems.stickyNote'), choice: { kind: 'sticky' }, icon: <IconNote /> }
     ],
     [customAgents, disabledAgents]
   )
@@ -769,7 +770,7 @@ export const KanbanView = memo(function KanbanView({
     if (next !== boardRef.current) commit(next)
   }
   const viewsMenuItems = (): MenuItem[] => [
-    { type: 'label', label: views.length ? 'Saved views' : 'No saved views yet' },
+    { type: 'label', label: views.length ? menuT('menuItems.savedViews') : menuT('menuItems.noSavedViewsYet') },
     ...views.map((v): MenuItem => ({
       label: v.name,
       icon: v.id === activeView?.id ? <span aria-label="current">✓</span> : undefined,
@@ -779,7 +780,7 @@ export const KanbanView = memo(function KanbanView({
       }
     })),
     { type: 'separator' },
-    { label: 'Save current filters as a view…', onClick: () => void saveCurrentView() },
+    { label: menuT('menuItems.saveCurrentFiltersAsAView'), onClick: () => void saveCurrentView() },
     ...(activeView
       ? ([
         ...(viewDirty
@@ -792,7 +793,7 @@ export const KanbanView = memo(function KanbanView({
         { label: `Delete “${activeView.name}”…`, danger: true, onClick: () => setPendingViewDelete(activeView) },
         { type: 'separator' },
         {
-          label: 'Leave the view (show every card)',
+          label: menuT('menuItems.leaveTheViewShowEveryCard'),
           onClick: () => {
             applyQuery({}, board)
             setActiveViewId(projectId, undefined)
@@ -1138,7 +1139,7 @@ export const KanbanView = memo(function KanbanView({
             <>
               <div className="label-picker__scrim" onMouseDown={() => setFilterOpen(false)} />
               <div className="kanban-filter-menu">
-                {paletteLabels.length > 0 && <div className="kanban-filter-group">Sessions</div>}
+                {paletteLabels.length > 0 && <div className="kanban-filter-group">{menuT('menuItems.sessions')}</div>}
                 {paletteLabels.map((l) => {
                   const s = labelSwatch(l.color)
                   const key = `local:${l.id}`
@@ -1166,14 +1167,14 @@ export const KanbanView = memo(function KanbanView({
                     </button>
                   )
                 })}
-                {memberNames.length > 0 && <div className="kanban-filter-group">Members</div>}
+                {memberNames.length > 0 && <div className="kanban-filter-group">{menuT('menuItems.members')}</div>}
                 {memberNames.map((name) => (
                   <button key={`member:${name}`} className="kanban-filter-row" onClick={() => toggleIn(setAssigneeFilter, name)}>
                     <span className="kanban-filter-member">{name}</span>
                     {assigneeFilter.includes(name) && <span className="label-picker__rowcheck">✓</span>}
                   </button>
                 ))}
-                <div className="kanban-filter-group">Columns</div>
+                <div className="kanban-filter-group">{menuT('menuItems.columns')}</div>
                 {[{ id: 'ungrouped', title: 'Ungrouped' }, ...board.columns].map((c) => (
                   <button key={`column:${c.id}`} className="kanban-filter-row" onClick={() => toggleIn(setColumnFilter, c.id)}>
                     <span className="kanban-filter-member">{c.title}</span>
@@ -1188,9 +1189,7 @@ export const KanbanView = memo(function KanbanView({
                       setAssigneeFilter([])
                       setColumnFilter([])
                     }}
-                  >
-                    Clear filter
-                  </button>
+                  >{menuT('menuItems.clearFilter')}</button>
                 )}
               </div>
             </>
@@ -1261,19 +1260,19 @@ export const KanbanView = memo(function KanbanView({
             ...(issueAgentMenu
               ? ([{
                   type: 'submenu',
-                  label: 'Start with agent',
+                  label: menuT('menuItems.startWithAgent'),
                   icon: <IconAgent />,
                   children: issueAgentMenu(issueMenu.issue)
                 }] as MenuItem[])
               : []),
             ...(issueWorktreeMenu ? [issueWorktreeMenuRow(issueWorktreeMenu(issueMenu.issue), <IconBranch />)] : []),
             {
-              label: 'Open summary',
+              label: menuT('menuItems.openSummary'),
               icon: <IconExternal />,
               onClick: () => setModalIssue({ item: issueMenu.issue, kind: 'issue' })
             },
             {
-              label: 'Open on GitHub',
+              label: menuT('menuItems.openOnGithub'),
               icon: <IconExternal />,
               onClick: () => void api.shell.openExternal(issueMenu.issue.htmlUrl)
             }
@@ -1398,7 +1397,7 @@ export const KanbanView = memo(function KanbanView({
           danger={pendingGitHubMove.confirmation.danger}
           choice={pendingGitHubMove.confirmation.closeReasons && pendingGitHubMove.closeReason
             ? {
-                label: 'Close as',
+                label: menuT('menuItems.closeAs'),
                 options: pendingGitHubMove.confirmation.closeReasons,
                 value: pendingGitHubMove.closeReason,
                 onChange: (value) => setPendingGitHubMove((current) =>

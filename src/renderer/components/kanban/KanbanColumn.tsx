@@ -1,3 +1,4 @@
+import { t as menuT } from '../../i18n/runtime'
 import { Fragment, memo, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconClose } from '../icons'
@@ -109,12 +110,12 @@ export const KanbanColumn = memo(function KanbanColumn({
   const menuItems = (): MenuItem[] => {
     if (!column || !onSetCategory) return []
     const pick = (next: KanbanColumnCategory | undefined): MenuItem => ({
-      label: next ? CATEGORY_LABELS[next] : 'No category',
+      label: next ? CATEGORY_LABELS[next] : menuT('menuItems.noCategory'),
       icon: category === next ? <span aria-label="current">✓</span> : undefined,
       onClick: () => onSetCategory(column.id, next)
     })
     return [
-      { type: 'label', label: 'Category' },
+      { type: 'label', label: menuT('menuItems.category') },
       ...KANBAN_COLUMN_CATEGORIES.map(pick),
       { type: 'separator' },
       pick(undefined)

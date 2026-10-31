@@ -1,3 +1,4 @@
+import { t as menuT } from '../../i18n/runtime'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BridgeLink, CanvasNodeState, ProjectKanban } from '@shared/types'
 import { AGENT_CONFIG, BUILTIN_AGENT_IDS, type AgentId } from '@shared/agents/config'
@@ -185,9 +186,9 @@ const Swimlane = memo(function Swimlane({
     ...customAgents.filter(a => !disabledAgents.includes(a.id)).map(a => ({
       key: a.id, label: a.label, choice: { kind: 'agent', agentId: a.id } as KanbanCreateChoice, icon: <IconAgent />
     })),
-    { key: 'terminal', label: 'Terminal', choice: { kind: 'terminal' } as KanbanCreateChoice, icon: <IconTerminal /> },
-    { key: 'browser', label: 'Browser', choice: { kind: 'browser' } as KanbanCreateChoice, icon: <IconWeb /> },
-    { key: 'sticky', label: 'Sticky note', choice: { kind: 'sticky' } as KanbanCreateChoice, icon: <IconNote /> }
+    { key: 'terminal', label: menuT('menuItems.terminal'), choice: { kind: 'terminal' } as KanbanCreateChoice, icon: <IconTerminal /> },
+    { key: 'browser', label: menuT('menuItems.browser'), choice: { kind: 'browser' } as KanbanCreateChoice, icon: <IconWeb /> },
+    { key: 'sticky', label: menuT('menuItems.stickyNote'), choice: { kind: 'sticky' } as KanbanCreateChoice, icon: <IconNote /> }
   ], [customAgents, disabledAgents])
 
   const columnCards = useMemo(() => {

@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { DirEntry, FsApi } from '@shared/types'
@@ -462,9 +463,7 @@ export function ExplorerPanel({
                   setMenu(null)
                   void createEntry(m.path, m.dir, 'file')
                 }}
-              >
-                New File…
-              </button>
+              >{menuT('menuItems.newFile')}</button>
               <button
                 className="ctx-item"
                 onClick={() => {
@@ -472,9 +471,7 @@ export function ExplorerPanel({
                   setMenu(null)
                   void createEntry(m.path, m.dir, 'folder')
                 }}
-              >
-                New Folder…
-              </button>
+              >{menuT('menuItems.newFolder')}</button>
               {route !== 'none' && isDownloadablePath(menu.path) && (
                 <>
                   <div className="ctx-sep" />
@@ -498,9 +495,7 @@ export function ExplorerPanel({
                         setMenu(null)
                         void downloadTo(m.path, m.dir)
                       }}
-                    >
-                      Download to…
-                    </button>
+                    >{menuT('menuItems.downloadTo')}</button>
                   )}
                 </>
               )}
@@ -511,18 +506,14 @@ export function ExplorerPanel({
                   window.nodeTerminal.clipboard.writeText(menu.path)
                   setMenu(null)
                 }}
-              >
-                Copy Path
-              </button>
+              >{menuT('menuItems.copyPath')}</button>
               <button
                 className="ctx-item"
                 onClick={() => {
                   window.nodeTerminal.clipboard.writeText(cwd ? menu.path.slice(cwd.length + 1) : menu.path)
                   setMenu(null)
                 }}
-              >
-                Copy Relative Path
-              </button>
+              >{menuT('menuItems.copyRelativePath')}</button>
               {/* Root itself (the empty-area menu) is not an ignorable entry. An entry ignored by
                   a broader PATTERN gets neither item: it cannot be "added" (already ignored) and
                   there is no exact line to remove — see onContext. */}

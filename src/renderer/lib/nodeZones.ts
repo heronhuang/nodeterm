@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 // Zone snapping (issue #394, v1): place ONE node into a chosen region of the visible canvas —
 // halves, quarters, thirds — at that region's position and size. The MacsyZones/FancyZones idea,
 // scoped to the deliberate keyboard/menu gesture (the drag-time overlay is the follow-up).
@@ -38,17 +39,17 @@ interface ZoneFraction {
 
 /** Each zone as fractions of the usable (margin-inset) viewport. The menu renders in this order. */
 export const ZONES: readonly { id: ZoneId; label: string; frac: ZoneFraction }[] = [
-  { id: 'left-half', label: 'Left half', frac: { x0: 0, y0: 0, x1: 0.5, y1: 1 } },
-  { id: 'right-half', label: 'Right half', frac: { x0: 0.5, y0: 0, x1: 1, y1: 1 } },
-  { id: 'top-half', label: 'Top half', frac: { x0: 0, y0: 0, x1: 1, y1: 0.5 } },
-  { id: 'bottom-half', label: 'Bottom half', frac: { x0: 0, y0: 0.5, x1: 1, y1: 1 } },
-  { id: 'top-left', label: 'Top left quarter', frac: { x0: 0, y0: 0, x1: 0.5, y1: 0.5 } },
-  { id: 'top-right', label: 'Top right quarter', frac: { x0: 0.5, y0: 0, x1: 1, y1: 0.5 } },
-  { id: 'bottom-left', label: 'Bottom left quarter', frac: { x0: 0, y0: 0.5, x1: 0.5, y1: 1 } },
-  { id: 'bottom-right', label: 'Bottom right quarter', frac: { x0: 0.5, y0: 0.5, x1: 1, y1: 1 } },
-  { id: 'left-third', label: 'Left third', frac: { x0: 0, y0: 0, x1: 1 / 3, y1: 1 } },
-  { id: 'center-third', label: 'Center third', frac: { x0: 1 / 3, y0: 0, x1: 2 / 3, y1: 1 } },
-  { id: 'right-third', label: 'Right third', frac: { x0: 2 / 3, y0: 0, x1: 1, y1: 1 } }
+  { id: 'left-half', get label() { return menuT('menuItems.leftHalf') }, frac: { x0: 0, y0: 0, x1: 0.5, y1: 1 } },
+  { id: 'right-half', get label() { return menuT('menuItems.rightHalf') }, frac: { x0: 0.5, y0: 0, x1: 1, y1: 1 } },
+  { id: 'top-half', get label() { return menuT('menuItems.topHalf') }, frac: { x0: 0, y0: 0, x1: 1, y1: 0.5 } },
+  { id: 'bottom-half', get label() { return menuT('menuItems.bottomHalf') }, frac: { x0: 0, y0: 0.5, x1: 1, y1: 1 } },
+  { id: 'top-left', get label() { return menuT('menuItems.topLeftQuarter') }, frac: { x0: 0, y0: 0, x1: 0.5, y1: 0.5 } },
+  { id: 'top-right', get label() { return menuT('menuItems.topRightQuarter') }, frac: { x0: 0.5, y0: 0, x1: 1, y1: 0.5 } },
+  { id: 'bottom-left', get label() { return menuT('menuItems.bottomLeftQuarter') }, frac: { x0: 0, y0: 0.5, x1: 0.5, y1: 1 } },
+  { id: 'bottom-right', get label() { return menuT('menuItems.bottomRightQuarter') }, frac: { x0: 0.5, y0: 0.5, x1: 1, y1: 1 } },
+  { id: 'left-third', get label() { return menuT('menuItems.leftThird') }, frac: { x0: 0, y0: 0, x1: 1 / 3, y1: 1 } },
+  { id: 'center-third', get label() { return menuT('menuItems.centerThird') }, frac: { x0: 1 / 3, y0: 0, x1: 2 / 3, y1: 1 } },
+  { id: 'right-third', get label() { return menuT('menuItems.rightThird') }, frac: { x0: 2 / 3, y0: 0, x1: 1, y1: 1 } }
 ]
 
 /**

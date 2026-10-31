@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 /**
  * A file-manager node: one directory listing, on the canvas, beside the terminals that work in it.
  *
@@ -328,7 +329,7 @@ export function FilesNode({ id, data, selected }: NodeProps<CanvasNode>) {
       const dir = entry ? createTargetDir(path, entry.dir) : cwd
       const items: MenuItem[] = []
       if (entry) {
-        items.push({ label: entry.dir ? 'Open folder' : 'Open', onClick: () => open(entry) })
+        items.push({ label: entry.dir ? menuT('menuItems.openFolder') : menuT('menuItems.open'), onClick: () => open(entry) })
       }
       // "here" has to be somewhere a terminal can actually be opened. `addTerminal` spawns
       // against the ACTIVE project, and a relay project carries no `ssh` binding — so on a relay
@@ -338,7 +339,7 @@ export function FilesNode({ id, data, selected }: NodeProps<CanvasNode>) {
       // is fine: `addTerminal` now rebinds `remoteCwd` to the requested directory.)
       if ((!entry || entry.dir) && source !== 'relay') {
         items.push({
-          label: 'New terminal here',
+          label: menuT('menuItems.newTerminalHere'),
           onClick: () =>
             window.dispatchEvent(
               new CustomEvent('nodeterm:open-terminal', { detail: { cwd: entry ? path : cwd } })
@@ -346,8 +347,8 @@ export function FilesNode({ id, data, selected }: NodeProps<CanvasNode>) {
         })
       }
       items.push({ type: 'separator' })
-      items.push({ label: 'New file…', onClick: () => void create(dir, 'file') })
-      items.push({ label: 'New folder…', onClick: () => void create(dir, 'folder') })
+      items.push({ label: menuT('menuItems.newFile2'), onClick: () => void create(dir, 'file') })
+      items.push({ label: menuT('menuItems.newFolder2'), onClick: () => void create(dir, 'folder') })
       const dl = downloadMenuEntries(route, path, { dir: entry ? entry.dir : true, here: !entry })
       if (dl.length) {
         items.push({ type: 'separator' })
@@ -358,14 +359,14 @@ export function FilesNode({ id, data, selected }: NodeProps<CanvasNode>) {
           items.push({
             label: d.label,
             disabled: busy,
-            hint: busy ? 'Already downloading' : undefined,
+            hint: busy ? menuT('menuItems.alreadyDownloading') : undefined,
             onClick: () => void (d.pickFolder ? downloadTo(path, isDir) : download(path, isDir))
           })
         }
       }
       items.push({ type: 'separator' })
       items.push({
-        label: 'Copy path',
+        label: menuT('menuItems.copyPath2'),
         onClick: () => api.clipboard.writeText(path)
       })
       if (localShell) {

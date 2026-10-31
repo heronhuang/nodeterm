@@ -1,3 +1,4 @@
+import { t as menuT } from '../../i18n/runtime'
 import { KANBAN_SOURCES, type KanbanSourceFilter as KanbanSourceFilterValue } from '../../lib/kanbanSources'
 
 /** The filter's value: every source, or one of them. Named for its call sites, which read it as
@@ -13,7 +14,7 @@ export function KanbanSourceFilter({
 }): React.JSX.Element {
   // 'all' plus the registry, in declaration order — adding a source adds a button here.
   const options: { id: KanbanSource; label: string }[] = [
-    { id: 'all', label: 'All' },
+    { id: 'all', label: menuT('menuItems.all') },
     ...KANBAN_SOURCES.map((source) => ({ id: source.id as KanbanSource, label: source.label }))
   ]
   return (

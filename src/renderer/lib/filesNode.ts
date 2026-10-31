@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 /**
  * The decisions a file-manager node makes, kept pure so they can be pressed in a test rather than
  * clicked in the app: which directory "up" is, what the breadcrumb shows, what a filter matches,
@@ -217,12 +218,12 @@ export function downloadMenuEntries(
   { dir, here }: { dir: boolean; here: boolean }
 ): DownloadMenuEntry[] {
   if (route === 'none' || !isDownloadablePath(path)) return []
-  const what = dir ? (here ? 'Download this folder' : 'Download folder') : 'Download'
+  const what = dir ? (here ? menuT('menuItems.downloadThisFolder') : menuT('menuItems.downloadFolder2')) : menuT('menuItems.download')
   const entries: DownloadMenuEntry[] = [
     { label: dir && route === 'http' ? `${what} (.tar.gz)` : what, pickFolder: false }
   ]
   // The browser has no native folder picker, and where its downloads land is a browser setting.
-  if (route === 'scp') entries.push({ label: 'Download to…', pickFolder: true })
+  if (route === 'scp') entries.push({ label: menuT('menuItems.downloadTo'), pickFolder: true })
   return entries
 }
 

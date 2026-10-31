@@ -1,9 +1,11 @@
+import { menuItemsEn } from './menu-items-en'
 import { settingsSectionEn } from './settings-en'
 
 const { language: languageSectionEn, ...settingsRestEn } = settingsSectionEn
 
 /** English UI message catalog (nested keys resolved by createTranslator). */
 export const enMessages = {
+  menuItems: menuItemsEn,
   common: {
     cancel: 'Cancel',
     ok: 'OK',

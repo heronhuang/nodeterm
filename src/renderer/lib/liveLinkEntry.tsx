@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 // Live links: the ENTRY POINTS' decisions — one rule for every place that can start or stop a live
 // link (the canvas node menu, the sessions-sidebar row, the kanban card menus of both boards, the
 // card modal's action, the command palette, Settings). Pure: every surface fact (Server Edition,
@@ -18,7 +19,6 @@ import {
   shareDisabledReason,
   showsStopAll,
   STOP_ALL_BUTTON,
-  STOP_ALL_PALETTE_LABEL,
   STOP_FAILED_MESSAGE,
   stopAllConfirmMessage,
   stopAllOutcomeText
@@ -172,10 +172,10 @@ export function liveLinkMenuRow(o: {
   const target: LiveLinkTarget = { nodeId: o.node.id, title, projectId: o.projectId }
   return [
     {
-      label: SHARE_LIVE_LINK_LABEL,
+      label: menuT('menuItems.shareLiveLinkEllipsis'),
       icon: o.icon,
       disabled: !!why,
-      hint: why ?? 'A read-only browser link to this terminal that ends by itself.',
+      hint: why ?? menuT('menuItems.aReadOnlyBrowserLinkToThisTerminalThat'),
       onClick: () => o.open(target)
     }
   ]
@@ -303,7 +303,7 @@ export function liveLinkCommands(o: {
   return [
     {
       id: 'live-links-manage',
-      label: 'Manage live links',
+      label: menuT('menuItems.manageLiveLinks'),
       hint: 'share watch broadcast stream link public viewers',
       icon: o.icon,
       run: o.manage
@@ -312,7 +312,7 @@ export function liveLinkCommands(o: {
       ? [
           {
             id: 'live-chat',
-            label: 'Live chat',
+            label: menuT('menuItems.liveChat'),
             hint: 'live link viewers messages reply people kick control',
             section: 'View',
             icon: o.chatIcon,
@@ -324,7 +324,7 @@ export function liveLinkCommands(o: {
       ? [
           {
             id: 'live-links-stop-all',
-            label: STOP_ALL_PALETTE_LABEL,
+            label: menuT('menuItems.stopAllLinks'),
             hint: 'share revoke broadcast',
             icon: o.icon,
             run: o.confirmStopAll

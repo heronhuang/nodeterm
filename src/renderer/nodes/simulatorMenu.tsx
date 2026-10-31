@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import type { MenuItem } from '../components/ContextMenu'
 import type {
   BatteryState,
@@ -39,17 +40,16 @@ export interface SimulatorMenuState {
   recording: boolean
 }
 
-const NOT_SUPPORTED = ' (Not Supported)'
 
 function notSupported(label: string, why: string): MenuItem {
-  return { label: label + NOT_SUPPORTED, disabled: true, hint: why, onClick: () => undefined }
+  return { label: label + menuT('menuItems.notSupported'), disabled: true, hint: why, onClick: () => undefined }
 }
 
 /** A View-menu sizing item: inside a run node there is no node of its own to size. */
 function sizeItem(label: string, fn: (() => void) | undefined): MenuItem {
   return fn
     ? { label, onClick: () => fn() }
-    : { label, disabled: true, hint: 'Pop the simulator out of the run node to size it.', onClick: () => undefined }
+    : { label, disabled: true, hint: menuT('menuItems.popTheSimulatorOutOfTheRunNodeTo'), onClick: () => undefined }
 }
 
 const check = (on: boolean | undefined, label: string) => (on ? `✓ ${label}` : label)
@@ -61,169 +61,169 @@ export function buildSimulatorMenu(h: SimulatorMenuHandlers, s: SimulatorMenuSta
     onClick: () => h.action({ a: 'status-bar', preset: 'battery', batteryLevel: level, batteryState: state })
   })
   const bio = (kind: 'face' | 'touch'): MenuItem[] => [
-    { label: 'Enrolled', onClick: () => h.action({ a: 'biometric', kind, op: 'enroll' }) },
-    { label: 'Not Enrolled', onClick: () => h.action({ a: 'biometric', kind, op: 'unenroll' }) },
+    { label: menuT('menuItems.enrolled'), onClick: () => h.action({ a: 'biometric', kind, op: 'enroll' }) },
+    { label: menuT('menuItems.notEnrolled'), onClick: () => h.action({ a: 'biometric', kind, op: 'unenroll' }) },
     { type: 'separator' },
-    { label: kind === 'face' ? 'Matching Face' : 'Matching Touch', onClick: () => h.action({ a: 'biometric', kind, op: 'match' }) },
-    { label: kind === 'face' ? 'Non-matching Face' : 'Non-matching Touch', onClick: () => h.action({ a: 'biometric', kind, op: 'nomatch' }) }
+    { label: kind === 'face' ? menuT('menuItems.matchingFace') : menuT('menuItems.matchingTouch'), onClick: () => h.action({ a: 'biometric', kind, op: 'match' }) },
+    { label: kind === 'face' ? menuT('menuItems.nonMatchingFace') : menuT('menuItems.nonMatchingTouch'), onClick: () => h.action({ a: 'biometric', kind, op: 'nomatch' }) }
   ]
 
   return [
     {
       type: 'submenu',
-      label: 'Device',
+      label: menuT('menuItems.device'),
       children: [
-        { label: 'Home', onClick: () => h.button('home') },
-        { label: 'Lock', onClick: () => h.button('lock') },
-        { label: 'Side Button', onClick: () => h.button('side') },
+        { label: menuT('menuItems.home'), onClick: () => h.button('home') },
+        { label: menuT('menuItems.lock'), onClick: () => h.button('lock') },
+        { label: menuT('menuItems.sideButton'), onClick: () => h.button('side') },
         { label: 'Siri', onClick: () => h.button('siri') },
-        notSupported('App Switcher', 'The swipe-up-and-hold gesture is not recognised when sent from outside DeviceHub yet.'),
-        notSupported('Action Button', 'The Action Button’s input code is not documented.'),
+        notSupported(menuT('menuItems.appSwitcher'), menuT('menuItems.theSwipeUpAndHoldGestureIsNotRecognised')),
+        notSupported(menuT('menuItems.actionButton'), menuT('menuItems.theActionButtonSInputCodeIsNotDocumented')),
         { type: 'separator' },
-        { label: 'Volume Up', onClick: () => h.button('volup') },
-        { label: 'Volume Down', onClick: () => h.button('voldown') },
-        { label: 'Play / Pause', onClick: () => h.button('playpause') },
+        { label: menuT('menuItems.volumeUp'), onClick: () => h.button('volup') },
+        { label: menuT('menuItems.volumeDown'), onClick: () => h.button('voldown') },
+        { label: menuT('menuItems.playPause'), onClick: () => h.button('playpause') },
         { type: 'separator' },
-        { label: 'Shake', onClick: () => h.action({ a: 'shake' }) },
-        { label: 'Rotate Left  ⌘←', onClick: () => h.rotate('left') },
-        { label: 'Rotate Right  ⌘→', onClick: () => h.rotate('right') },
+        { label: menuT('menuItems.shake'), onClick: () => h.action({ a: 'shake' }) },
+        { label: menuT('menuItems.rotateLeft'), onClick: () => h.rotate('left') },
+        { label: menuT('menuItems.rotateRight'), onClick: () => h.rotate('right') },
         { type: 'separator' },
-        { label: 'Restart', onClick: () => h.action({ a: 'restart' }) },
-        { label: 'Reset Content and Settings…', danger: true, onClick: () => h.confirmErase() },
-        { label: 'Shut Down', onClick: () => h.shutDown() },
+        { label: menuT('menuItems.restart'), onClick: () => h.action({ a: 'restart' }) },
+        { label: menuT('menuItems.resetContentAndSettings'), danger: true, onClick: () => h.confirmErase() },
+        { label: menuT('menuItems.shutDown'), onClick: () => h.shutDown() },
         { type: 'separator' },
-        notSupported('Directional Pad', 'Apple TV only.'),
-        notSupported('Simulate Trackpad', 'Apple TV only.'),
-        notSupported('Back', 'Apple Watch / Apple TV only.')
+        notSupported(menuT('menuItems.directionalPad'), menuT('menuItems.appleTvOnly')),
+        notSupported(menuT('menuItems.simulateTrackpad'), menuT('menuItems.appleTvOnly')),
+        notSupported(menuT('menuItems.back'), menuT('menuItems.appleWatchAppleTvOnly'))
       ]
     },
     {
       type: 'submenu',
-      label: 'Capture',
+      label: menuT('menuItems.capture'),
       children: [
-        { label: 'Save Screenshot to Desktop', onClick: () => h.screenshot('desktop') },
-        { label: 'Copy Screenshot', onClick: () => h.screenshot('clipboard') },
-        { label: 'Add Screenshot to Canvas', onClick: () => h.screenshot('canvas') },
+        { label: menuT('menuItems.saveScreenshotToDesktop'), onClick: () => h.screenshot('desktop') },
+        { label: menuT('menuItems.copyScreenshot'), onClick: () => h.screenshot('clipboard') },
+        { label: menuT('menuItems.addScreenshotToCanvas'), onClick: () => h.screenshot('canvas') },
         { type: 'separator' },
-        { label: s.recording ? '■ Stop Recording' : '● Record Screen', onClick: () => h.toggleRecording() }
+        { label: s.recording ? menuT('menuItems.stopRecording') : menuT('menuItems.recordScreen'), onClick: () => h.toggleRecording() }
       ]
     },
     {
       type: 'submenu',
-      label: 'Appearance',
+      label: menuT('menuItems.appearance'),
       children: [
-        { label: check(d.appearance === 'light', 'Light'), onClick: () => h.action({ a: 'appearance', value: 'light' }) },
-        { label: check(d.appearance === 'dark', 'Dark'), onClick: () => h.action({ a: 'appearance', value: 'dark' }) },
+        { label: check(d.appearance === 'light', menuT('menuItems.light')), onClick: () => h.action({ a: 'appearance', value: 'light' }) },
+        { label: check(d.appearance === 'dark', menuT('menuItems.dark')), onClick: () => h.action({ a: 'appearance', value: 'dark' }) },
         { type: 'separator' },
-        { label: 'Larger Text', onClick: () => h.action({ a: 'content-size', value: 'increment' }) },
-        { label: 'Smaller Text', onClick: () => h.action({ a: 'content-size', value: 'decrement' }) },
+        { label: menuT('menuItems.largerText'), onClick: () => h.action({ a: 'content-size', value: 'increment' }) },
+        { label: menuT('menuItems.smallerText'), onClick: () => h.action({ a: 'content-size', value: 'decrement' }) },
         {
-          label: check(d.increaseContrast, 'Increase Contrast'),
+          label: check(d.increaseContrast, menuT('menuItems.increaseContrast')),
           onClick: () => h.action({ a: 'increase-contrast', value: !d.increaseContrast })
         },
         { type: 'separator' },
-        notSupported('Grayscale', 'DeviceHub sets this through Apple internals; there is no public simctl command for it.'),
-        notSupported('Reduce Motion', 'DeviceHub sets this through Apple internals; there is no public simctl command for it.'),
-        notSupported('Reduce Transparency', 'DeviceHub sets this through Apple internals; there is no public simctl command for it.'),
-        notSupported('Liquid Glass Look', 'DeviceHub sets this through Apple internals; there is no public simctl command for it.')
+        notSupported(menuT('menuItems.grayscale'), menuT('menuItems.devicehubSetsThisThroughAppleInternalsThereIsNo')),
+        notSupported(menuT('menuItems.reduceMotion'), menuT('menuItems.devicehubSetsThisThroughAppleInternalsThereIsNo')),
+        notSupported(menuT('menuItems.reduceTransparency'), menuT('menuItems.devicehubSetsThisThroughAppleInternalsThereIsNo')),
+        notSupported(menuT('menuItems.liquidGlassLook'), menuT('menuItems.devicehubSetsThisThroughAppleInternalsThereIsNo'))
       ]
     },
     {
       type: 'submenu',
-      label: 'Location',
+      label: menuT('menuItems.location'),
       children: [
-        { label: 'None', onClick: () => h.action({ a: 'location-clear' }) },
+        { label: menuT('menuItems.none'), onClick: () => h.action({ a: 'location-clear' }) },
         ...((d.locationScenarios ?? []).length ? [{ type: 'separator' } as MenuItem] : []),
         ...(d.locationScenarios ?? []).map(
           (scenario): MenuItem => ({ label: scenario, onClick: () => h.action({ a: 'location-run', scenario }) })
         ),
         { type: 'separator' },
-        { label: 'Custom Location…', onClick: () => h.promptCustomLocation() }
+        { label: menuT('menuItems.customLocation'), onClick: () => h.promptCustomLocation() }
       ]
     },
     {
       type: 'submenu',
-      label: 'Status Bar',
+      label: menuT('menuItems.statusBar'),
       children: [
-        { label: 'Clean (9:41, full battery)', onClick: () => h.action({ a: 'status-bar', preset: 'clean' }) },
+        { label: menuT('menuItems.clean941FullBattery'), onClick: () => h.action({ a: 'status-bar', preset: 'clean' }) },
         {
           type: 'submenu',
-          label: 'Battery',
+          label: menuT('menuItems.battery'),
           children: [
-            battery(100, 'charged', '100% — Charged'),
-            battery(50, 'charging', '50% — Charging'),
+            battery(100, 'charged', menuT('menuItems.value100Charged')),
+            battery(50, 'charging', menuT('menuItems.value50Charging')),
             battery(50, 'discharging', '50%'),
             battery(20, 'discharging', '20%'),
             battery(5, 'discharging', '5%')
           ]
         },
         { type: 'separator' },
-        { label: 'Clear Overrides', onClick: () => h.action({ a: 'status-bar', preset: 'clear' }) }
+        { label: menuT('menuItems.clearOverrides'), onClick: () => h.action({ a: 'status-bar', preset: 'clear' }) }
       ]
     },
     {
       type: 'submenu',
-      label: 'Biometrics',
+      label: menuT('menuItems.biometrics'),
       children: [
-        { type: 'submenu', label: 'Face ID', children: bio('face') },
-        { type: 'submenu', label: 'Touch ID', children: bio('touch') },
-        notSupported('Optic ID', 'Apple Vision Pro only.')
+        { type: 'submenu', label: menuT('menuItems.faceId'), children: bio('face') },
+        { type: 'submenu', label: menuT('menuItems.touchId'), children: bio('touch') },
+        notSupported(menuT('menuItems.opticId'), menuT('menuItems.appleVisionProOnly'))
       ]
     },
     {
       type: 'submenu',
-      label: 'Clipboard',
+      label: menuT('menuItems.clipboard'),
       children: [
-        { label: 'Paste Mac Clipboard into Device  ⌘V', onClick: () => h.action({ a: 'pasteboard', dir: 'to-device' }) },
-        { label: 'Copy Device Clipboard to Mac', onClick: () => h.action({ a: 'pasteboard', dir: 'to-mac' }) }
+        { label: menuT('menuItems.pasteMacClipboardIntoDeviceV'), onClick: () => h.action({ a: 'pasteboard', dir: 'to-device' }) },
+        { label: menuT('menuItems.copyDeviceClipboardToMac'), onClick: () => h.action({ a: 'pasteboard', dir: 'to-mac' }) }
       ]
     },
     {
       type: 'submenu',
-      label: 'Apps',
+      label: menuT('menuItems.apps'),
       children: [
-        { label: 'Install App…', onClick: () => h.pickInstall() },
-        { label: 'Add Photo or Video…', onClick: () => h.pickMedia() },
+        { label: menuT('menuItems.installApp'), onClick: () => h.pickInstall() },
+        { label: menuT('menuItems.addPhotoOrVideo'), onClick: () => h.pickMedia() },
         { type: 'separator' },
-        { label: 'Open URL…', onClick: () => h.promptOpenUrl() },
-        { label: 'Send Push Notification…', onClick: () => h.promptPush() },
+        { label: menuT('menuItems.openUrl'), onClick: () => h.promptOpenUrl() },
+        { label: menuT('menuItems.sendPushNotification'), onClick: () => h.promptPush() },
         {
           type: 'submenu',
-          label: 'Privacy',
+          label: menuT('menuItems.privacy'),
           children: [
-            { label: 'Grant All Permissions to App…', onClick: () => h.promptPrivacy('grant') },
-            { label: 'Revoke All Permissions from App…', onClick: () => h.promptPrivacy('revoke') },
+            { label: menuT('menuItems.grantAllPermissionsToApp'), onClick: () => h.promptPrivacy('grant') },
+            { label: menuT('menuItems.revokeAllPermissionsFromApp'), onClick: () => h.promptPrivacy('revoke') },
             { type: 'separator' },
-            { label: 'Reset All Permissions', onClick: () => h.action({ a: 'privacy', op: 'reset', service: 'all' }) }
+            { label: menuT('menuItems.resetAllPermissions'), onClick: () => h.action({ a: 'privacy', op: 'reset', service: 'all' }) }
           ]
         },
         { type: 'separator' },
-        notSupported('Provisioning Profiles', 'Managed in DeviceHub.'),
-        notSupported('Crash Reports', 'Managed in DeviceHub.')
+        notSupported(menuT('menuItems.provisioningProfiles'), menuT('menuItems.managedInDevicehub')),
+        notSupported(menuT('menuItems.crashReports'), menuT('menuItems.managedInDevicehub'))
       ]
     },
     {
       type: 'submenu',
-      label: 'View',
+      label: menuT('menuItems.view'),
       children: [
-        sizeItem('Actual Size', h.actualSize),
-        sizeItem('Fit to Screen', h.fitToScreen)
+        sizeItem(menuT('menuItems.actualSize'), h.actualSize),
+        sizeItem(menuT('menuItems.fitToScreen'), h.fitToScreen)
       ]
     },
     { type: 'separator' },
     {
-      label: 'Open in DeviceHub',
-      hint: 'While DeviceHub shows this device, it takes the touch input — close its window to tap here again.',
+      label: menuT('menuItems.openInDevicehub'),
+      hint: menuT('menuItems.whileDevicehubShowsThisDeviceItTakesTheTouch'),
       onClick: () => h.action({ a: 'open-devicehub' })
     },
     {
       type: 'submenu',
-      label: 'Device Management',
+      label: menuT('menuItems.deviceManagement'),
       children: [
-        notSupported('New Device…', 'Create devices in DeviceHub.'),
-        notSupported('Rename…', 'Rename devices in DeviceHub.'),
-        notSupported('Pair Apple Watch…', 'Pair devices in DeviceHub.'),
-        notSupported('Pair Nearby Device…', 'Pair devices in DeviceHub.')
+        notSupported(menuT('menuItems.newDevice'), menuT('menuItems.createDevicesInDevicehub')),
+        notSupported(menuT('menuItems.rename2'), menuT('menuItems.renameDevicesInDevicehub')),
+        notSupported(menuT('menuItems.pairAppleWatch'), menuT('menuItems.pairDevicesInDevicehub')),
+        notSupported(menuT('menuItems.pairNearbyDevice'), menuT('menuItems.pairDevicesInDevicehub'))
       ]
     }
   ]
@@ -242,120 +242,120 @@ export function buildAndroidMenu(h: SimulatorMenuHandlers, s: Pick<SimulatorMenu
   return [
     {
       type: 'submenu',
-      label: 'Device',
+      label: menuT('menuItems.device'),
       children: [
-        { label: 'Home', onClick: () => h.button('home') },
-        { label: 'Back', onClick: () => h.button('back') },
-        { label: 'Recent Apps', onClick: () => h.button('recents') },
-        { label: 'Power', onClick: () => h.button('lock') },
+        { label: menuT('menuItems.home'), onClick: () => h.button('home') },
+        { label: menuT('menuItems.back'), onClick: () => h.button('back') },
+        { label: menuT('menuItems.recentApps'), onClick: () => h.button('recents') },
+        { label: menuT('menuItems.power'), onClick: () => h.button('lock') },
         { type: 'separator' },
-        { label: 'Volume Up', onClick: () => h.button('volup') },
-        { label: 'Volume Down', onClick: () => h.button('voldown') },
-        { label: 'Play / Pause', onClick: () => h.button('playpause') },
+        { label: menuT('menuItems.volumeUp'), onClick: () => h.button('volup') },
+        { label: menuT('menuItems.volumeDown'), onClick: () => h.button('voldown') },
+        { label: menuT('menuItems.playPause'), onClick: () => h.button('playpause') },
         { type: 'separator' },
-        { label: 'Rotate Left  ⌘←', onClick: () => h.rotate('left') },
-        { label: 'Rotate Right  ⌘→', onClick: () => h.rotate('right') },
+        { label: menuT('menuItems.rotateLeft'), onClick: () => h.rotate('left') },
+        { label: menuT('menuItems.rotateRight'), onClick: () => h.rotate('right') },
         { type: 'separator' },
-        { label: 'Restart', onClick: () => h.action({ a: 'restart' }) },
-        { label: 'Shut Down', onClick: () => h.shutDown() },
-        notSupported('Wipe Data…', 'Use Android Studio’s Device Manager → Wipe Data (the emulator must be stopped).'),
-        notSupported('Fold / Unfold', 'Foldable postures are not wired up yet.')
+        { label: menuT('menuItems.restart'), onClick: () => h.action({ a: 'restart' }) },
+        { label: menuT('menuItems.shutDown'), onClick: () => h.shutDown() },
+        notSupported(menuT('menuItems.wipeData'), menuT('menuItems.useAndroidStudioSDeviceManagerWipeDataThe')),
+        notSupported(menuT('menuItems.foldUnfold'), menuT('menuItems.foldablePosturesAreNotWiredUpYet'))
       ]
     },
     {
       type: 'submenu',
-      label: 'Capture',
+      label: menuT('menuItems.capture'),
       children: [
-        { label: 'Save Screenshot to Desktop', onClick: () => h.screenshot('desktop') },
-        { label: 'Copy Screenshot', onClick: () => h.screenshot('clipboard') },
-        { label: 'Add Screenshot to Canvas', onClick: () => h.screenshot('canvas') },
+        { label: menuT('menuItems.saveScreenshotToDesktop'), onClick: () => h.screenshot('desktop') },
+        { label: menuT('menuItems.copyScreenshot'), onClick: () => h.screenshot('clipboard') },
+        { label: menuT('menuItems.addScreenshotToCanvas'), onClick: () => h.screenshot('canvas') },
         { type: 'separator' },
-        notSupported('Record Screen', 'Screen recording for Android devices is not wired up yet.')
+        notSupported(menuT('menuItems.recordScreen2'), menuT('menuItems.screenRecordingForAndroidDevicesIsNotWiredUp'))
       ]
     },
     {
       type: 'submenu',
-      label: 'Appearance',
+      label: menuT('menuItems.appearance'),
       children: [
-        { label: check(d.appearance === 'light', 'Light'), onClick: () => h.action({ a: 'appearance', value: 'light' }) },
-        { label: check(d.appearance === 'dark', 'Dark'), onClick: () => h.action({ a: 'appearance', value: 'dark' }) },
+        { label: check(d.appearance === 'light', menuT('menuItems.light')), onClick: () => h.action({ a: 'appearance', value: 'light' }) },
+        { label: check(d.appearance === 'dark', menuT('menuItems.dark')), onClick: () => h.action({ a: 'appearance', value: 'dark' }) },
         { type: 'separator' },
-        { label: 'Larger Text', onClick: () => h.action({ a: 'content-size', value: 'increment' }) },
-        { label: 'Smaller Text', onClick: () => h.action({ a: 'content-size', value: 'decrement' }) }
+        { label: menuT('menuItems.largerText'), onClick: () => h.action({ a: 'content-size', value: 'increment' }) },
+        { label: menuT('menuItems.smallerText'), onClick: () => h.action({ a: 'content-size', value: 'decrement' }) }
       ]
     },
     {
       type: 'submenu',
-      label: 'Location',
+      label: menuT('menuItems.location'),
       children: [
-        { label: 'Custom Location…', onClick: () => h.promptCustomLocation() },
-        notSupported('Routes', 'GPX / KML routes are played from Android Studio’s extended controls.')
+        { label: menuT('menuItems.customLocation'), onClick: () => h.promptCustomLocation() },
+        notSupported(menuT('menuItems.routes'), menuT('menuItems.gpxKmlRoutesArePlayedFromAndroidStudioS'))
       ]
     },
     {
       type: 'submenu',
-      label: 'Status Bar',
+      label: menuT('menuItems.statusBar'),
       children: [
-        { label: 'Clean (9:41, full battery)', onClick: () => h.action({ a: 'status-bar', preset: 'clean' }) },
+        { label: menuT('menuItems.clean941FullBattery'), onClick: () => h.action({ a: 'status-bar', preset: 'clean' }) },
         {
           type: 'submenu',
-          label: 'Battery',
+          label: menuT('menuItems.battery'),
           children: [
-            battery(100, 'charged', '100% — Charged'),
-            battery(50, 'charging', '50% — Charging'),
+            battery(100, 'charged', menuT('menuItems.value100Charged')),
+            battery(50, 'charging', menuT('menuItems.value50Charging')),
             battery(50, 'discharging', '50%'),
             battery(20, 'discharging', '20%'),
             battery(5, 'discharging', '5%')
           ]
         },
         { type: 'separator' },
-        { label: 'Clear Overrides', onClick: () => h.action({ a: 'status-bar', preset: 'clear' }) }
+        { label: menuT('menuItems.clearOverrides'), onClick: () => h.action({ a: 'status-bar', preset: 'clear' }) }
       ]
     },
     {
       type: 'submenu',
-      label: 'Biometrics',
+      label: menuT('menuItems.biometrics'),
       children: [
-        { label: 'Matching Fingerprint', onClick: () => h.action({ a: 'biometric', kind: 'touch', op: 'match' }) },
-        { label: 'Non-matching Fingerprint', onClick: () => h.action({ a: 'biometric', kind: 'touch', op: 'nomatch' }) },
-        notSupported('Face Unlock', 'The emulator has no face sensor to simulate.')
+        { label: menuT('menuItems.matchingFingerprint'), onClick: () => h.action({ a: 'biometric', kind: 'touch', op: 'match' }) },
+        { label: menuT('menuItems.nonMatchingFingerprint'), onClick: () => h.action({ a: 'biometric', kind: 'touch', op: 'nomatch' }) },
+        notSupported(menuT('menuItems.faceUnlock'), menuT('menuItems.theEmulatorHasNoFaceSensorToSimulate'))
       ]
     },
     {
       type: 'submenu',
-      label: 'Clipboard',
+      label: menuT('menuItems.clipboard'),
       children: [
-        { label: 'Paste Mac Clipboard into Device  ⌘V', disabled: true, hint: 'Press ⌘V while the screen has focus.', onClick: () => undefined },
-        { label: 'Copy Device Clipboard to Mac', onClick: () => h.action({ a: 'pasteboard', dir: 'to-mac' }) }
+        { label: menuT('menuItems.pasteMacClipboardIntoDeviceV'), disabled: true, hint: menuT('menuItems.pressVWhileTheScreenHasFocus'), onClick: () => undefined },
+        { label: menuT('menuItems.copyDeviceClipboardToMac'), onClick: () => h.action({ a: 'pasteboard', dir: 'to-mac' }) }
       ]
     },
     {
       type: 'submenu',
-      label: 'Apps',
+      label: menuT('menuItems.apps'),
       children: [
-        { label: 'Install APK…', onClick: () => h.pickInstall() },
-        { label: 'Add Photo or Video…', onClick: () => h.pickMedia() },
+        { label: menuT('menuItems.installApk'), onClick: () => h.pickInstall() },
+        { label: menuT('menuItems.addPhotoOrVideo'), onClick: () => h.pickMedia() },
         { type: 'separator' },
-        { label: 'Open URL…', onClick: () => h.promptOpenUrl() },
-        notSupported('Send Push Notification…', 'Android push goes through Firebase Cloud Messaging, which the emulator does not simulate.'),
-        notSupported('Permissions…', 'Grant or revoke permissions with adb shell pm grant / revoke.')
+        { label: menuT('menuItems.openUrl'), onClick: () => h.promptOpenUrl() },
+        notSupported(menuT('menuItems.sendPushNotification'), menuT('menuItems.androidPushGoesThroughFirebaseCloudMessagingWhichThe')),
+        notSupported(menuT('menuItems.permissions'), menuT('menuItems.grantOrRevokePermissionsWithAdbShellPmGrant'))
       ]
     },
     {
       type: 'submenu',
-      label: 'View',
+      label: menuT('menuItems.view'),
       children: [
-        sizeItem('Actual Size', h.actualSize),
-        sizeItem('Fit to Screen', h.fitToScreen)
+        sizeItem(menuT('menuItems.actualSize'), h.actualSize),
+        sizeItem(menuT('menuItems.fitToScreen'), h.fitToScreen)
       ]
     },
     { type: 'separator' },
     {
       type: 'submenu',
-      label: 'Device Management',
+      label: menuT('menuItems.deviceManagement'),
       children: [
-        notSupported('New Device…', 'Create virtual devices in Android Studio’s Device Manager.'),
-        notSupported('Rename…', 'Rename virtual devices in Android Studio’s Device Manager.')
+        notSupported(menuT('menuItems.newDevice'), menuT('menuItems.createVirtualDevicesInAndroidStudioSDeviceManager')),
+        notSupported(menuT('menuItems.rename2'), menuT('menuItems.renameVirtualDevicesInAndroidStudioSDeviceManager'))
       ]
     }
   ]

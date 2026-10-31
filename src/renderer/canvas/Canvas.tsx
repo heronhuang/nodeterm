@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { PrepareUpdateDialog } from '../components/PrepareUpdateDialog'
 import type { PrepNode } from '../lib/updatePrep'
 import { markLocalOnSshCanvas } from '../lib/localOnSshCanvas'
@@ -611,7 +612,6 @@ import {
   BUILTIN_AGENT_IDS,
   resolvePermissionMode,
   hasPermissionMode,
-  PERMISSION_MODE_LABELS,
   type AgentId,
   type AgentPermissionMode
 } from '@shared/agents/config'
@@ -1013,6 +1013,20 @@ import { useWallpaperBackground, wallpaperLayers } from '../state/wallpaper'
 import { AerialWallpaper, useIsAerialWallpaper } from '../components/AerialWallpaper'
 import { showCanvasDots } from '../lib/canvasDots'
 import { PROJECT_NAME_MAX, clampProjectName } from '@shared/project-name'
+
+const permissionMenuKeys = {
+  manual: 'menuItems.askEachTime',
+  auto: 'menuItems.auto',
+  acceptEdits: 'menuItems.acceptEdits',
+  plan: 'menuItems.plan',
+  bypassPermissions: 'menuItems.bypassAll'
+} as const
+
+const waiverMenuKeys: Record<string, string> = {
+  'close': 'menuItems.closeNodes',
+  'write': 'menuItems.typeIntoTerminals',
+  'open-project': 'menuItems.openOrAddProjects'
+}
 
 const isMac = /Mac/i.test(navigator.platform || navigator.userAgent)
 
@@ -4368,7 +4382,7 @@ export function Canvas() {
   // host-side expiry drops the dialog rather than leaving Approve aimed at a dead id.
   useEffect(() => {
     const unPending = window.nodeTerminal.remoteHost.onPeerPending((info) =>
-      offerPendingPeer({ ...info, source: 'phone', label: 'Your phone' })
+      offerPendingPeer({ ...info, source: 'phone', label: menuT('menuItems.yourPhone') })
     )
     const unCleared = window.nodeTerminal.remoteHost.onPeerPendingCleared((info) => {
       const cur = pendingPeerRef.current
@@ -5106,20 +5120,20 @@ export function Canvas() {
         return {
           label: `${active ? '✓ ' : ''}${label}`,
           onClick: () => setReader(reader),
-          ...(active ? { disabled: true, hint: 'Current direction' } : {})
+          ...(active ? { disabled: true, hint: menuT('menuItems.currentDirection') } : {})
         }
       }
       setMenu({
         x: e.clientX,
         y: e.clientY,
         items: [
-          { type: 'label', label: 'Context link — who reads whom' },
-          option(`${a} ⇄ ${b} (both read)`, null),
-          option(`${a} reads ${b} only`, link.source),
-          option(`${b} reads ${a} only`, link.target),
+          { type: 'label', label: menuT('menuItems.contextLinkWhoReadsWhom') },
+          option(menuT('menuItems.bothRead', { a, b }), null),
+          option(menuT('menuItems.oneReads', { a, b }), link.source),
+          option(menuT('menuItems.oneReads', { a: b, b: a }), link.target),
           { type: 'separator' },
           {
-            label: viaRope ? 'Remove context link (keeps the rope)' : 'Remove link',
+            label: viaRope ? menuT('menuItems.removeContextLinkKeepsTheRope') : menuT('menuItems.removeLink'),
             danger: true,
             onClick: () => {
               setLinkEdges((es) => es.filter((x) => x.id !== link.id))
@@ -8889,21 +8903,21 @@ export function Canvas() {
       const active = projectId === useProjects.getState().activeProjectId
       return [
         {
-          label: 'Pause project',
+          label: menuT('menuItems.pauseProject'),
           icon: <IconPower />,
           onClick: () => void pauseNodes(projectTerminalIds(projectId), projectScopeLabel(projectId))
         },
         ...(pending
           ? [
               {
-                label: 'Cancel pending pauses',
+                label: menuT('menuItems.cancelPendingPauses'),
                 icon: <IconPower />,
                 onClick: () => cancelPendingPauses(projectId)
               } as MenuItem
             ]
           : []),
         {
-          label: 'Resume all',
+          label: menuT('menuItems.resumeAll'),
           icon: <IconPower />,
           disabled: !active,
           ...(active ? {} : { hint: t('tabBar.openToResume') }),
@@ -11342,7 +11356,7 @@ export function Canvas() {
         else addAgentNode(aid, at, groupId, acct)
       }
       const rowLabel = (agentLabel: string): string =>
-        pick?.label ? pick.label(agentLabel) : `New ${agentLabel}`
+        pick?.label ? pick.label(agentLabel) : menuT('menuItems.newNamed', { name: agentLabel })
       const disabled = useSettings.getState().settings.disabledAgents
       // Read the active project LIVE from the store (not the closure value) so a menu built right
       // after a `switchProject` — e.g. the sessions-sidebar "+" opening this menu on a non-active
@@ -11356,6 +11370,7 @@ export function Canvas() {
         useSettings.getState().settings.systemAccountLabel,
         useSystemAccount.getState().email
       )
+      const systemMenuLabel = systemLabel === 'System account' ? menuT('menuItems.systemAccount') : systemLabel
       // ✓ marks what a bare "New Claude" resolves to: the project default while it still
       // exists, else the system account (mirrors resolveNewNodeAccount's stale-id guard).
       const defaultAccountId = accounts.some((a) => a.id === project?.defaultAccountId)
@@ -11391,7 +11406,7 @@ export function Canvas() {
             icon: <AgentIcon agentId={aid} />,
             children: [
               {
-                label: withDefaultMark(systemLabel),
+                label: withDefaultMark(systemMenuLabel),
                 icon: <AgentIcon agentId="claude" />,
                 onClick: () => create('claude', null)
               },
@@ -11405,7 +11420,7 @@ export function Canvas() {
               ...(accountsHint
                 ? [
                     {
-                      label: 'No accounts on this host yet',
+                      label: menuT('menuItems.noAccountsOnThisHostYet'),
                       onClick: () => {},
                       disabled: true,
                       hint: accountsHint
@@ -11443,8 +11458,8 @@ export function Canvas() {
                   hint: sel.ok
                     ? undefined
                     : sel.reason === 'no-connection'
-                      ? 'This account lives on a host that is not connected — connect its SSH project first.'
-                      : 'This account is no longer available.',
+                      ? menuT('menuItems.thisAccountLivesOnAHostThatIsNot')
+                      : menuT('menuItems.thisAccountIsNoLongerAvailable'),
                   onClick: () => create('codex', a.id)
                 }
               })
@@ -11503,11 +11518,11 @@ export function Canvas() {
       // The group frame has its own colors strip; it answers to the same "Colors" toggle as the
       // node menu, so hiding it in Settings hides it everywhere a right-click can reach it.
       return tidySeparators([
-        { type: 'label', label: 'Group' },
+        { type: 'label', label: menuT('menuItems.group') },
         ...(canAddSelection && !groupHidden
           ? [
               {
-                label: 'Add selected objects to group',
+                label: menuT('menuItems.addSelectedObjectsToGroup'),
                 icon: <IconGroup />,
                 onClick: () => addToExistingGroup(selectedIds, groupId)
               } as MenuItem
@@ -11516,14 +11531,14 @@ export function Canvas() {
         ...(canWrapSelection && !groupHidden
           ? [
               {
-                label: 'Wrap selection in new group',
+                label: menuT('menuItems.wrapSelectionInNewGroup'),
                 icon: <IconGroup />,
                 onClick: () => groupSelection(rootIds)
               } as MenuItem
             ]
           : []),
         {
-          label: 'New terminal',
+          label: menuT('menuItems.newTerminal'),
           icon: <IconTerminal />,
           onClick: () => addTerminal(at, undefined, groupId)
         },
@@ -11532,34 +11547,34 @@ export function Canvas() {
         // content rows are hand-written and deliberately left alone — a frame offers the kinds
         // that make sense INSIDE a frame, which is not the pane's full list.
         ...agentEntriesToMenuItems(agentCreationEntries(at, groupId)),
-        { label: 'New sticky note', icon: <IconNote />, onClick: () => addSticky(at, groupId) },
+        { label: menuT('menuItems.newStickyNote'), icon: <IconNote />, onClick: () => addSticky(at, groupId) },
         // Inside a worktree-bound frame this roots the manager at the WORKTREE, not the project —
         // `cwdForNewNodeIn` is what makes a frame per branch also mean a file tree per branch.
-        { label: 'New file manager', icon: <IconExplorer />, onClick: () => addFiles(at, groupId) },
+        { label: menuT('menuItems.newFileManager'), icon: <IconExplorer />, onClick: () => addFiles(at, groupId) },
         { type: 'separator' },
         // The two canvas tidies, one level down: organize THIS frame's own items and size the
         // frame (and its ancestors) to hold them. Disabled WITH the reason rather than hidden —
         // the pane menu's rule: a row that is off for an invisible reason teaches nothing.
         {
-          label: 'Tidy group',
+          label: menuT('menuItems.tidyGroup'),
           icon: <IconGrid />,
           disabled: !!tidyRefusal,
-          hint: tidyRefusal ?? 'Pack the items in a grid and resize the group to fit.',
+          hint: tidyRefusal ?? menuT('menuItems.packTheItemsInAGridAndResizeThe'),
           onClick: () => arrangeGroupAction(groupId, 'grid')
         },
         {
-          label: 'Arrange group by lineage',
+          label: menuT('menuItems.arrangeGroupByLineage'),
           icon: <IconLineage />,
           disabled: !!lineageRefusal,
-          hint: lineageRefusal ?? 'One row per level: who opened whom, top to bottom.',
+          hint: lineageRefusal ?? menuT('menuItems.oneRowPerLevelWhoOpenedWhomTopTo'),
           onClick: () => arrangeGroupAction(groupId, 'lineage')
         },
         {
           // Every agent session inside the frame, nested frames included (the planner skips
           // non-agents and says so in the confirm).
-          label: 'Pause group',
+          label: menuT('menuItems.pauseGroup'),
           icon: <IconPower />,
-          hint: 'Quits each agent CLI in this group; busy ones pause after their current turn.',
+          hint: menuT('menuItems.quitsEachAgentCliInThisGroupBusyOnes'),
           onClick: () =>
             void pauseNodes(
               [...descendantIds(nodesRef.current, groupId)],
@@ -11575,7 +11590,7 @@ export function Canvas() {
           ? []
           : [
               {
-                label: 'Bind to worktree…',
+                label: menuT('menuItems.bindToWorktree'),
                 icon: <IconBranch />,
                 // On an SSH project the row stays, greyed, with the reason: the user learns the
                 // feature exists and why it is off, instead of wondering where it went.
@@ -11584,9 +11599,9 @@ export function Canvas() {
                 onClick: () => openWorktreeDialog(groupId)
               } as MenuItem
             ]),
-        { label: 'Ungroup', icon: <IconUngroup />, onClick: () => ungroup(groupId) },
+        { label: menuT('menuItems.ungroup'), icon: <IconUngroup />, onClick: () => ungroup(groupId) },
         {
-          label: 'Delete (keeps nodes)',
+          label: menuT('menuItems.deleteKeepsNodes'),
           icon: <IconTrash />,
           danger: true,
           onClick: () => ungroup(groupId)
@@ -11618,14 +11633,14 @@ export function Canvas() {
     const st = useAgentNodes.getState()
     const isLoop = id.startsWith('loop-')
     return [
-      { type: 'label', label: isLoop ? 'Loop card' : 'Subagent card' },
+      { type: 'label', label: isLoop ? menuT('menuItems.loopCard') : menuT('menuItems.subagentCard') },
       {
-        label: st.expanded[id] ? 'Collapse' : 'Expand',
+        label: st.expanded[id] ? menuT('menuItems.collapse') : menuT('menuItems.expand'),
         icon: <IconCollapse />,
         onClick: () => useAgentNodes.getState().toggleExpanded(id)
       },
       {
-        label: 'Reset position',
+        label: menuT('menuItems.resetPosition'),
         icon: <IconGrid />,
         onClick: () => useAgentNodes.getState().resetPlacement(id)
       },
@@ -11637,7 +11652,7 @@ export function Canvas() {
               // are one user action and had already drifted apart once: this one cleared the
               // durable `loop` entry, which is the only thing keeping Eco mode from quitting the
               // CLI a live cron was going to fire in.
-              label: 'Dismiss card',
+              label: menuT('menuItems.dismissCard'),
               icon: <IconTrash />,
               danger: true,
               onClick: () => applyLoopDismiss(id.slice('loop-'.length))
@@ -11722,27 +11737,27 @@ export function Canvas() {
           ...items,
           { type: 'separator' },
           // Canvas actions.
-          { label: 'Select all', icon: <IconSelectAll />, onClick: selectAll },
+          { label: menuT('menuItems.selectAll'), icon: <IconSelectAll />, onClick: selectAll },
           // fitAll, NOT the raw fitView: fitAll frames against the CURRENT chrome layout (the same
           // wrapper the command palette's Fit view uses). #227 swapped this to bare fitView, which
           // loses that framing and lets sidebar/HUD chrome cover part of the fitted content.
-          { label: 'Fit view', icon: <IconFit />, onClick: fitAll },
+          { label: menuT('menuItems.fitView'), icon: <IconFit />, onClick: fitAll },
           // Hidden below 2 top-level nodes — same reasoning as restart-idle-agents just below:
           // with 0 or 1 node the action can only be a visual no-op that still writes project.json.
           ...(hasArrangeableNodes()
-            ? [{ label: 'Tidy canvas', icon: <IconGrid />, onClick: arrangeAllNodes } as MenuItem]
+            ? [{ label: menuT('menuItems.tidyCanvas'), icon: <IconGrid />, onClick: arrangeAllNodes } as MenuItem]
             : []),
           // Same visibility gate as Tidy canvas, then disabled WITH the reason when this canvas
           // has no lineage to lay out — a row that is off for an invisible reason teaches nothing.
           ...(hasArrangeableNodes()
             ? [
                 {
-                  label: 'Arrange by lineage',
+                  label: menuT('menuItems.arrangeByLineage'),
                   icon: <IconLineage />,
                   disabled: !hasLineageLayers(),
                   hint: hasLineageLayers()
-                    ? 'One row per level: who opened whom, top to bottom.'
-                    : 'Nothing on this canvas was opened by another node yet.',
+                    ? menuT('menuItems.oneRowPerLevelWhoOpenedWhomTopTo')
+                    : menuT('menuItems.nothingOnThisCanvasWasOpenedByAnotherNode'),
                   onClick: arrangeByLineageAction
                 } as MenuItem
               ]
@@ -11752,9 +11767,9 @@ export function Canvas() {
           ...(hasRestartableAgents()
             ? [
                 {
-                  label: 'Restart idle agent sessions',
+                  label: menuT('menuItems.restartIdleAgentSessions'),
                   icon: <IconPower />,
-                  hint: 'Quits each idle agent CLI and relaunches it with --resume.',
+                  hint: menuT('menuItems.quitsEachIdleAgentCliAndRelaunchesItWith'),
                   onClick: restartIdleAgents
                 } as MenuItem
               ]
@@ -12421,7 +12436,7 @@ export function Canvas() {
                 kind: 'error',
                 sticky: true,
                 text: `Dispatched #${entry.number} in "${project.name}", but it could not start (${outcome.reason}). Use Run now on its node, or close the node to dispatch the issue again.`,
-                action: { label: 'Go there', run: () => travelToNodeRef.current(nodeId) }
+                action: { label: menuT('menuItems.goThere'), run: () => travelToNodeRef.current(nodeId) }
               })
             }
           } else {
@@ -13264,7 +13279,7 @@ export function Canvas() {
             // `travelToNode` reopens a closed project first and resolves off the SERIALIZED nodes,
             // which the write above has already made. Landing on the project's saved camera
             // instead would leave the user hunting for it.
-            action: { label: 'Go there', run: () => travelToNodeRef.current(first) }
+            action: { label: menuT('menuItems.goThere'), run: () => travelToNodeRef.current(first) }
           })
         }
         api.sendAgentControlResult({ requestId, ...r })
@@ -15796,7 +15811,7 @@ export function Canvas() {
                     return `  ${i + 1}. ${r.title ?? r.agent} — agent ${r.agent}${r.model ? `, model ${r.model}` : ''} — ${brief}`
                   })
                 ].join('\n'),
-                result: { dryRun: true, label: args.label || 'Team', roles }
+                result: { dryRun: true, label: args.label || menuT('menuItems.team'), roles }
               })
               return
             }
@@ -17136,9 +17151,9 @@ export function Canvas() {
       // Session-list-specific rows that have no canvas analogue: Go to (focus) and Rename (the
       // sidebar's prompt-dialog rename). These stay on top for every project.
       const head: MenuItem[] = [
-        { label: 'Go to', icon: <IconJump />, onClick: () => focusNodeById(id) },
+        { label: menuT('menuItems.goTo'), icon: <IconJump />, onClick: () => focusNodeById(id) },
         {
-          label: 'Rename',
+          label: menuT('menuItems.rename'),
           icon: <IconEditor />,
           onClick: () => {
             void promptDialog({ message: 'Rename session' }).then((t) => {
@@ -17167,14 +17182,14 @@ export function Canvas() {
               // row's "End session" in its place.
               ...selectionItems([id], undefined, { omit: ['delete'] }),
               { type: 'separator' },
-              { label: 'End session', icon: <IconTrash />, danger: true, onClick: () => closeSession(projectId, id) }
+              { label: menuT('menuItems.endSession'), icon: <IconTrash />, danger: true, onClick: () => closeSession(projectId, id) }
             ]
           : [
               // Non-active project: the shared rows read the active canvas's live nodes + per-node
               // registered closures, which don't exist here. Keep the narrow set that works for any
               // project (Duplicate defers to the store; the rest are list-level).
               {
-                label: 'Duplicate',
+                label: menuT('menuItems.duplicate'),
                 icon: <IconDuplicate />,
                 onClick: () => {
                   useProjects.getState().duplicateNode(projectId, id)
@@ -17184,7 +17199,7 @@ export function Canvas() {
               // Works for any project: a live link needs no node on screen (R49).
               ...liveLinkMenuItems(id, projectId),
               { type: 'separator' },
-              { label: 'End session', icon: <IconTrash />, danger: true, onClick: () => closeSession(projectId, id) }
+              { label: menuT('menuItems.endSession'), icon: <IconTrash />, danger: true, onClick: () => closeSession(projectId, id) }
             ]
       setMenu({ x: e.clientX, y: e.clientY, items: [...head, ...body] })
     },
@@ -18251,13 +18266,13 @@ export function Canvas() {
         y: e.clientY,
         items: [
           {
-            label: 'Go to project',
+            label: menuT('menuItems.goToProject'),
             icon: <IconSwitch />,
             disabled: projectId === activeProjectId,
             onClick: () => switchProject(projectId)
           },
           {
-            label: 'Rename',
+            label: menuT('menuItems.rename'),
             icon: <IconEditor />,
             onClick: () => {
               void promptDialog({
@@ -18272,26 +18287,26 @@ export function Canvas() {
               })
             }
           },
-          { label: 'Set folder…', icon: <IconProject />, onClick: () => setProjectFolder(projectId) },
+          { label: menuT('menuItems.setFolder'), icon: <IconProject />, onClick: () => setProjectFolder(projectId) },
           // Issue #1145: a local folder project only — an ssh project's file is on its host, and a
           // relay tab is another machine's project.
           ...(project.cwd && !project.ssh && !project.remote && !project.unavailable
             ? [
                 project.storeInAppData
                   ? {
-                      label: 'Store canvas in folder',
+                      label: menuT('menuItems.storeCanvasInFolder'),
                       icon: <IconProject />,
                       onClick: () => void moveProjectToFolder(projectId, projectStorageMoveDeps)
                     }
                   : {
-                      label: 'Store canvas in app data',
+                      label: menuT('menuItems.storeCanvasInAppData'),
                       icon: <IconProject />,
                       onClick: () => void moveProjectToAppData(projectId, projectStorageMoveDeps)
                     }
               ]
             : []),
           {
-            label: 'Project settings…',
+            label: menuT('menuItems.projectSettings'),
             icon: <IconGear />,
             onClick: () => openProjectSettings(projectId)
           },
@@ -18300,7 +18315,7 @@ export function Canvas() {
                 const blocked = shareBlockedReason(projectId)
                 return [
                   {
-                    label: 'Share with team…',
+                    label: menuT('menuItems.shareWithTeam'),
                     icon: <IconRemote />,
                     disabled: !!blocked,
                     ...(blocked ? { hint: blocked } : {}),
@@ -18315,7 +18330,7 @@ export function Canvas() {
           { type: 'colors', onPick: (color) => setProjectColor(projectId, color) },
           { type: 'separator' },
           {
-            label: 'Close project',
+            label: menuT('menuItems.closeProject'),
             icon: <IconTrash />,
             danger: true,
             onClick: () => closeProject(projectId)
@@ -18660,7 +18675,7 @@ export function Canvas() {
       // The sheet showed a permission mode; the session must start in that one. A project file that
       // changed in between (a pull, an adopted folder that differs from the probe) refuses.
       if (shownMode !== undefined && accepted.agent !== 'terminal' && hasPermissionMode(accepted.agent)) {
-        const now = PERMISSION_MODE_LABELS[projectPermissionMode(project, accepted.agent)]
+        const now = menuT(permissionMenuKeys[projectPermissionMode(project, accepted.agent)])
         if (now !== shownMode) {
           setNotice({
             kind: 'error',
@@ -18697,14 +18712,14 @@ export function Canvas() {
       if (key === NEW_PROJECT_KEY) {
         const probe = linkProbeRef.current
         if (!probe || probe.reqId !== req.id || probe.project === undefined) {
-          return { label: 'Checking the folder…', bypass: false, pending: true }
+          return { label: menuT('menuItems.checkingTheFolder'), bypass: false, pending: true }
         }
         project = probe.project ?? undefined
       } else if (key) {
         project = useProjects.getState().getProject(key)
       }
       const mode = projectPermissionMode(project, agent)
-      return { label: PERMISSION_MODE_LABELS[mode], bypass: mode === 'bypassPermissions' }
+      return { label: menuT(permissionMenuKeys[mode]), bypass: mode === 'bypassPermissions' }
     },
     []
   )
@@ -18872,7 +18887,7 @@ export function Canvas() {
           kind: 'info',
           sticky: true,
           text: headlessStartNoticeText(project.name, started.length),
-          action: { label: 'Go there', run: () => travelToNodeRef.current(started[0]) }
+          action: { label: menuT('menuItems.goThere'), run: () => travelToNodeRef.current(started[0]) }
         })
       }
       return { outcomes, unhidden }
@@ -19202,11 +19217,11 @@ export function Canvas() {
     const activeProject = useProjects.getState().getProject(activeProjectId)
     const newFileHasCwd = !!(activeProject?.ssh?.remoteCwd ?? activeProject?.cwd)
     const cmds: Command[] = [
-      { id: 'new-term', label: 'New terminal', section: 'Create', icon: <IconTerminal />, run: () => addTerminal() },
+      { id: 'new-term', label: menuT('menuItems.newTerminal'), section: menuT('menuItems.sectionCreate'), icon: <IconTerminal />, run: () => addTerminal() },
       ...BUILTIN_AGENT_IDS.filter((aid) => !disabled.includes(aid)).map(
         (aid): Command => ({
           id: `new-${aid}`,
-          label: `New ${AGENT_CONFIG[aid].label}`,
+          label: menuT('menuItems.newNamed', { name: AGENT_CONFIG[aid].label }),
           icon: <AgentIcon agentId={aid} />,
           run: () => addAgentNode(aid)
         })
@@ -19217,7 +19232,7 @@ export function Canvas() {
         .map(
           (c): Command => ({
             id: `new-${c.id}`,
-            label: `New ${c.label}`,
+            label: menuT('menuItems.newNamed', { name: c.label }),
             icon: <AgentIcon agentId={c.id} />,
             run: () => addAgentNode(c.id)
           })
@@ -19232,18 +19247,18 @@ export function Canvas() {
         .map(
           (a): Command => ({
             id: `new-claude-${a.id}`,
-            label: `New Claude — ${a.label}`,
+            label: menuT('menuItems.newNamed', { name: `Claude — ${a.label}` }),
             icon: <AgentIcon agentId="claude" />,
             run: () => addAgentNode('claude', undefined, undefined, a.id)
           })
         ),
-      { id: 'new-sticky', label: 'New sticky note', icon: <IconNote />, run: () => addSticky() },
+      { id: 'new-sticky', label: menuT('menuItems.newStickyNote'), icon: <IconNote />, run: () => addSticky() },
       // Needs a folder to root itself in, exactly like "New file…" below.
       ...(newFileHasCwd
         ? [
             {
               id: 'new-files',
-              label: 'New file manager',
+              label: menuT('menuItems.newFileManager'),
               icon: <IconExplorer />,
               run: () => addFiles()
             }
@@ -19251,23 +19266,23 @@ export function Canvas() {
         : []),
       ...(isSshProject || isWindowsCore
         ? []
-        : [{ id: 'new-run', label: 'New run configuration', icon: <IconPlay />, run: () => void addRun() }]),
+        : [{ id: 'new-run', label: menuT('menuItems.newRunConfiguration'), icon: <IconPlay />, run: () => void addRun() }]),
       ...(!simulatorRefusal(activeSession.source === 'relay', isSshProject)
-        ? [{ id: 'new-simulator', label: 'New simulator', icon: <IconPhone />, run: () => addSimulator() }]
+        ? [{ id: 'new-simulator', label: menuT('menuItems.newSimulator'), icon: <IconPhone />, run: () => addSimulator() }]
         : []),
-      { id: 'new-whiteboard', label: 'New whiteboard', icon: <IconWhiteboard />, run: () => addWhiteboard() },
-      { id: 'new-dino', label: 'New dino game', icon: <IconDino />, run: () => addDino() },
-      { id: 'open-file', label: 'Open file…', icon: <IconEditor />, run: () => void openFileDialog() },
+      { id: 'new-whiteboard', label: menuT('menuItems.newWhiteboard'), icon: <IconWhiteboard />, run: () => addWhiteboard() },
+      { id: 'new-dino', label: menuT('menuItems.newDinoGame'), icon: <IconDino />, run: () => addDino() },
+      { id: 'open-file', label: menuT('menuItems.openFile'), icon: <IconEditor />, run: () => void openFileDialog() },
       // "New file…" needs a project folder to create into — hidden when the project has no cwd.
       ...(newFileHasCwd
-        ? [{ id: 'new-file', label: 'New file…', icon: <IconEditor />, run: () => void newProjectFile() }]
+        ? [{ id: 'new-file', label: menuT('menuItems.newFile2'), icon: <IconEditor />, run: () => void newProjectFile() }]
         : []),
-      { id: 'open-web', label: 'Open web view…', icon: <IconRemote />, run: () => addWebView() },
-      { id: 'open-browser', label: 'New browser', icon: <IconRemote />, run: () => addBrowser() },
+      { id: 'open-web', label: menuT('menuItems.openWebView'), icon: <IconRemote />, run: () => addWebView() },
+      { id: 'open-browser', label: menuT('menuItems.newBrowser'), icon: <IconRemote />, run: () => addBrowser() },
       ...useSshServers.getState().servers.map(
         (srv): Command => ({
           id: `new-remote-${srv.id}`,
-          label: `New remote: ${srv.label}`,
+          label: menuT('menuItems.newRemoteNamed', { name: srv.label }),
           icon: <IconTerminal />,
           run: () =>
             addSshTerminal(srv, { x: window.innerWidth / 2, y: window.innerHeight / 2 })
@@ -19275,7 +19290,7 @@ export function Canvas() {
       ),
       {
         id: 'worktree-new',
-        label: 'New worktree…',
+        label: menuT('menuItems.newWorktree'),
         icon: <IconBranch />,
         // The palette has no disabled row, so the reason rides along and `openWorktreeDialog`
         // refuses with a banner — the command never silently does nothing. `note`, not `hint`:
@@ -19288,7 +19303,7 @@ export function Canvas() {
         ? [
             {
               id: 'debug-log',
-              label: 'Show debug log',
+              label: menuT('menuItems.showDebugLog'),
               hint: 'console diagnostics troubleshoot',
               section: 'View',
               icon: <IconGear />,
@@ -19298,17 +19313,17 @@ export function Canvas() {
         : []),
       {
         id: 'spawn-team',
-        label: 'Spawn a team…',
+        label: menuT('menuItems.spawnATeam'),
         // Searchable synonyms — this is the entry people will look for by intent, not by name.
         hint: 'orchestrate parallelize delegate agents conductor',
         icon: <IconGroup />,
         run: () => setSpawnTeamDialog({})
       },
-      { id: 'new-project', label: 'New project', icon: <IconProject />, run: () => void addProject() },
-      { id: 'clone-repo', label: 'Clone repository…', icon: <IconProject />, run: () => setCloneDialogOpen(true) },
+      { id: 'new-project', label: menuT('menuItems.newProject'), icon: <IconProject />, run: () => void addProject() },
+      { id: 'clone-repo', label: menuT('menuItems.cloneRepository'), icon: <IconProject />, run: () => setCloneDialogOpen(true) },
       {
         id: 'new-remote',
-        label: 'New Remote Connection',
+        label: menuT('menuItems.newRemoteConnection'),
         icon: <IconRemote />,
         run: () => void connectRemote()
       },
@@ -19320,7 +19335,7 @@ export function Canvas() {
           ? [
               {
                 id: 'hosted-invite-code',
-                label: 'Copy team invite code',
+                label: menuT('menuItems.copyTeamInviteCode'),
                 hint: 'hosted team invite join share',
                 icon: <IconRemote />,
                 run: () => copyHostedInviteCode(hosted)
@@ -19336,7 +19351,7 @@ export function Canvas() {
             return [
               {
                 id: 'share-with-team',
-                label: `Share ${activeProject.name} with team`,
+                label: menuT('menuItems.shareNamed', { name: activeProject.name }),
                 hint: 'hosted team invite ssh server share',
                 icon: <IconRemote />,
                 ...(blocked ? { note: blocked } : {}),
@@ -19348,7 +19363,7 @@ export function Canvas() {
       ...hostedBookmarks.map(
         (b): Command => ({
           id: `hosted-forget-${b.hostId}`,
-          label: `Forget hosted team: ${b.label || 'unnamed team'}`,
+          label: menuT('menuItems.forgetTeam', { name: b.label || menuT('menuItems.team') }),
           hint: 'hosted team bookmark leave remove',
           icon: <IconRemote />,
           run: () => forgetHostedTeam(b)
@@ -19356,7 +19371,7 @@ export function Canvas() {
       ),
       {
         id: 'focus-node',
-        label: 'Focus node',
+        label: menuT('menuItems.focusNode'),
         hint: 'zen fullscreen fill distraction',
         section: 'View',
         icon: <IconFit />,
@@ -19370,7 +19385,7 @@ export function Canvas() {
           ? [
               {
                 id: 'next-needing-you',
-                label: 'Go to next agent needing you',
+                label: menuT('menuItems.goToNextAgentNeedingYou'),
                 hint: `${waiting} waiting · attention blocked permission`,
                 icon: <IconJump />,
                 run: goToNextNeedingYou
@@ -19378,13 +19393,13 @@ export function Canvas() {
             ]
           : []
       })(),
-      { id: 'fit', label: 'Fit view', icon: <IconFit />, run: fitAll },
+      { id: 'fit', label: menuT('menuItems.fitView'), icon: <IconFit />, run: fitAll },
       // Hidden below 2 top-level nodes — see arrangeAllNodes.
       ...(hasArrangeableNodes()
         ? [
             {
               id: 'arrange-all',
-              label: 'Tidy canvas',
+              label: menuT('menuItems.tidyCanvas'),
               hint: 'arrange grid layout organize clean up',
               icon: <IconGrid />,
               run: arrangeAllNodes
@@ -19397,7 +19412,7 @@ export function Canvas() {
         ? [
             {
               id: 'arrange-lineage',
-              label: 'Arrange by lineage',
+              label: menuT('menuItems.arrangeByLineage'),
               hint: 'layers levels who opened whom tree hierarchy organize',
               icon: <IconLineage />,
               run: arrangeByLineageAction
@@ -19417,7 +19432,7 @@ export function Canvas() {
             : [
                 {
                   id: 'arrange-group',
-                  label: 'Tidy selected group',
+                  label: menuT('menuItems.tidySelectedGroup'),
                   hint: 'arrange grid layout organize frame resize fit clean up',
                   icon: <IconGrid />,
                   run: () => arrangeGroupAction(groupId, 'grid')
@@ -19428,7 +19443,7 @@ export function Canvas() {
             : [
                 {
                   id: 'arrange-group-lineage',
-                  label: 'Arrange selected group by lineage',
+                  label: menuT('menuItems.arrangeSelectedGroupByLineage'),
                   hint: 'layers levels who opened whom tree hierarchy organize frame resize',
                   icon: <IconLineage />,
                   run: () => arrangeGroupAction(groupId, 'lineage')
@@ -19436,12 +19451,12 @@ export function Canvas() {
               ])
         ]
       })(),
-      { id: 'zoom-100', label: 'Zoom to 100%', icon: <IconFit />, run: zoomTo100 },
+      { id: 'zoom-100', label: menuT('menuItems.zoomTo100'), icon: <IconFit />, run: zoomTo100 },
       ...(prepareUpdateAvailable
         ? [
             {
               id: 'prepare-update',
-              label: 'Prepare for update…',
+              label: menuT('menuItems.prepareForUpdate'),
               hint: 'install update installer stop session host windows quit',
               run: () => setPrepareUpdateOpen(true)
             } as Command
@@ -19455,7 +19470,7 @@ export function Canvas() {
         : [
             {
               id: 'save-layout',
-              label: 'Save canvas layout…',
+              label: menuT('menuItems.saveCanvasLayout'),
               hint: 'arrangement snapshot monitor screen restore',
               section: 'View',
               icon: <IconCanvasView />,
@@ -19464,14 +19479,14 @@ export function Canvas() {
             ...sortedLayouts(activeProject?.layouts).map(
               (layout): Command => ({
                 id: `restore-layout-${layout.id}`,
-                label: `Restore layout: ${layout.name}`,
+                label: menuT('menuItems.restoreLayout', { name: layout.name }),
                 section: 'View',
                 icon: <IconCanvasView />,
                 run: () => restoreCanvasLayout(layout)
               })
             )
           ]),
-      { id: 'save', label: 'Save', icon: <IconSave />, run: () => void persist() },
+      { id: 'save', label: menuT('menuItems.save'), icon: <IconSave />, run: () => void persist() },
       // Live links: Manage (the Settings section), and Stop all — which CONFIRMS (R48).
       ...liveLinkCommands({
         activeLinks: useWatchLinks.getState().links.length,
@@ -19493,7 +19508,7 @@ export function Canvas() {
         ? [
             {
               id: 'restart-idle-agents',
-              label: 'Restart idle agent sessions',
+              label: menuT('menuItems.restartIdleAgentSessions'),
               hint: 'pick up a new model',
               icon: <IconPower />,
               run: restartIdleAgents
@@ -19514,7 +19529,7 @@ export function Canvas() {
         if (hint === null) return
         cmds.push({
           id: `proj-${p.id}`,
-          label: `Switch to ${p.name}`,
+          label: menuT('menuItems.switchProject', { name: p.name }),
           hint,
           icon: <IconSwitch />,
           // A closed project is REOPENED (tab restored), never activated behind a hidden tab — and
@@ -19547,7 +19562,7 @@ export function Canvas() {
         )
         cmds.push({
           id: `node-${n.id}`,
-          label: `Go to ${n.data.title}`,
+          label: menuT('menuItems.goToNamed', { name: n.data.title }),
           section: 'Opened terminals',
           hint: [labelNames.join(' '), session, isAgent ? `nt-${n.id}` : '']
             .filter(Boolean)
@@ -19562,7 +19577,7 @@ export function Canvas() {
       const kb = isKanbanOpen(kanbanId)
       cmds.push({
         id: 'toggle-kanban',
-        label: kb ? 'Canvas view' : 'Kanban view',
+        label: kb ? menuT('menuItems.canvasView') : menuT('menuItems.kanbanView'),
         hint: chipFor('view.kanbanToggle') || undefined,
         section: 'View',
         icon: kb ? <IconCanvasView /> : <IconKanban />,
@@ -19571,7 +19586,7 @@ export function Canvas() {
     }
     cmds.push({
       id: 'setup-tour',
-      label: 'Setup tour',
+      label: menuT('menuItems.setupTour'),
       hint: 'welcome onboarding first-run',
       section: 'View',
       run: () => setOnboardingOpen(true)
@@ -20001,14 +20016,14 @@ export function Canvas() {
               x: Math.max(8, r.right - 220),
               y: r.bottom + 6,
               items: [
-                { label: 'Keyboard shortcuts', hint: chipFor('app.shortcutsPanel') || undefined, onClick: () => setShortcutsOpen(true) },
-                { label: 'Report a bug…', onClick: () => setBugReportOpen(true) },
+                { label: menuT('menuItems.keyboardShortcuts'), hint: chipFor('app.shortcutsPanel') || undefined, onClick: () => setShortcutsOpen(true) },
+                { label: menuT('menuItems.reportABug'), onClick: () => setBugReportOpen(true) },
                 {
-                  label: 'Documentation',
+                  label: menuT('menuItems.documentation'),
                   onClick: () => window.nodeTerminal.shell.openExternal(`${REPO_URL}#readme`)
                 },
                 {
-                  label: 'GitHub repository',
+                  label: menuT('menuItems.githubRepository'),
                   onClick: () => window.nodeTerminal.shell.openExternal(REPO_URL)
                 },
                 { type: 'separator' },
@@ -20575,7 +20590,7 @@ export function Canvas() {
           choice={
             confirm.waiveVerb
               ? {
-                  label: "Don't ask again",
+                  label: menuT('menuItems.donTAskAgain'),
                   options: waiveChoices({
                     id: confirm.waiveProjectId,
                     name: confirm.waiveProjectName
@@ -20783,7 +20798,7 @@ export function Canvas() {
         <ConfirmDialog
           message={issueWorktreeAsk.message}
           choice={{
-            label: 'Start the agent in',
+            label: menuT('menuItems.startTheAgentIn'),
             options: issueWorktreeAsk.options,
             value: issueWorktreeAsk.value,
             onChange: (value) =>
@@ -20864,7 +20879,7 @@ export function Canvas() {
             // be politely undone, so it is the user's decision, never a side effect of merging.
             mergeTarget.hasOrigin
               ? {
-                  label: `Also push ${mergeTarget.baseRef} to origin`,
+                  label: menuT('menuItems.pushBase', { name: mergeTarget.baseRef }),
                   checked: mergePush,
                   onChange: setMergePush
                 }
@@ -20899,7 +20914,7 @@ export function Canvas() {
             removeTarget.canDelete
               ? undefined
               : {
-                  label: 'Delete the worktree directory from disk too',
+                  label: menuT('menuItems.deleteTheWorktreeDirectoryFromDiskToo'),
                   checked: deleteFromDisk,
                   onChange: setDeleteFromDisk
                 }

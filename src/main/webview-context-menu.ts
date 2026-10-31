@@ -1,3 +1,5 @@
+import { createTranslator } from '@shared/i18n/translate'
+import { DEFAULT_UI_LANGUAGE, type TranslateFn } from '@shared/i18n/types'
 import type { MenuItemConstructorOptions } from 'electron'
 
 /**
@@ -80,13 +82,14 @@ function tidy(items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[]
  * Build the guest's context menu.
  *
  * The editing block uses Electron **roles** rather than explicit `webContents.cut()` calls: the
- * roles carry the OS's own localized labels and accelerators, which is what makes our menu look
+ * roles carry native editing behavior and accelerators; explicit labels follow the app language, which is what makes our menu look
  * like the native one the AutoFill and Services items are appended to. Enablement comes from
  * `editFlags`, because a role does not disable itself.
  */
 export function guestContextMenuTemplate(
   ctx: GuestMenuContext,
-  handlers: GuestMenuHandlers
+  handlers: GuestMenuHandlers,
+  t: TranslateFn = createTranslator(DEFAULT_UI_LANGUAGE)
 ): MenuItemConstructorOptions[] {
   const items: MenuItemConstructorOptions[] = []
 
@@ -99,43 +102,43 @@ export function guestContextMenuTemplate(
 
   if (isHttpUrl(ctx.linkURL)) {
     items.push(
-      { label: 'Open Link in New Browser Node', click: () => handlers.openLinkInNode(ctx.linkURL) },
-      { label: 'Copy Link Address', click: () => handlers.copyText(ctx.linkURL) },
+      { label: t('menuItems.openLinkInNewBrowserNode'), click: () => handlers.openLinkInNode(ctx.linkURL) },
+      { label: t('menuItems.copyLinkAddress'), click: () => handlers.copyText(ctx.linkURL) },
       SEPARATOR
     )
   }
 
   if (ctx.mediaType === 'image' && ctx.hasImageContents) {
-    items.push({ label: 'Copy Image', click: () => handlers.copyImage() })
+    items.push({ label: t('menuItems.copyImage'), click: () => handlers.copyImage() })
     if (ctx.srcURL) {
-      items.push({ label: 'Copy Image Address', click: () => handlers.copyText(ctx.srcURL) })
+      items.push({ label: t('menuItems.copyImageAddress'), click: () => handlers.copyText(ctx.srcURL) })
     }
     items.push(SEPARATOR)
   }
 
   if (ctx.isEditable) {
     items.push(
-      { role: 'undo', enabled: ctx.editFlags.canUndo },
-      { role: 'redo', enabled: ctx.editFlags.canRedo },
+      { role: 'undo', label: t('menuItems.undo'), enabled: ctx.editFlags.canUndo },
+      { role: 'redo', label: t('menuItems.redo'), enabled: ctx.editFlags.canRedo },
       SEPARATOR,
-      { role: 'cut', enabled: ctx.editFlags.canCut },
-      { role: 'copy', enabled: ctx.editFlags.canCopy },
-      { role: 'paste', enabled: ctx.editFlags.canPaste },
-      { role: 'delete', enabled: ctx.editFlags.canDelete },
+      { role: 'cut', label: t('menuItems.cut'), enabled: ctx.editFlags.canCut },
+      { role: 'copy', label: t('menuItems.copy'), enabled: ctx.editFlags.canCopy },
+      { role: 'paste', label: t('menuItems.paste'), enabled: ctx.editFlags.canPaste },
+      { role: 'delete', label: t('menuItems.delete'), enabled: ctx.editFlags.canDelete },
       SEPARATOR,
-      { role: 'selectAll', enabled: ctx.editFlags.canSelectAll },
+      { role: 'selectAll', label: t('menuItems.selectAll2'), enabled: ctx.editFlags.canSelectAll },
       SEPARATOR
     )
   } else if (ctx.selectionText) {
-    items.push({ role: 'copy', enabled: ctx.editFlags.canCopy }, SEPARATOR)
+    items.push({ role: 'copy', label: t('menuItems.copy'), enabled: ctx.editFlags.canCopy }, SEPARATOR)
   }
 
   items.push(
-    { label: 'Back', enabled: ctx.canGoBack, click: () => handlers.back() },
-    { label: 'Forward', enabled: ctx.canGoForward, click: () => handlers.forward() },
-    { label: 'Reload', click: () => handlers.reload() },
+    { label: t('menuItems.back'), enabled: ctx.canGoBack, click: () => handlers.back() },
+    { label: t('menuItems.forward'), enabled: ctx.canGoForward, click: () => handlers.forward() },
+    { label: t('menuItems.reload'), click: () => handlers.reload() },
     SEPARATOR,
-    { label: 'Inspect Element', click: () => handlers.inspect() }
+    { label: t('menuItems.inspectElement'), click: () => handlers.inspect() }
   )
 
   return tidy(items)

@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -201,7 +202,7 @@ export function PrepareUpdateDialog({ collectNodes, onTravel, onClose }: Props):
         danger
         enterConfirms={false}
         option={{
-          label: 'Open the download page after quitting',
+          label: menuT('menuItems.openTheDownloadPageAfterQuitting'),
           checked: openDownload,
           onChange: setOpenDownload
         }}

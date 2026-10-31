@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 // Right-click on a link in terminal output → a menu of what can be done with it: open, reveal,
 // download, copy. The Cmd/Ctrl+click opener (file-links.ts) does exactly ONE thing per link; this is
 // the rest of what the Explorer offers for the same path, one right-click away, without first
@@ -98,10 +99,10 @@ export async function resolveLinkTarget(
 export function urlLinkMenuItems(url: string, act: UrlLinkActions): MenuItem[] {
   const inNode = act.openUrlInNode
   return [
-    { label: 'Open in browser', onClick: () => act.openUrl(url) },
-    ...(inNode ? [{ label: 'Open in canvas browser', onClick: () => inNode(url) }] : []),
+    { label: menuT('menuItems.openInBrowser'), onClick: () => act.openUrl(url) },
+    ...(inNode ? [{ label: menuT('menuItems.openInCanvasBrowser'), onClick: () => inNode(url) }] : []),
     { type: 'separator' },
-    { label: 'Copy link', onClick: () => act.copy(url) }
+    { label: menuT('menuItems.copyLink'), onClick: () => act.copy(url) }
   ]
 }
 
@@ -117,9 +118,9 @@ export function linkMenuItems(
     return [
       {
         type: 'label',
-        label: target.kind === 'missing' ? 'Not found' : `Couldn't check: ${target.reason}`
+        label: target.kind === 'missing' ? menuT('menuItems.notFound') : menuT('menuItems.lookupFailed', { reason: target.reason })
       },
-      { label: 'Copy path', onClick: () => act.copy(abs) }
+      { label: menuT('menuItems.copyPath2'), onClick: () => act.copy(abs) }
     ]
   }
 
@@ -127,21 +128,21 @@ export function linkMenuItems(
   const rel = relativeInside(ctx.explorerRoot, abs)
   const busy = ctx.downloading(abs)
   const items: MenuItem[] = []
-  if (!dir) items.push({ label: 'Open', onClick: () => act.openFile(abs) })
-  if (rel !== null) items.push({ label: 'Reveal in Explorer', onClick: () => act.revealInExplorer(abs) })
-  if (dir && ctx.terminals) items.push({ label: 'New terminal here', onClick: () => act.openTerminal(abs) })
+  if (!dir) items.push({ label: menuT('menuItems.open'), onClick: () => act.openFile(abs) })
+  if (rel !== null) items.push({ label: menuT('menuItems.revealInExplorer'), onClick: () => act.revealInExplorer(abs) })
+  if (dir && ctx.terminals) items.push({ label: menuT('menuItems.newTerminalHere'), onClick: () => act.openTerminal(abs) })
   items.push({ type: 'separator' })
   for (const d of downloadMenuEntries(ctx.route, abs, { dir, here: false })) {
     items.push({
       label: d.label,
       disabled: busy,
-      hint: busy ? 'Already downloading' : undefined,
+      hint: busy ? menuT('menuItems.alreadyDownloading') : undefined,
       onClick: () => act.download(abs, dir, d.pickFolder)
     })
   }
   items.push({ type: 'separator' })
-  items.push({ label: 'Copy path', onClick: () => act.copy(abs) })
-  if (rel !== null) items.push({ label: 'Copy relative path', onClick: () => act.copy(rel) })
+  items.push({ label: menuT('menuItems.copyPath2'), onClick: () => act.copy(abs) })
+  if (rel !== null) items.push({ label: menuT('menuItems.copyRelativePath2'), onClick: () => act.copy(rel) })
   if (ctx.localShell) items.push({ label: osRevealLabel(ctx.os), onClick: () => act.revealInOs(abs) })
   return tidySeparators(items)
 }

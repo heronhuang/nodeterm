@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { usageDiagnosticLines } from '../lib/usageDiagnostic'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { UsageOrganization } from './UsageOrganization'
@@ -450,7 +451,7 @@ export function UsageIndicator({
     }
     const targets = [
       systemTarget,
-      ...eligibleAccounts.map((a) => ({ id: a.id, label: a.label || a.email || 'Account' }))
+      ...eligibleAccounts.map((a) => ({ id: a.id, label: a.label || a.email || menuT('menuItems.account') }))
     ].filter((t) => t.id !== from)
     return (
       <MoveSessionsControl

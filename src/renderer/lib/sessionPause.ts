@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 /**
  * MAY THIS SESSION-MEMORY ROW OFFER "PAUSE"? — the pure decision behind the panel's ⏻ control.
  *
@@ -76,13 +77,13 @@ export function sessionPauseOffer(i: SessionPauseInput): SessionPauseOffer {
     return {
       show: true,
       disabled: true,
-      hint: 'This session is already paused — its agent process has been exited.'
+      hint: menuT('menuItems.thisSessionIsAlreadyPausedItsAgentProcessHas')
     }
   if (!i.wired)
     return {
       show: true,
       disabled: true,
-      hint: 'Open this session on its canvas first — pausing types into its pane, so the terminal has to be here.'
+      hint: menuT('menuItems.openThisSessionOnItsCanvasFirstPausingTypes')
     }
   if (!i.eligibility.ok)
     return {
@@ -90,12 +91,12 @@ export function sessionPauseOffer(i: SessionPauseInput): SessionPauseOffer {
       disabled: true,
       hint:
         i.eligibility.reason === 'working'
-          ? 'This session is busy — try again once its turn (or permission prompt) is done.'
-          : 'Nothing to resume yet — this session has not reported an id.'
+          ? menuT('menuItems.thisSessionIsBusyTryAgainOnceItsTurn')
+          : menuT('menuItems.nothingToResumeYetThisSessionHasNotReported')
     }
   return {
     show: true,
     disabled: false,
-    hint: 'Pause session: quits the agent CLI to free its memory and keeps the conversation, tmux session and scrollback. Resume brings it back.'
+    hint: menuT('menuItems.pauseSessionQuitsTheAgentCliToFreeIts')
   }
 }

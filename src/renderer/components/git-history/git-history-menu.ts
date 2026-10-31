@@ -1,3 +1,4 @@
+import { t as menuT } from '../../i18n/runtime'
 import type { MenuItem } from '../ContextMenu'
 import type { GitHistoryItem } from '@shared/git-history'
 
@@ -13,14 +14,14 @@ export type CommitMenuHandlers = {
 
 export function buildCommitMenuItems(item: GitHistoryItem, h: CommitMenuHandlers): MenuItem[] {
   return [
-    { label: 'Open commit in browser', onClick: () => h.openInBrowser(item) },
-    { label: 'Copy commit hash', onClick: () => h.copyHash(item) },
-    { label: 'Copy commit message', onClick: () => h.copyMessage(item) },
+    { label: menuT('menuItems.openCommitInBrowser'), onClick: () => h.openInBrowser(item) },
+    { label: menuT('menuItems.copyCommitHash'), onClick: () => h.copyHash(item) },
+    { label: menuT('menuItems.copyCommitMessage'), onClick: () => h.copyMessage(item) },
     { type: 'separator' },
-    { label: 'New branch from here…', onClick: () => h.branchFrom(item) },
-    { label: 'Checkout this commit', onClick: () => h.checkout(item) },
-    { label: 'Revert commit', onClick: () => h.revert(item), danger: true },
+    { label: menuT('menuItems.newBranchFromHere'), onClick: () => h.branchFrom(item) },
+    { label: menuT('menuItems.checkoutThisCommit'), onClick: () => h.checkout(item) },
+    { label: menuT('menuItems.revertCommit'), onClick: () => h.revert(item), danger: true },
     { type: 'separator' },
-    { label: 'Explain changes with AI', onClick: () => h.explain(item) }
+    { label: menuT('menuItems.explainChangesWithAi'), onClick: () => h.explain(item) }
   ]
 }

@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AGENT_CONFIG, BUILTIN_AGENT_IDS, type AgentId, type BuiltinAgentId } from '@shared/agents/config'
@@ -272,11 +273,11 @@ export function Dock({
             >
               <button onClick={pick(onAddTerminal)}>
                 <TerminalIcon />
-                <span>Terminal</span>
+                <span>{menuT('menuItems.terminal')}</span>
               </button>
               <button onClick={pick(onAddRemote)}>
                 <TerminalIcon />
-                <span>Remote…</span>
+                <span>{menuT('menuItems.remote')}</span>
               </button>
               {BUILTIN_AGENT_IDS.filter((aid) => !disabledAgents.includes(aid)).flatMap((aid) => {
                 const inheriting = inheritingByBase.get(aid) ?? []
@@ -298,7 +299,7 @@ export function Dock({
                       base,
                       <button key={`${aid}-acct-hint`} disabled title={acctHint}>
                         <AgentIcon agentId={aid} size={18} />
-                        <span>No accounts on this host yet</span>
+                        <span>{menuT('menuItems.noAccountsOnThisHostYet')}</span>
                       </button>
                     ]
                   }
@@ -337,7 +338,7 @@ export function Dock({
                       <div className="dock-menu__sub" style={subPos ?? undefined}>
                         {aid === 'claude' && localAccounts.length > 0 && (
                           <>
-                            <div className="dock-menu__sub-label">Accounts</div>
+                            <div className="dock-menu__sub-label">{menuT('menuItems.accounts')}</div>
                             {localAccounts.map((a) => (
                               <button
                                 key={a.id}
@@ -355,10 +356,10 @@ export function Dock({
                         {aid === 'claude' && acctHint && (
                           <button disabled title={acctHint}>
                             <AgentIcon agentId={aid} size={18} />
-                            <span>No accounts on this host yet</span>
+                            <span>{menuT('menuItems.noAccountsOnThisHostYet')}</span>
                           </button>
                         )}
-                        <div className="dock-menu__sub-label">Custom</div>
+                        <div className="dock-menu__sub-label">{menuT('menuItems.custom')}</div>
                         {inheriting.map((c) => (
                           <button key={c.id} onClick={pick(() => onAddAgent(c.id))}>
                             <AgentIcon agentId={c.id} size={18} />
@@ -390,7 +391,7 @@ export function Dock({
               ))}
               <button onClick={pick(onConnectRemote)}>
                 <RemoteIcon />
-                <span>New Remote Connection</span>
+                <span>{menuT('menuItems.newRemoteConnection')}</span>
               </button>
             </div>
           </div>
@@ -460,7 +461,7 @@ export function Dock({
                 // Never an empty popover: a menu that opens onto nothing reads as broken rather
                 // than as empty.
                 <button disabled>
-                  <span>No layouts saved yet</span>
+                  <span>{menuT('menuItems.noLayoutsSavedYet')}</span>
                 </button>
               ) : (
                 layoutRows.map((layout) => (
@@ -523,7 +524,7 @@ export function Dock({
               <span className="dock-menu__rule" />
               <button onClick={pickLayout(onSaveLayout)}>
                 <PlusSmallIcon />
-                <span>Save current layout…</span>
+                <span>{menuT('menuItems.saveCurrentLayout')}</span>
               </button>
             </div>
           )}
@@ -594,7 +595,7 @@ export function Dock({
               <span className="dock-menu__rule" />
               <button onClick={pickZoom(onFitView)}>
                 <span className="dock-menu__check" />
-                <span>Zoom to fit</span>
+                <span>{menuT('menuItems.zoomToFit')}</span>
                 <span className="dock-menu__chord">⇧1</span>
               </button>
             </div>

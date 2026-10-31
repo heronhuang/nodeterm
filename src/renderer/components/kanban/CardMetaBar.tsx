@@ -1,3 +1,4 @@
+import { t as menuT } from '../../i18n/runtime'
 import { useMemo, useState } from 'react'
 import { IconClose } from '../icons'
 import type { BoardLogAuthor, KanbanPriority, ProjectKanban } from '@shared/types'
@@ -13,10 +14,10 @@ import { useOwningProjectId } from '../../session/owning-project'
 const initialOf = (name: string): string => (name.trim()[0] ?? '?').toUpperCase()
 
 export const PRIORITIES: Array<{ id: KanbanPriority; label: string; color: string }> = [
-  { id: 'low', label: 'Low', color: 'var(--state-queued)' },
-  { id: 'medium', label: 'Medium', color: 'var(--caution)' },
-  { id: 'high', label: 'High', color: 'var(--priority-high)' },
-  { id: 'urgent', label: 'Urgent', color: 'var(--danger)' }
+  { id: 'low', get label() { return menuT('menuItems.low') }, color: 'var(--state-queued)' },
+  { id: 'medium', get label() { return menuT('menuItems.medium') }, color: 'var(--caution)' },
+  { id: 'high', get label() { return menuT('menuItems.high') }, color: 'var(--priority-high)' },
+  { id: 'urgent', get label() { return menuT('menuItems.urgent') }, color: 'var(--danger)' }
 ]
 
 /** Local-wallclock value for a datetime-local input (its value is timezone-less). */

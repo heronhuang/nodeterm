@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useProjects } from '../state/projects'
@@ -22,7 +23,6 @@ import { projectTabTooltip } from '../lib/projectTabTooltip'
 import { useDragAutoScroll } from '../lib/dragAutoScroll'
 import {
   ALL_PERMISSION_MODES,
-  PERMISSION_MODE_LABELS,
   type AgentPermissionMode
 } from '@shared/agents/config'
 import { bypassSandboxCaveat, permissionModeAgentsLabel } from '@shared/agents/approval-mode'
@@ -33,6 +33,20 @@ import { projectWaiverRow, setControlConfirmWaivedForProject } from '../state/co
 import { useControlConfirm } from '../state/controlConfirm'
 import { isBrowserRuntime } from '../bridge/runtime'
 import { useI18n } from '@renderer/i18n/useI18n'
+
+const permissionMenuKeys = {
+  manual: 'menuItems.askEachTime',
+  auto: 'menuItems.auto',
+  acceptEdits: 'menuItems.acceptEdits',
+  plan: 'menuItems.plan',
+  bypassPermissions: 'menuItems.bypassAll'
+} as const
+
+const waiverMenuKeys: Record<string, string> = {
+  'close': 'menuItems.closeNodes',
+  'write': 'menuItems.typeIntoTerminals',
+  'open-project': 'menuItems.openOrAddProjects'
+}
 
 interface TabBarProps {
   onSwitch: (id: string) => void
@@ -169,7 +183,8 @@ export function TabBar({
   const globalMode = useSettings((s) => s.settings.claudePermissionMode)
   const systemLabelSetting = useSettings((s) => s.settings.systemAccountLabel)
   const systemEmail = useSystemAccount((s) => s.email)
-  const systemLabel = systemAccountDisplay(systemLabelSetting, systemEmail)
+  const rawSystemLabel = systemAccountDisplay(systemLabelSetting, systemEmail)
+  const systemLabel = rawSystemLabel === 'System account' ? menuT('menuItems.systemAccount') : rawSystemLabel
 
   // Session labels appear only once a second session exists (4c: remote tabs). For a solo user
   // this is always false, so the tab strip renders exactly as before. Plain call, not a
@@ -564,15 +579,13 @@ export function TabBar({
             style={{ top: menuFlip.top, left: menuFlip.left }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button onClick={() => startRename(menuProject.id, menuProject.name)}>Rename</button>
+            <button onClick={() => startRename(menuProject.id, menuProject.name)}>{menuT('menuItems.rename')}</button>
             <button
               onClick={() => {
                 onSetFolder(menuProject.id)
                 closeMenu()
               }}
-            >
-              Set folder…
-            </button>
+            >{menuT('menuItems.setFolder')}</button>
             {onMoveStorage &&
               menuProject.cwd &&
               !menuProject.ssh &&
@@ -594,9 +607,7 @@ export function TabBar({
                 onRemoteAccess()
                 closeMenu()
               }}
-            >
-              Remote access…
-            </button>
+            >{menuT('menuItems.remoteAccess')}</button>
             {menuProject.ssh &&
               !menuProject.remote &&
               onShareWithTeam &&
@@ -610,9 +621,7 @@ export function TabBar({
                       onShareWithTeam(menuProject.id)
                       closeMenu()
                     }}
-                  >
-                    Share with team…
-                  </button>
+                  >{menuT('menuItems.shareWithTeam')}</button>
                 )
               })()}
             {menuAccounts.length > 0 && (
@@ -620,9 +629,7 @@ export function TabBar({
                 <button
                   className={`tab-menu__group${acctOpen ? ' open' : ''}`}
                   onClick={() => setAcctOpen((v) => !v)}
-                >
-                  Default Claude account
-                  <span className="tab-menu__caret">▸</span>
+                >{menuT('menuItems.defaultClaudeAccount')}<span className="tab-menu__caret">▸</span>
                 </button>
                 {acctOpen && (
                   <div className="tab-menu__sub">
@@ -653,9 +660,7 @@ export function TabBar({
                     ))}
                     {menuAccountsHint && (
                       <button disabled title={menuAccountsHint}>
-                        <span className="tab-menu__check" />
-                        No accounts on this host yet
-                      </button>
+                        <span className="tab-menu__check" />{menuT('menuItems.noAccountsOnThisHostYet')}</button>
                     )}
                   </div>
                 )}
@@ -664,9 +669,7 @@ export function TabBar({
             <button
               className={`tab-menu__group${modeOpen ? ' open' : ''}`}
               onClick={() => setModeOpen((v) => !v)}
-            >
-              Default permission mode
-              <span className="tab-menu__caret">▸</span>
+            >{menuT('menuItems.defaultPermissionMode')}<span className="tab-menu__caret">▸</span>
             </button>
             {modeOpen && (
               <div className="tab-menu__sub">
@@ -681,8 +684,7 @@ export function TabBar({
                 >
                   <span className="tab-menu__check">
                     {menuProject.defaultPermissionMode ? '' : '✓'}
-                  </span>
-                  Use global ({PERMISSION_MODE_LABELS[globalMode]})
+                  </span>{menuT('menuItems.useGlobal')}{menuT(permissionMenuKeys[globalMode])})
                   {globalMode === 'auto' && menuAutoHint ? ' ⚠︎' : ''}
                 </button>
                 {ALL_PERMISSION_MODES.map((m) => (
@@ -717,8 +719,8 @@ export function TabBar({
                       {menuProject.defaultPermissionMode === m ? '✓' : ''}
                     </span>
                     {m === 'bypassPermissions' || (m === 'auto' && menuAutoHint)
-                      ? `${PERMISSION_MODE_LABELS[m]} ⚠︎`
-                      : PERMISSION_MODE_LABELS[m]}
+                      ? `${menuT(permissionMenuKeys[m])} ⚠︎`
+                      : menuT(permissionMenuKeys[m])}
                   </button>
                 ))}
               </div>
@@ -740,9 +742,7 @@ export function TabBar({
                     <button
                       className={`tab-menu__group${agentActsOpen ? ' open' : ''}`}
                       onClick={() => setAgentActsOpen((v) => !v)}
-                    >
-                      Agents may, without asking
-                      <span className="tab-menu__caret">▸</span>
+                    >{menuT('menuItems.agentsMayWithoutAsking')}<span className="tab-menu__caret">▸</span>
                     </button>
                     {agentActsOpen && (
                       <div className="tab-menu__sub">
@@ -767,7 +767,7 @@ export function TabBar({
                               }}
                             >
                               <span className="tab-menu__check">{row.skips ? '✓' : ''}</span>
-                              {WAIVABLE_VERB_ACTIONS[verb] ?? verb}
+                              {menuT(waiverMenuKeys[verb] ?? verb)}
                             </button>
                           )
                         })}
@@ -781,9 +781,7 @@ export function TabBar({
                 onOpenProjectSettings(menuProject.id)
                 closeMenu()
               }}
-            >
-              Project settings…
-            </button>
+            >{menuT('menuItems.projectSettings')}</button>
             {/* The id a `nodeterm://open?project=<id>` link names (another app's config maps its
                 repositories to these ids). A relay tab's id belongs to the host, which a link here
                 cannot open. */}
@@ -793,27 +791,21 @@ export function TabBar({
                   window.nodeTerminal.clipboard.writeText(menuProject.id)
                   closeMenu()
                 }}
-              >
-                Copy project id
-              </button>
+              >{menuT('menuItems.copyProjectId')}</button>
             )}
             <button
               onClick={() => {
                 onPauseProject(menuProject.id)
                 closeMenu()
               }}
-            >
-              Pause project
-            </button>
+            >{menuT('menuItems.pauseProject')}</button>
             {(pauseCounts[menuProject.id]?.pending ?? 0) > 0 && (
               <button
                 onClick={() => {
                   onCancelPendingPauses(menuProject.id)
                   closeMenu()
                 }}
-              >
-                Cancel pending pauses
-              </button>
+              >{menuT('menuItems.cancelPendingPauses')}</button>
             )}
             {/* Chromium shows no `title` for a DISABLED button (it receives no pointer events), so
                 the reason sits on a wrapper the pointer can reach; the disabled button lets the
@@ -830,18 +822,14 @@ export function TabBar({
                   onResumeAllProject(menuProject.id)
                   closeMenu()
                 }}
-              >
-                Resume all
-              </button>
+              >{menuT('menuItems.resumeAll')}</button>
             </span>
             <button
               onClick={() => {
                 onCloseProject(menuProject.id)
                 closeMenu()
               }}
-            >
-              Close project
-            </button>
+            >{menuT('menuItems.closeProject')}</button>
           </div>,
           document.body
         )}

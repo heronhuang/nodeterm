@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 /**
  * Shared "Transfer conversation to" menu builder.
  *
@@ -145,7 +146,7 @@ export function transferConversationItems(
       children: [
         // The agent's own default model — transfer with no `--model` flag.
         {
-          label: 'Default model',
+          label: menuT('menuItems.defaultModel'),
           onClick: () => void handler(nodeId, tg.id, at)
         },
         ...models.map(
@@ -158,6 +159,6 @@ export function transferConversationItems(
     }
   })
   return [
-    { type: 'submenu', label: 'Transfer conversation', icon: <IconMoveTo />, children: rows }
+    { type: 'submenu', label: menuT('menuItems.transferConversation'), icon: <IconMoveTo />, children: rows }
   ]
 }

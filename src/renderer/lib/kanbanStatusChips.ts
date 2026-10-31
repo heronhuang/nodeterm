@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 /**
  * The board's transient status filter chips — Running / Needs you / Unread — and the ONE badge
  * rule the session card and the chips both read, so a chip can never select cards whose badge
@@ -18,9 +19,9 @@ import type { AgentNodeStatus } from '../state/agentStatus'
 export type StatusChip = 'running' | 'needs' | 'unread'
 
 export const STATUS_CHIPS: ReadonlyArray<{ id: StatusChip; label: string }> = [
-  { id: 'running', label: 'Running' },
-  { id: 'needs', label: 'Needs you' },
-  { id: 'unread', label: 'Unread' }
+  { id: 'running', get label() { return menuT('menuItems.running') } },
+  { id: 'needs', get label() { return menuT('menuItems.needsYou') } },
+  { id: 'unread', get label() { return menuT('menuItems.unread') } }
 ]
 
 export type CardBadge = 'dropped' | 'running' | 'needs' | 'paused' | 'sleeping'

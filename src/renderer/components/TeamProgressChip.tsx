@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { memo, useState } from 'react'
 import { useAgentStatus } from '../state/agentStatus'
 import {
@@ -48,7 +49,7 @@ export const TeamProgressChip = memo(function TeamProgressChip({
       return {
         label: `${station.title.trim() || 'Untitled session'} — ${STATION_LABEL[kind]}`,
         icon: <span className={`team-progress__dot team-progress__dot--${kind}`} aria-hidden="true" />,
-        hint: 'Go to this station on the canvas',
+        hint: menuT('menuItems.goToThisStationOnTheCanvas'),
         onClick: () => onTravel(station.id)
       }
     })

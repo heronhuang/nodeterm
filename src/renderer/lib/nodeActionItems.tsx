@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 /**
  * The node action rows: ONE builder for every surface that acts on a canvas node — the canvas node
  * right-click menu (`selectionItems` in Canvas), the sessions-sidebar row menu (the same rows minus
@@ -468,7 +469,7 @@ export function buildNodeActionSections(
                 hint:
                   ids.length === 1 && !ctx.onCanvas(ids[0])
                     ? NOT_ATTACHED_HINT
-                    : 'Rebuilds the view and re-attaches to the same session. Nothing running is interrupted.',
+                    : menuT('menuItems.rebuildsTheViewAndReAttachesToTheSame'),
                 onClick: () => ctx.reloadTerminals(ids)
               }
             ]
@@ -558,7 +559,7 @@ function bulkPauseRows(
     {
       label: t('nodeActions.pauseSessions', { count: agents.length }),
       icon: <IconPower />,
-      hint: 'Quits each CLI; busy ones pause after their current turn. Resume brings each back.',
+      hint: menuT('menuItems.quitsEachCliBusyOnesPauseAfterTheirCurrent'),
       onClick: () => ctx.pauseNodes(agents)
     }
   ]
@@ -636,7 +637,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
       label: t('nodeActions.restartAgent'),
       icon: <IconPower />,
       disabled: !!why,
-      hint: why ?? 'Quits the CLI and relaunches it with --resume (same conversation).',
+      hint: why ?? menuT('menuItems.quitsTheCliAndRelaunchesItWithResumeSame'),
       onClick: () => void ctx.restartAgentNode(ids[0])
     },
     // Restart agent AND shell: same quit + relaunch, but RECYCLES the tmux session so a
@@ -656,8 +657,8 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
       hint:
         why ??
         (ctx.sessionSource === 'relay'
-          ? 'Restart the shell on the machine hosting this relay session.'
-          : 'Quits the CLI, respawns a fresh shell (picks up env/profile changes), then resumes.'),
+          ? menuT('menuItems.restartTheShellOnTheMachineHostingThisRelay')
+          : menuT('menuItems.quitsTheCliRespawnsAFreshShellPicksUp')),
       onClick: () => void ctx.restartAgentNode(ids[0], undefined, undefined, true)
     },
     // "Restart on subscription": recycle the session VANILLA — strip the gateway + inherited
@@ -678,19 +679,19 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
           {
             label:
               capabilityAgentId(sourceAgentId ?? ('claude' as AgentId)) === 'copilot'
-                ? 'Restart on Copilot defaults'
-                : 'Restart on subscription',
+                ? menuT('menuItems.restartOnCopilotDefaults')
+                : menuT('menuItems.restartOnSubscription'),
             icon: <IconPower />,
             disabled:
               !clearEnvEligibility(sourceAgentId, sessionId).ok ||
               ctx.sessionSource === 'relay' ||
               !ctx.attached(ids[0]),
             hint: !clearEnvEligibility(sourceAgentId, sessionId).ok
-              ? 'Nothing to resume yet — this session has not reported an id.'
+              ? menuT('menuItems.nothingToResumeYetThisSessionHasNotReported')
               : ctx.sessionSource === 'relay'
-                ? 'Restart the shell on the machine hosting this relay session.'
+                ? menuT('menuItems.restartTheShellOnTheMachineHostingThisRelay')
                 : detachedHint(ctx, ids[0]) ??
-                  'Restarts the session with gateway/provider env stripped — uses your own subscription/credentials.',
+                  menuT('menuItems.restartsTheSessionWithGatewayProviderEnvStrippedUses'),
             onClick: () => void ctx.restartAgentNode(ids[0], undefined, undefined, undefined, true)
           }
         ]
@@ -731,7 +732,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
                 disabled: !!why || model.id === currentModel,
                 hint:
                   model.id === currentModel
-                    ? 'This node is already using this model.'
+                    ? menuT('menuItems.thisNodeIsAlreadyUsingThisModel')
                     : (why ??
                       `Restarts the terminal session and resumes this conversation with ${model.id}.`),
                 onClick: () => void ctx.restartAgentNode(ids[0], undefined, model.id)
@@ -746,10 +747,10 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
             disabled: true,
             hint:
               ctx.sessionSource === 'relay'
-                ? 'Configure the model gateway on the machine hosting this relay session.'
+                ? menuT('menuItems.configureTheModelGatewayOnTheMachineHostingThis')
                 : ctx.gatewayStatus === 'loading'
-                  ? 'Discovering models…'
-                  : ctx.gatewayError || 'Configure a URL and API key in Settings → Model gateway.'
+                  ? menuT('menuItems.discoveringModels')
+                  : ctx.gatewayError || menuT('menuItems.configureAUrlAndApiKeyInSettingsModel')
           }
         ] as MenuItem[])
     : []
@@ -778,7 +779,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
             label: t('nodeActions.resumeSession'),
             icon: <IconPower />,
             disabled: !ctx.attached(ids[0]),
-            hint: detachedHint(ctx, ids[0]) ?? 'Brings the conversation back.',
+            hint: detachedHint(ctx, ids[0]) ?? menuT('menuItems.bringsTheConversationBack'),
             onClick: () => void ctx.resumeAgentNode(ids[0])
           }
         ] as MenuItem[])
@@ -793,7 +794,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
                 disabled: !!pauseWhy,
                 hint:
                   pauseWhy ??
-                  'Quits the CLI; the tmux session stays so Resume is fast. Frees most of the memory.',
+                  menuT('menuItems.quitsTheCliTheTmuxSessionStaysSoResume'),
                 onClick: () => void ctx.pauseAgentNode(ids[0], false)
               },
               {
@@ -807,8 +808,8 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
                 hint:
                   pauseWhy ??
                   (ctx.sessionSource === 'relay'
-                    ? 'Ends the tmux session on the machine hosting this relay session, not here.'
-                    : 'Quits the CLI and ends its tmux session too, for a fuller memory reclaim. Resume starts a fresh session with the same conversation.'),
+                    ? menuT('menuItems.endsTheTmuxSessionOnTheMachineHostingThis')
+                    : menuT('menuItems.quitsTheCliAndEndsItsTmuxSessionToo')),
                 onClick: () => void ctx.pauseAgentNode(ids[0], true)
               }
             ]
@@ -852,7 +853,7 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
           // The system row names the machine it is on: an SSH node's is the HOST's
           // `~/.claude`, whose identity this machine's system email says nothing about.
           const systemLabel = hostKey
-            ? `System account (${hostKey})`
+            ? menuT('menuItems.systemHostAccount', { host: hostKey })
             : systemAccountDisplay(settingsNow.systemAccountLabel, useSystemAccount.getState().email)
           const row = (id: string | undefined, label: string): MenuItem => {
             const isCurrent = (id || undefined) === currentAccountId
@@ -861,9 +862,9 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
               icon: <AgentIcon agentId="claude" />,
               disabled: !!why || isCurrent,
               hint: isCurrent
-                ? 'This node already runs on this account.'
+                ? menuT('menuItems.thisNodeAlreadyRunsOnThisAccount')
                 : (why ??
-                  'Quits Claude, moves this conversation to the account and resumes it there — no login needed.'),
+                  menuT('menuItems.quitsClaudeMovesThisConversationToTheAccountAnd')),
               onClick: () => void ctx.switchClaudeAccountNode(nodeId, id, label)
             }
           }
@@ -873,7 +874,7 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
                 label: t('nodeActions.switchClaudeAccount'),
                 icon: <IconSwitch />,
                 disabled: true,
-                hint: 'Not available for relay sessions.',
+                hint: menuT('menuItems.notAvailableForRelaySessions'),
                 onClick: () => {}
               }
             ] as MenuItem[]
@@ -904,7 +905,7 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
           // The system row names ITS machine: an SSH node's is the host's own `~/.codex`, whose
           // login this machine's system email says nothing about.
           const systemCodexLabel = hostKey
-            ? (useSystemCodexAccount.getState().remoteEmails[hostKey] ?? `System account (${hostKey})`)
+            ? (useSystemCodexAccount.getState().remoteEmails[hostKey] ?? menuT('menuItems.systemHostAccount', { host: hostKey }))
             : systemAccountDisplay(undefined, useSystemCodexAccount.getState().email)
           const row = (id: string | undefined, label: string): MenuItem => {
             const isCurrent = (id || undefined) === currentAccountId
@@ -914,13 +915,13 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
               icon: <AgentIcon agentId="codex" />,
               disabled: !!why || isCurrent || !sel.ok,
               hint: isCurrent
-                ? 'This node already runs on this account.'
+                ? menuT('menuItems.thisNodeAlreadyRunsOnThisAccount')
                 : !sel.ok
                   ? sel.reason === 'no-connection'
-                    ? 'This account lives on a host that is not connected.'
-                    : 'This account is no longer available.'
+                    ? menuT('menuItems.thisAccountLivesOnAHostThatIsNot2')
+                    : menuT('menuItems.thisAccountIsNoLongerAvailable')
                   : (why ??
-                    'Moves this conversation to the account and resumes it there (same conversation).'),
+                    menuT('menuItems.movesThisConversationToTheAccountAndResumesIt')),
               onClick: () => void ctx.switchCodexAccountNode(nodeId, id)
             }
           }

@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { createPortal } from 'react-dom'
 import { useSshServers } from '../state/sshServers'
 import type { SshServer } from '@shared/ssh'
@@ -24,9 +25,7 @@ export function RemotePicker({ x, y, onPick, onManage, onClose }: RemotePickerPr
               onManage()
               onClose()
             }}
-          >
-            Add SSH server…
-          </button>
+          >{menuT('menuItems.addSshServer')}</button>
         ) : (
           <>
             {servers.map((s) => (
@@ -49,9 +48,7 @@ export function RemotePicker({ x, y, onPick, onManage, onClose }: RemotePickerPr
                 onManage()
                 onClose()
               }}
-            >
-              Manage SSH servers…
-            </button>
+            >{menuT('menuItems.manageSshServers')}</button>
           </>
         )}
       </div>

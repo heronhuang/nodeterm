@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import type { ProjectKanban } from '@shared/types'
 
 /** Where a board card can come from. Sources are a membership list plus one concrete leaf each
@@ -35,14 +36,14 @@ export interface KanbanSourceDef {
 export const KANBAN_SOURCES: readonly KanbanSourceDef[] = [
   {
     id: 'github',
-    label: 'Issues',
+    get label() { return menuT('menuItems.issues') },
     placement: 'provider',
     lane: 1,
     configured: (board) => !!board.github
   },
   {
     id: 'pulls',
-    label: 'Pull requests',
+    get label() { return menuT('menuItems.pullRequests') },
     placement: 'provider',
     lane: 2,
     readOnly: true,
@@ -50,7 +51,7 @@ export const KANBAN_SOURCES: readonly KanbanSourceDef[] = [
   },
   {
     id: 'sessions',
-    label: 'Sessions',
+    get label() { return menuT('menuItems.sessions') },
     placement: 'assignment',
     lane: 0,
     configured: () => true

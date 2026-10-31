@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { memo, useCallback, useState } from 'react'
 import {
   devPortUrl,
@@ -137,7 +138,7 @@ export const PortsChip = memo(function PortsChip({
   const primary = rows.filter((r) => !r.ephemeral)
   const other = rows.filter((r) => r.ephemeral)
   const items: MenuItem[] = [
-    { type: 'label', label: remote ? 'Listening on the server' : 'Listening in this session' },
+    { type: 'label', label: remote ? menuT('menuItems.listeningOnTheServer') : menuT('menuItems.listeningInThisSession') },
     ...primary.flatMap(rowItems)
   ]
   if (other.length > 0) {

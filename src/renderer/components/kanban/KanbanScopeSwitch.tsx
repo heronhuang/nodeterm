@@ -1,3 +1,4 @@
+import { t as menuT } from '../../i18n/runtime'
 import { useProjects } from '../../state/projects'
 import { useSettings } from '../../state/settings'
 import { isOmniKanbanEnabled, showAllProjectsBoard, showProjectBoard } from '../../state/viewMode'
@@ -14,8 +15,8 @@ export function KanbanScopeSwitch({ scope }: { scope: KanbanScope }): React.JSX.
   const omniEnabled = useSettings((s) => isOmniKanbanEnabled(s.settings))
   if (!omniEnabled) return null
   const options: { id: KanbanScope; label: string }[] = [
-    { id: 'project', label: 'This project' },
-    { id: 'all', label: 'All projects' }
+    { id: 'project', label: menuT('menuItems.thisProject') },
+    { id: 'all', label: menuT('menuItems.allProjects') }
   ]
   const choose = (next: KanbanScope): void => {
     if (next === scope) return

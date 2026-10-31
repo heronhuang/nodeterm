@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconClose, IconMore, IconSparkle, IconUndo } from './icons'
 import { createPortal } from 'react-dom'
@@ -660,9 +661,7 @@ export function SourceControlPanel({
                     setScopeMenu(null)
                     onNewWorktree()
                   }}
-                >
-                  New worktree…
-                </button>
+                >{menuT('menuItems.newWorktree')}</button>
               </div>
             </>,
             document.body
@@ -755,7 +754,7 @@ export function SourceControlPanel({
                     {query && !exact && !remoteExact && (
                       <>
                         {(shown.length > 0 || remoteShown.length > 0) && <div className="ctx-sep" />}
-                        <button onClick={createNew}>+ Create branch “{query}”</button>
+                        <button onClick={createNew}>{menuT('menuItems.createBranch')}{query}”</button>
                       </>
                     )}
                   </div>
@@ -792,18 +791,14 @@ export function SourceControlPanel({
                   window.nodeTerminal.clipboard.writeText(`${cwd}/${fileMenu.path}`)
                   setFileMenu(null)
                 }}
-              >
-                Copy Path
-              </button>
+              >{menuT('menuItems.copyPath')}</button>
               <button
                 className="ctx-item"
                 onClick={() => {
                   window.nodeTerminal.clipboard.writeText(fileMenu.path)
                   setFileMenu(null)
                 }}
-              >
-                Copy Relative Path
-              </button>
+              >{menuT('menuItems.copyRelativePath')}</button>
               <div className="ctx-sep" />
               {/* Always "Add": a file this panel lists is by definition NOT ignored (git status
                   never shows ignored files), so there is nothing to offer removal for here. */}
@@ -814,9 +809,7 @@ export function SourceControlPanel({
                   setFileMenu(null)
                   void addToGitignore(m.path)
                 }}
-              >
-                Add to .gitignore
-              </button>
+              >{menuT('menuItems.addToGitignore')}</button>
               <div className="ctx-sep" />
               <button
                 className="ctx-item"
@@ -883,15 +876,15 @@ export function SourceControlPanel({
             // repos route these to the remote over the master via the Phase-4 git chokepoint.
             ...(status.hasUpstream
               ? ([
-                  { label: 'Pull', onClick: () => void act(() => git.pull(cwd!)) },
-                  { label: 'Push', onClick: () => void act(() => git.push(cwd!)) },
-                  { label: 'Sync', onClick: () => void act(() => git.sync(cwd!)) },
+                  { label: menuT('menuItems.pull'), onClick: () => void act(() => git.pull(cwd!)) },
+                  { label: menuT('menuItems.push'), onClick: () => void act(() => git.push(cwd!)) },
+                  { label: menuT('menuItems.sync'), onClick: () => void act(() => git.sync(cwd!)) },
                   { type: 'separator' }
                 ] as MenuItem[])
               : []),
-            { label: 'Fetch', onClick: () => void act(() => git.fetch(cwd!)) },
+            { label: menuT('menuItems.fetch'), onClick: () => void act(() => git.fetch(cwd!)) },
             {
-              label: 'Force Push',
+              label: menuT('menuItems.forcePush'),
               onClick: () => {
                 if (window.confirm('Force push with lease? This overwrites the remote branch.'))
                   void act(() => git.forcePush(cwd!))
@@ -899,15 +892,15 @@ export function SourceControlPanel({
             },
             { type: 'separator' },
             {
-              label: 'Merge Branch…',
+              label: menuT('menuItems.mergeBranch'),
               onClick: () => setBranchPick({ x: moreMenu.x, y: moreMenu.y, action: 'merge' })
             },
             {
-              label: 'Rebase onto…',
+              label: menuT('menuItems.rebaseOnto'),
               onClick: () => setBranchPick({ x: moreMenu.x, y: moreMenu.y, action: 'rebase' })
             },
             {
-              label: 'Rename Branch…',
+              label: menuT('menuItems.renameBranch'),
               onClick: () => {
                 void promptDialog({ message: 'Rename current branch to:', initialValue: status.branch }).then(
                   (name) => {
@@ -917,12 +910,12 @@ export function SourceControlPanel({
               }
             },
             {
-              label: 'Delete Branch…',
+              label: menuT('menuItems.deleteBranch'),
               onClick: () => setBranchPick({ x: moreMenu.x, y: moreMenu.y, action: 'delete' })
             },
             { type: 'separator' },
-            { label: 'Stash Changes', onClick: () => void act(() => git.stashPush(cwd!)) },
-            { label: 'Pop Stash', onClick: () => void act(() => git.stashPop(cwd!)) }
+            { label: menuT('menuItems.stashChanges'), onClick: () => void act(() => git.stashPush(cwd!)) },
+            { label: menuT('menuItems.popStash'), onClick: () => void act(() => git.stashPop(cwd!)) }
           ] as MenuItem[]}
         />
       )}

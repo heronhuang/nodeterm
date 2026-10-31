@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 // What a board move actually DOES to a GitHub issue — decided in one pure place so the drop
 // handler, the card's Move selector and the summary modal cannot disagree about it.
 //
@@ -29,8 +30,8 @@ export interface GitHubMoveConfirmation {
 }
 
 const CLOSE_REASONS: Array<{ value: GitHubCloseReason; label: string }> = [
-  { value: 'completed', label: 'Completed' },
-  { value: 'not_planned', label: 'Not planned' }
+  { value: 'completed', get label() { return menuT('menuItems.completed') } },
+  { value: 'not_planned', get label() { return menuT('menuItems.notPlanned') } }
 ]
 
 interface MovableIssue {

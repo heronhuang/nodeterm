@@ -1,3 +1,4 @@
+import { menuItemsZh } from './menu-items-zh'
 import { settingsSectionZh } from './settings-zh'
 import { keybindingsZh } from './keybindings-zh'
 
@@ -5,6 +6,7 @@ const { language: languageSectionZh, ...settingsRestZh } = settingsSectionZh
 
 /** 简体中文 UI 消息目录（由 createTranslator 解析嵌套键）。 */
 export const zhMessages = {
+  menuItems: menuItemsZh,
   common: {
     cancel: '取消',
     ok: '确定',
@@ -147,7 +149,7 @@ export const zhMessages = {
   nodeActions: {
     nodesCount: '{count} 个节点',
     oneNode: '1 个节点',
-    stopAgentControl: '停止 Agent 控制',
+    stopAgentControl: '停止智能体控制',
     addToGroup: '将选中项添加到 {title}',
     addToGroupFallback: '分组',
     addSelectionToGroup: '将选中项添加到分组',
@@ -160,13 +162,13 @@ export const zhMessages = {
     duplicate: '复制',
     snapToZone: '对齐到区域',
     collapseExpand: '折叠 / 展开',
-    markdownView: 'Markdown 视图',
+    markdownView: '标记文本视图',
     refreshTerminal: '刷新终端',
     branchConversation: '分支对话',
     delete: '删除',
     pauseSessions: '暂停 {count} 个会话',
-    restartAgent: '重启 Agent',
-    restartAgentAndShell: '重启 Agent 与 Shell',
+    restartAgent: '重启智能体',
+    restartAgentAndShell: '重启智能体与命令行环境',
     reopenAs: '以此重新打开会话',
     switchModel: '切换模型',
     switchModelCurrent: '切换模型 ({model})',
@@ -337,7 +339,7 @@ export const zhMessages = {
       openFile: '打开文件…',
       newFile: '新建文件…',
       spawnTeam: '组建团队…',
-      newWorktree: '新建 worktree…',
+      newWorktree: '新建工作树…',
       simulator: '模拟器',
       runConfiguration: '运行配置',
       browser: '浏览器',
@@ -347,8 +349,8 @@ export const zhMessages = {
       whiteboard: '白板',
       dinoGame: '恐龙游戏',
       trigger: '触发器',
-      worktree: 'Worktree…',
-      newAgent: '新建 Agent',
+      worktree: '工作树…',
+      newAgent: '新建智能体',
       groupView: '新建视图',
       groupFiles: '文件',
       groupOrchestrate: '编排'

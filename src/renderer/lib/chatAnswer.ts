@@ -1,3 +1,4 @@
+import { t as menuT } from '../i18n/runtime'
 import type { ChatMessage } from '@shared/types'
 import {
   ANSWER_TEXT_MAX_CHARS,
@@ -18,9 +19,9 @@ import {
 /** The three ways to approve a plan, in button order. There is deliberately no `auto`
  *  (see `PermissionAnswer`), and the default names what it actually does. */
 export const PLAN_CHOICES: ReadonlyArray<{ mode: 'restore' | 'acceptEdits' | 'manual'; label: string; hint: string }> = [
-  { mode: 'restore', label: 'Approve · previous mode', hint: 'Continue in the mode you were in before plan mode' },
-  { mode: 'acceptEdits', label: 'Approve · accept edits', hint: 'Continue with file edits auto-approved' },
-  { mode: 'manual', label: 'Approve · ask before edits', hint: 'Continue, asking before each edit' }
+  { mode: 'restore', get label() { return menuT('menuItems.approvePreviousMode') }, get hint() { return menuT('menuItems.continueInTheModeYouWereInBeforePlan') } },
+  { mode: 'acceptEdits', get label() { return menuT('menuItems.approveAcceptEdits') }, get hint() { return menuT('menuItems.continueWithFileEditsAutoApproved') } },
+  { mode: 'manual', get label() { return menuT('menuItems.approveAskBeforeEdits') }, get hint() { return menuT('menuItems.continueAskingBeforeEachEdit') } }
 ]
 
 /** Typed text limit for "Revise…" and "Other" — the shared limit core enforces. */
