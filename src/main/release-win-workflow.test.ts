@@ -96,6 +96,18 @@ describe('release.yml release-win', () => {
 
 // U2: the feed the apps read is a mirror outside this repo; this job is the only thing that
 // notices when it does not serve a release's latest*.yml.
+describe('release.yml publish', () => {
+  const text = fs.readFileSync(WORKFLOW, 'utf8')
+  const block = jobBlock(text, 'publish')
+  const job = commands(block)
+
+  it('does not treat a /releases/latest 404 body as the previous tag', () => {
+    expect(block).toContain('if latest=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest"')
+    expect(block).not.toMatch(/releases\/latest" --jq \.tag_name 2>\/dev\/null \|\| true/)
+    expect(block).toContain('case "$latest" in v*)')
+  })
+})
+
 describe('release.yml verify-feed', () => {
   const text = fs.readFileSync(WORKFLOW, 'utf8')
   const job = commands(jobBlock(text, 'verify-feed'))
