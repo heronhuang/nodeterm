@@ -35,7 +35,7 @@ describe('release.yml release-mac', () => {
 
   it('runs on a GitHub-hosted macOS runner', () => {
     expect(block).toMatch(/runs-on: macos-14/)
-    expect(block).not.toContain('self-hosted')
+    expect(job).not.toContain('self-hosted')
   })
 
   it('builds the unsigned manual-marker package, not the signed release script', () => {

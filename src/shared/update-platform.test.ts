@@ -58,13 +58,15 @@ describe('local dist scripts opt out of the production update feed', () => {
   ) as { scripts: Record<string, string> }
   const MARKER = '-c.extraMetadata.nodeTermUpdates=disabled'
   const MANUAL = `-c.extraMetadata.nodeTermUpdates=${MANUAL_UPDATE_MODE}`
-  // The one dist-named script that is a RELEASE package: the unsigned Windows beta, which checks
-  // the feed but never self-installs. Everything else under `dist*` is a local package.
+  // Dist-named scripts that are RELEASE packages (unsigned betas): check the feed but never
+  // self-install. Everything else under `dist*` is a local package.
   const WIN_RELEASE = 'dist:win:release'
+  const MAC_RELEASE = 'dist:mac:release'
 
   it('every local dist script carries the marker — not just the one whose 404 was noticed', () => {
     const dist = Object.keys(pkg.scripts).filter(
-      (s) => (s === 'dist' || s.startsWith('dist:')) && s !== WIN_RELEASE
+      (s) =>
+        (s === 'dist' || s.startsWith('dist:')) && s !== WIN_RELEASE && s !== MAC_RELEASE
     )
     expect(dist.length).toBeGreaterThanOrEqual(2) // dist, dist:win
     expect(dist.filter((s) => !pkg.scripts[s].includes(MARKER))).toEqual([])
@@ -81,6 +83,14 @@ describe('local dist scripts opt out of the production update feed', () => {
     expect(cmd).not.toContain(MARKER)
     expect(cmd).toContain('--win')
     // It still never publishes from the build step; release.yml uploads the assets itself.
+    expect(cmd).toContain('--publish never')
+  })
+
+  it('the macOS release package is stamped manual — feed check, never self-install', () => {
+    const cmd = pkg.scripts[MAC_RELEASE]
+    expect(cmd).toContain(MANUAL)
+    expect(cmd).not.toContain(MARKER)
+    expect(cmd).toContain('--mac')
     expect(cmd).toContain('--publish never')
   })
 
