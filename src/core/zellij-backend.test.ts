@@ -1,6 +1,6 @@
 // Pure halves of the Zellij backend (zellij-backend.ts). The real-binary half is
 // zellij-backend.realzellij.test.ts; these pin the decisions against the exact shapes Zellij 0.45.1
-// printed when measured (docs/session-backends.md).
+// printed when measured (docs/en/session-backends.md — English mirror; zh at docs/session-backends.md).
 import { describe, it, expect } from 'vitest'
 import {
   ZELLIJ_LAYOUT,
@@ -248,9 +248,9 @@ describe('argv and config builders', () => {
 })
 
 describe('the gap list the Settings row prints is the list the docs state', () => {
-  it('every ZELLIJ_BACKEND_GAPS line appears verbatim in docs/session-backends.md', () => {
+  it('every ZELLIJ_BACKEND_GAPS line appears verbatim in docs/en/session-backends.md', () => {
     const doc = fs
-      .readFileSync(path.join(__dirname, '../../docs/session-backends.md'), 'utf8')
+      .readFileSync(path.join(__dirname, '../../docs/en/session-backends.md'), 'utf8')
       .replace(/\r\n/g, '\n')
     for (const gap of ZELLIJ_BACKEND_GAPS) expect(doc).toContain(`- ${gap}`)
   })
