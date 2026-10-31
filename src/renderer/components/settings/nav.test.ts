@@ -5,7 +5,7 @@ describe('SETTINGS_GROUPS', () => {
   it('lists exactly 28 sections with no duplicates', () => {
     const ids = allSectionIds()
     expect(ids).toHaveLength(28)
-    expect(new Set(ids).size).toBe(27)
+    expect(new Set(ids).size).toBe(28)
   })
   it('starts at a section that exists in the groups', () => {
     expect(allSectionIds()).toContain(FIRST_SECTION_ID)
