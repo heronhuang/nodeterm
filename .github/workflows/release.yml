@@ -58,7 +58,12 @@ jobs:
       # Unsigned macOS release (arm64 + x64): same electron-builder flags as local `npm run dist`,
       # plus both arches and nodeTermUpdates=manual — passive update notice only until signing exists.
       # No CSC_* / APPLE_* secrets on this fork.
+      #
+      # electron-vite's renderer bundle (Monaco, Excalidraw, xterm, …) needs more than the ~2 GiB
+      # default old-space cap on GitHub-hosted macOS runners — without this the client build OOMs.
       - name: Build macOS packages (DMG + zip, unsigned)
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: npm run dist:mac:release
 
       - name: Verify expected artifacts
