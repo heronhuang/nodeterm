@@ -54,9 +54,9 @@ describe('release.yml release-win', () => {
     expect(job).not.toContain('dist/*.yml')
   })
 
-  it('is still not a gate on the mac+linux publish', () => {
+  it('is still not a gate on the mac publish', () => {
     const publish = commands(jobBlock(text, 'publish'))
-    expect(publish).toMatch(/needs: \[release-mac, release-linux\]/)
+    expect(publish).toMatch(/needs: \[release-mac\]/)
     expect(publish).not.toContain('release-win')
   })
 })
@@ -74,7 +74,7 @@ describe('release.yml verify-feed', () => {
 
   it('checks every platform feed file against the tag on the real update URL', () => {
     expect(job).toContain('FEED: https://nodeterm.dev/updates')
-    expect(job).toMatch(/STRICT: latest-mac\.yml latest-linux\.yml/)
+    expect(job).toMatch(/STRICT: latest-mac\.yml/)
     expect(job).toMatch(/ADVISORY: latest\.yml/)
     expect(job).toContain('want="${GITHUB_REF_NAME#v}"')
     expect(job).toContain('curl -fsSL')

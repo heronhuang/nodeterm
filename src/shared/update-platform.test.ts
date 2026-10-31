@@ -66,7 +66,7 @@ describe('local dist scripts opt out of the production update feed', () => {
     const dist = Object.keys(pkg.scripts).filter(
       (s) => (s === 'dist' || s.startsWith('dist:')) && s !== WIN_RELEASE
     )
-    expect(dist.length).toBeGreaterThanOrEqual(3) // dist, dist:linux, dist:win
+    expect(dist.length).toBeGreaterThanOrEqual(2) // dist, dist:win
     expect(dist.filter((s) => !pkg.scripts[s].includes(MARKER))).toEqual([])
   })
 
@@ -154,7 +154,7 @@ describe('updateDelivery', () => {
   })
 
   it('decides no-channel from the build marker, never from the platform name', () => {
-    // The same marker on every platform: `dist`, `dist:linux` and `dist:win` all set it, and the
+    // The same marker on every local dist script: `dist` and `dist:win` both set it, and the
     // day a Windows RELEASE ships with a feed it carries no marker and takes the ordinary path
     // below with nothing to edit here.
     for (const platform of ['win32', 'darwin', 'linux']) {

@@ -34,7 +34,7 @@ jobs:
       # in every release before the flip, or DO_NOT_TRACK users are gated before anyone else. This
       # refuses a tag whose deadline is under 30 days away (until it is frozen at the flip). Plain
       # node, no npm ci, so a refused release fails in seconds. It is the FIRST step that runs in
-      # every build job (mac, linux, win): those jobs do not wait for each other and each creates
+      # every build job (mac, win): those jobs do not wait for each other and each creates
       # the release on its first upload, so a refused tag must stop all three before they build.
       # See docs/project-limit.md.
       - name: Project-limit deadline guard
@@ -134,10 +134,10 @@ jobs:
           # below can't catch. `-w $$` ties the assertion to this shell's lifetime.
           caffeinate -dims -w $$ &
           tag="${GITHUB_REF_NAME}"
-          # The linux job may already have created the release for this tag; tolerate the race.
+          # Another platform job may already have created the release for this tag; tolerate the race.
           # Created as PRERELEASE: a half-built release must never become "latest" (the site and
-          # the update feed follow /releases/latest). The `publish` job flips it once BOTH
-          # platform jobs have uploaded.
+          # the update feed follow /releases/latest). The `publish` job flips it once the mac
+          # job has uploaded.
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "$tag" --verify-tag --prerelease --notes "" || true
           n=1
@@ -162,54 +162,6 @@ jobs:
       #     rsync -avz dist/*.dmg dist/*.zip dist/*.yml dist/*.blockmap \
       #       deploy@nodeterm.dev:/var/www/nodeterm.dev/updates/
 
-  # Linux build: unsigned, so it runs on a plain GitHub runner (fast + free tier), in
-  # parallel with the self-hosted mac job — it must never queue behind notarization.
-  # Publishes AppImage + deb + rpm + latest-linux.yml to the SAME tag's GitHub Release; the
-  # nodeterm.dev update feed serves latest-linux.yml alongside the mac files.
-  release-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-
-      # Same guard as release-mac (see the comment there): first, so a refused tag uploads nothing.
-      - name: Project-limit deadline guard
-        run: node scripts/check-project-limit-deadline.mjs
-
-      # electron-builder ships its own fpm, but the rpm target shells out to the system
-      # rpmbuild ("Need executable 'rpmbuild' to convert dir to rpm"). Installed explicitly
-      # rather than relying on whatever the runner image happens to carry.
-      - name: Install rpmbuild
-        run: sudo apt-get update && sudo apt-get install -y rpm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Linux packages
-        run: |
-          npm run make-icon
-          npm run build
-          npx electron-builder --linux --publish never
-
-      # Both jobs target the release for the same tag; softprops updates an existing
-      # release rather than failing, so mac/linux artifact sets merge. (A same-instant
-      # creation race is theoretically possible — rerunning the failed job resolves it.)
-      # prerelease: a half-built release must never become "latest" — the `publish` job
-      # flips it once both platform jobs are done.
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          prerelease: true
-          files: |
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.rpm
-            dist/latest-linux.yml
-
   # Windows build: UNSIGNED BETA (#454), on a plain GitHub runner. Publishes the NSIS
   # installer + zip + latest.yml as assets on the same tag's GitHub Release. latest.yml is a
   # PASSIVE notice feed only: `dist:win:release` stamps the package `nodeTermUpdates=manual`
@@ -217,11 +169,11 @@ jobs:
   # "new version available — Download" card linking the releases page, but never downloads or
   # installs (quitAndInstall is refused in main). Self-install arrives with code signing; an
   # unsigned auto-update is a trust downgrade. The nodeterm.dev/updates mirror must serve
-  # latest.yml the way it serves latest-mac.yml / latest-linux.yml (hosted outside this repo);
+  # latest.yml the way it serves latest-mac.yml (hosted outside this repo);
   # the `verify-feed` job below reports whether it does.
   #
   # BEST-EFFORT by design: the `publish` promote gate below deliberately does NOT wait on
-  # this job, so a Windows failure never strands the mac+linux release as a prerelease. A
+  # this job, so a Windows failure never strands the mac release as a prerelease. A
   # failed run is rerun and uploads into the (possibly already published) release. Uploads
   # use `gh release upload --clobber` (never softprops) so a late finish can't flip an
   # already-promoted release back to prerelease by re-writing its fields.
@@ -287,16 +239,15 @@ jobs:
             sleep 30
           done
 
-  # Flips the release to a published "latest" only when BOTH the mac and linux jobs uploaded
-  # their assets. Until then it stays a prerelease, so /releases/latest (the site + both update
-  # feeds) keeps serving the previous complete release — a mac-runner sleep or an upload
-  # failure can no longer put a partial release in front of users. If one platform job
-  # fails, fix/rerun it; this job then runs on the rerun and publishes.
+  # Flips the release to a published "latest" once the mac job uploaded its assets. Until then
+  # it stays a prerelease, so /releases/latest (the site + update feeds) keeps serving the
+  # previous complete release — a mac-runner sleep or an upload failure can no longer put a
+  # partial release in front of users.
   # release-win is deliberately NOT in `needs`: the Windows asset is an unsigned beta whose feed
-  # is a passive notice only, and its failure must never hold the mac+linux release hostage.
+  # is a passive notice only, and its failure must never hold the mac release hostage.
   publish:
     runs-on: ubuntu-latest
-    needs: [release-mac, release-linux]
+    needs: [release-mac]
     # A job-level block replaces the workflow's, so contents: write is restated. issues: read lets
     # the release-notes generator look up the PRs labelled `no-release-notes` (labels live on the
     # issues API); without it that lookup fails and the notes fall back to the plain commit list.
@@ -401,10 +352,7 @@ jobs:
   # The budget is ONE deadline for the whole job, not a retry count per file, and that is the
   # v0.4.4 lesson. Measured on run 39079366383: publish promoted at 00:25:02, this job started at
   # 00:25:03 — one second later — and the mirror did not serve 0.4.4 until somewhere inside
-  # 00:29:43…00:30:14, i.e. ~5 minutes behind the promote, for every file AT ONCE. Under a per-file
-  # count the first STRICT file absorbs that entire wait alone, and it ran out ~30 s short: the job
-  # failed on latest-mac.yml and then passed latest-linux.yml and latest.yml seconds later, which
-  # reads as a mac-specific cache problem and is nothing of the kind. A shared deadline charges the
+  # 00:29:43…00:30:14, i.e. ~5 minutes behind the promote. A shared deadline charges the
   # one lag once — the first file waits, the rest are free — and it bounds a genuinely dead mirror
   # to BUDGET_MINUTES instead of BUDGET_MINUTES × files. If STRICT spends the whole budget then
   # ADVISORY gets exactly one attempt, deliberately: the mirror is demonstrably behind and a second
@@ -418,7 +366,7 @@ jobs:
       - name: Verify the update feed serves this release
         env:
           FEED: https://nodeterm.dev/updates
-          STRICT: latest-mac.yml latest-linux.yml
+          STRICT: latest-mac.yml
           ADVISORY: latest.yml
           WIN_RESULT: ${{ needs.release-win.result }}
           # ~2.4× the 5 min lag measured on v0.4.4, and a cap on the JOB, not on each file.
