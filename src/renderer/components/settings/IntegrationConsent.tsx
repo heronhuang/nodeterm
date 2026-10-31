@@ -7,7 +7,6 @@
 import { useEffect, useState } from 'react'
 import { useSettings } from '../../state/settings'
 import {
-  FEATURES_NEEDING_INTEGRATION,
   INTEGRATION_AGENT_IDS,
   agentChoice,
   answerIntegrationPrompt,
@@ -26,17 +25,10 @@ import { AGENT_CONFIG } from '@shared/agents/config'
 import { Button } from '@renderer/ui/Button'
 import { AgentIcon } from '../../lib/agentIcons'
 import { IconClose } from '../icons'
+import { useI18n } from '@renderer/i18n/useI18n'
+import type { TranslateFn } from '@shared/i18n/types'
 
 const labelOf = (id: IntegrationAgentId): string => AGENT_CONFIG[id]?.label ?? id
-
-/** What an integration writes, in one sentence (the same words everywhere it is offered). */
-export const INTEGRATION_WRITES =
-  'nodeterm adds a status hook to each agent’s own settings and installs two small skills ' +
-  '(canvas control, reading linked nodes) in its skills folder. Nothing is added to your ' +
-  'AGENTS.md / GEMINI.md, and turning an agent off removes exactly what nodeterm added.'
-
-export const INTEGRATION_UNAVAILABLE =
-  `Terminals always work. Without an integration, that agent has no ${FEATURES_NEEDING_INTEGRATION.join('; no ')}.`
 
 function useSave(): (next: ReturnType<typeof useSettings.getState>['settings']) => void {
   const update = useSettings((s) => s.update)
@@ -46,6 +38,7 @@ function useSave(): (next: ReturnType<typeof useSettings.getState>['settings']) 
 /** The first-run question (a new install that has not answered). Nothing global is written until
  *  it is answered; "Not now" records a decline, so it is asked once. */
 export function IntegrationPromptBanner({ onChoose }: { onChoose: () => void }): React.JSX.Element | null {
+  const { t } = useI18n()
   const settings = useSettings((s) => s.settings)
   const hydrated = useSettings((s) => s.hydrated)
   const save = useSave()
@@ -54,25 +47,25 @@ export function IntegrationPromptBanner({ onChoose }: { onChoose: () => void }):
     <div className="announce-banner announce-banner--info" role="status" data-testid="integration-prompt">
       <span className="announce-banner__dot" />
       <div className="announce-banner__content">
-        <span className="announce-banner__title">Integrate nodeterm with your agent CLIs?</span>
+        <span className="announce-banner__title">{t('integrationConsent.prompt.title')}</span>
         <span className="announce-banner__body">
-          {INTEGRATION_WRITES} {INTEGRATION_UNAVAILABLE}
+          {t('integrationConsent.prompt.writes')} {t('integrationConsent.prompt.unavailable')}
         </span>
       </div>
       <button
         className="announce-banner__btn"
         onClick={() => save({ ...settings, agentIntegrations: answerIntegrationPrompt([...INTEGRATION_AGENT_IDS]) })}
       >
-        Enable all
+        {t('integrationConsent.prompt.enableAll')}
       </button>
       <button className="announce-banner__btn" onClick={onChoose}>
-        Choose…
+        {t('integrationConsent.prompt.choose')}
       </button>
       <button
         className="announce-banner__btn"
         onClick={() => save({ ...settings, agentIntegrations: answerIntegrationPrompt([]) })}
       >
-        Not now
+        {t('integrationConsent.prompt.notNow')}
       </button>
     </div>
   )
@@ -80,6 +73,7 @@ export function IntegrationPromptBanner({ onChoose }: { onChoose: () => void }):
 
 /** The one-time notice for an install from before this feature: everything it had stays on. */
 export function IntegrationGrandfatherNotice({ onOpenSettings }: { onOpenSettings: () => void }): React.JSX.Element | null {
+  const { t } = useI18n()
   const settings = useSettings((s) => s.settings)
   const hydrated = useSettings((s) => s.hydrated)
   const save = useSave()
@@ -89,11 +83,8 @@ export function IntegrationGrandfatherNotice({ onOpenSettings }: { onOpenSetting
     <div className="announce-banner announce-banner--info" role="status" data-testid="integration-notice">
       <span className="announce-banner__dot" />
       <div className="announce-banner__content">
-        <span className="announce-banner__title">Agent integrations are now a choice</span>
-        <span className="announce-banner__body">
-          They stay on for every agent, as before. You can turn any agent (or any SSH host) off in
-          Settings → Agents — nodeterm then removes exactly what it added.
-        </span>
+        <span className="announce-banner__title">{t('integrationConsent.grandfather.title')}</span>
+        <span className="announce-banner__body">{t('integrationConsent.grandfather.body')}</span>
       </div>
       <button
         className="announce-banner__btn"
@@ -102,9 +93,14 @@ export function IntegrationGrandfatherNotice({ onOpenSettings }: { onOpenSetting
           onOpenSettings()
         }}
       >
-        Review
+        {t('integrationConsent.grandfather.review')}
       </button>
-      <button className="announce-banner__close" title="Dismiss" aria-label="Dismiss" onClick={dismiss}>
+      <button
+        className="announce-banner__close"
+        title={t('common.dismiss')}
+        aria-label={t('common.dismiss')}
+        onClick={dismiss}
+      >
         <IconClose />
       </button>
     </div>
@@ -114,6 +110,7 @@ export function IntegrationGrandfatherNotice({ onOpenSettings }: { onOpenSetting
 /** The per-host question: the active project's SSH host has no answer yet, so nothing was
  *  installed there. Shown only once the first-run question is answered. */
 export function HostIntegrationBanner({ hostKey }: { hostKey: string | null }): React.JSX.Element | null {
+  const { t } = useI18n()
   const settings = useSettings((s) => s.settings)
   const hydrated = useSettings((s) => s.hydrated)
   const save = useSave()
@@ -124,25 +121,26 @@ export function HostIntegrationBanner({ hostKey }: { hostKey: string | null }): 
     <div className="announce-banner announce-banner--info" role="status" data-testid="host-integration-prompt">
       <span className="announce-banner__dot" />
       <div className="announce-banner__content">
-        <span className="announce-banner__title">Integrate with the agents on {hostKey}?</span>
+        <span className="announce-banner__title">{t('integrationConsent.host.title', { hostKey })}</span>
         <span className="announce-banner__body">
-          nodeterm writes the same hooks and skills into your agent config on that host. Nothing is
-          installed there until you say. {INTEGRATION_UNAVAILABLE}
+          {t('integrationConsent.host.bodyPrefix')} {t('integrationConsent.prompt.unavailable')}
         </span>
       </div>
       <button className="announce-banner__btn" onClick={() => save(withHostChoice(settings, hostKey, 'enabled'))}>
-        Allow on this host
+        {t('integrationConsent.host.allow')}
       </button>
       <button className="announce-banner__btn" onClick={() => save(withHostChoice(settings, hostKey, 'declined'))}>
-        Not on this host
+        {t('integrationConsent.host.decline')}
       </button>
     </div>
   )
 }
 
 /** The state, said as what is on disk — "On"/"Off" read like the Add-menu switch below it. */
-function choiceText(c: IntegrationChoice | undefined): string {
-  return c === 'enabled' ? 'Installed' : c === 'declined' ? 'Not installed' : 'Not set up yet'
+function choiceText(c: IntegrationChoice | undefined, t: TranslateFn): string {
+  if (c === 'enabled') return t('integrationConsent.choice.installed')
+  if (c === 'declined') return t('integrationConsent.choice.notInstalled')
+  return t('integrationConsent.choice.notSetUp')
 }
 
 /** One agent or SSH host: its state, and only the action(s) that would change it. */
@@ -159,26 +157,37 @@ function IntegrationRow({
   onChoose: (c: IntegrationChoice) => void
   testId: string
 }): React.JSX.Element {
+  const { t } = useI18n()
   return (
     <div className="flex items-center gap-3 py-1" data-testid={testId}>
       {icon}
       <span className="flex-1 text-[13px] text-text">{label}</span>
       <span className="text-[12px] text-muted" data-testid={`${testId}-state`}>
-        {choiceText(choice)}
+        {choiceText(choice, t)}
       </span>
       {choice !== 'enabled' && (
-        <Button variant="primary" onClick={() => onChoose('enabled')} aria-label={`Install the ${label} integration`}>
-          Install
+        <Button
+          variant="primary"
+          onClick={() => onChoose('enabled')}
+          aria-label={t('integrationConsent.actions.installAria', { label })}
+        >
+          {t('integrationConsent.actions.install')}
         </Button>
       )}
       {choice === 'enabled' && (
-        <Button onClick={() => onChoose('declined')} aria-label={`Remove the ${label} integration and what nodeterm added`}>
-          Remove
+        <Button
+          onClick={() => onChoose('declined')}
+          aria-label={t('integrationConsent.actions.removeAria', { label })}
+        >
+          {t('integrationConsent.actions.remove')}
         </Button>
       )}
       {choice === undefined && (
-        <Button onClick={() => onChoose('declined')} aria-label={`Don't install the ${label} integration`}>
-          Don’t install
+        <Button
+          onClick={() => onChoose('declined')}
+          aria-label={t('integrationConsent.actions.dontInstallAria', { label })}
+        >
+          {t('integrationConsent.actions.dontInstall')}
         </Button>
       )}
     </div>
@@ -187,6 +196,7 @@ function IntegrationRow({
 
 /** Settings → Agents: one row per agent, the per-host answers, and what the host kept. */
 export function IntegrationSettings(): React.JSX.Element {
+  const { t } = useI18n()
   const settings = useSettings((s) => s.settings)
   const save = useSave()
   const [status, setStatus] = useState<AgentIntegrationsStatus | null>(null)
@@ -194,7 +204,7 @@ export function IntegrationSettings(): React.JSX.Element {
   useEffect(() => {
     let live = true
     // Give the host a moment to reconcile after a save, then ask what it did.
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       window.nodeTerminal.integrations
         ?.status()
         .then((s) => {
@@ -204,17 +214,14 @@ export function IntegrationSettings(): React.JSX.Element {
     }, 400)
     return () => {
       live = false
-      clearTimeout(t)
+      clearTimeout(timer)
     }
   }, [sig])
   const hosts = Object.entries(integrationsOf(settings).hosts ?? {})
   return (
     <div className="space-y-2" data-testid="integration-settings">
       {status?.vetoed && (
-        <p className="text-[12px] text-muted">
-          This server was started with agent installs disabled, so nothing is written regardless of
-          these choices.
-        </p>
+        <p className="text-[12px] text-muted">{t('integrationConsent.settings.serverVetoed')}</p>
       )}
       {INTEGRATION_AGENT_IDS.map((id) => (
         <IntegrationRow
@@ -228,7 +235,7 @@ export function IntegrationSettings(): React.JSX.Element {
       ))}
       {hosts.length > 0 && (
         <div className="pt-2">
-          <div className="text-[12px] text-muted pb-1">On SSH hosts</div>
+          <div className="text-[12px] text-muted pb-1">{t('integrationConsent.settings.onSshHosts')}</div>
           {hosts.map(([host, c]) => (
             <IntegrationRow
               key={host}
@@ -242,8 +249,7 @@ export function IntegrationSettings(): React.JSX.Element {
       )}
       {!!status?.retained.length && (
         <div className="pt-2 text-[12px] text-muted" data-testid="integration-retained">
-          Kept because you changed them since nodeterm wrote them (remove by hand if you no longer
-          want them):
+          {t('integrationConsent.settings.retainedIntro')}
           <ul className="list-disc pl-5">
             {status.retained.map((p) => (
               <li key={p} className="font-mono">

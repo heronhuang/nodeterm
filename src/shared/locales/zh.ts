@@ -260,6 +260,50 @@ export const zhMessages = {
     allowAndCheck: '允许并检查',
     upgradeCta: 'Pro 无限项目 — $10/月'
   },
+  integrationConsent: {
+    prompt: {
+      title: '将 nodeterm 与 Agent CLI 集成？',
+      writes:
+        'nodeterm 会在各 Agent 自有设置中添加状态 hook，并在其 skills 文件夹中安装两个小技能（画布控制、读取关联节点）。' +
+        '不会向 AGENTS.md / GEMINI.md 写入任何内容；关闭某个 Agent 时会精确移除 nodeterm 所添加的内容。',
+      unavailable:
+        '终端始终可用。未启用集成时，该 Agent 没有运行中/需要你 状态徽章、未读圆点与完成通知；没有会话名称、上下文计量与子 Agent 卡片；也没有画布控制（Agent 打开与整理节点）及读取关联节点。',
+      enableAll: '全部启用',
+      choose: '选择…',
+      notNow: '暂不'
+    },
+    grandfather: {
+      title: 'Agent 集成现已改为可选',
+      body:
+        '所有 Agent 的集成保持与之前相同。可在 设置 → Agent 中为任意 Agent（或 SSH 主机）关闭 — nodeterm 会精确移除其添加的内容。',
+      review: '查看'
+    },
+    host: {
+      title: '是否在 {hostKey} 上与 Agent 集成？',
+      bodyPrefix:
+        'nodeterm 会在该主机的 Agent 配置中写入相同的 hook 与 skill。在你确认之前不会在主机上安装任何内容。',
+      allow: '在此主机上允许',
+      decline: '不在此主机上'
+    },
+    choice: {
+      installed: '已安装',
+      notInstalled: '未安装',
+      notSetUp: '尚未设置'
+    },
+    actions: {
+      install: '安装',
+      remove: '移除',
+      dontInstall: '不安装',
+      installAria: '安装 {label} 集成',
+      removeAria: '移除 {label} 集成及 nodeterm 添加的内容',
+      dontInstallAria: '不安装 {label} 集成'
+    },
+    settings: {
+      serverVetoed: '此服务器启动时已禁用 Agent 安装，因此无论此处如何选择都不会写入任何内容。',
+      onSshHosts: '在 SSH 主机上',
+      retainedIntro: '因你在 nodeterm 写入后修改过而保留（若不再需要请手动移除）：'
+    }
+  },
   announcement: {
     learnMore: '了解更多'
   },
