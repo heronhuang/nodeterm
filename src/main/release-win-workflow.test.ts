@@ -28,6 +28,35 @@ function commands(block: string): string {
     .join('\n')
 }
 
+describe('release.yml release-mac', () => {
+  const text = fs.readFileSync(WORKFLOW, 'utf8')
+  const block = jobBlock(text, 'release-mac')
+  const job = commands(block)
+
+  it('runs on a GitHub-hosted macOS runner', () => {
+    expect(block).toMatch(/runs-on: macos-14/)
+    expect(block).not.toContain('self-hosted')
+  })
+
+  it('builds the unsigned manual-marker package, not the signed release script', () => {
+    expect(job).toMatch(/run: npm run dist:mac:release/)
+    expect(job).not.toMatch(/run: npm run release/)
+    expect(job).not.toContain('CSC_LINK')
+  })
+
+  it('fails the job when latest-mac.yml was not produced', () => {
+    expect(job).toContain('test -f dist/latest-mac.yml')
+  })
+
+  it('uploads mac feed yml beside dmg and zip', () => {
+    const upload = job.split('\n').find((l) => l.includes('gh release upload'))
+    expect(upload).toBeDefined()
+    expect(upload).toContain('dist/*.dmg')
+    expect(upload).toContain('dist/*.zip')
+    expect(upload).toContain('dist/*.yml')
+  })
+})
+
 describe('release.yml release-win', () => {
   const text = fs.readFileSync(WORKFLOW, 'utf8')
   const job = commands(jobBlock(text, 'release-win'))
@@ -67,9 +96,9 @@ describe('release.yml verify-feed', () => {
   const text = fs.readFileSync(WORKFLOW, 'utf8')
   const job = commands(jobBlock(text, 'verify-feed'))
 
-  it('runs after the promote, even when the best-effort Windows job did not succeed', () => {
+  it('runs after the promote on upstream only, even when Windows did not succeed', () => {
     expect(job).toMatch(/needs: \[publish, release-win\]/)
-    expect(job).toContain("if: ${{ always() && needs.publish.result == 'success' }}")
+    expect(job).toContain("if: ${{ always() && needs.publish.result == 'success' && github.repository == 'eneskirca/nodeterm' }}")
   })
 
   it('checks every platform feed file against the tag on the real update URL', () => {

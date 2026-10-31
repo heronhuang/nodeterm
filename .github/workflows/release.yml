@@ -1,8 +1,9 @@
 name: Release
 
-# Build, code-sign, and notarize the macOS app on every version tag (e.g. v0.1.1),
-# then publish the artifacts (dmg + zip + latest-mac.yml + blockmaps). Those files
-# are what the self-hosted update feed at https://nodeterm.dev/updates serves.
+# Build macOS and Windows packages on every version tag (e.g. v1.0.0), then publish
+# artifacts on the GitHub Release (dmg/zip/latest-mac.yml + NSIS/zip/latest.yml).
+# Upstream mirrors those files at https://nodeterm.dev/updates; forks without that
+# mirror skip the post-promote feed check (see verify-feed).
 on:
   push:
     tags:
@@ -13,22 +14,16 @@ permissions:
 
 jobs:
   release-mac:
-    # Runs on a SELF-HOSTED Apple Silicon Mac (no GitHub macOS-runner minutes — those are billed
-    # 10× and a slow notarization poll can burn hundreds). Everything else is identical: the runner
-    # signs + notarizes + publishes the GitHub Release, which nodeterm.dev proxies for downloads and
-    # the update feed. The runner checks out into its own _work dir, so it never touches the dev repo.
-    runs-on: [self-hosted, macOS, ARM64]
+    # GitHub-hosted Apple Silicon (unsigned on forks without CSC / notarization secrets).
+    # Upstream may still use a self-hosted runner with signing — this fork uses hosted runners only.
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
-          # No `cache: npm` here on purpose: this is the self-hosted Mac runner, whose ~/.npm
-          # is already warm across runs. setup-node's post-run cache SAVE step (a tarball upload
-          # to GitHub's cache service) bought nothing but failed the whole release-mac job on a
-          # network blip — after every asset had uploaded — which skipped the publish gate and
-          # stranded v0.2.23 as a prerelease. The ephemeral Linux runner below keeps its cache.
+          node-version: '22'
+          cache: 'npm'
 
       # The free-tier project limit's embedded deadline (PROJECT_LIMIT_DEADLINE_MS) must be bumped
       # in every release before the flip, or DO_NOT_TRACK users are gated before anyone else. This
@@ -40,12 +35,8 @@ jobs:
       - name: Project-limit deadline guard
         run: node scripts/check-project-limit-deadline.mjs
 
-      # caffeinate on EVERY long-running step in this job, not just build+upload: the Air
-      # sleeping during npm ci or the tmux compile cancels the step just the same (the
-      # v0.3.1 attempt died mid tmux build). -dims only blocks idle sleep — a closed lid
-      # still sleeps the machine — but it removes the "opened the lid, walked away" window.
       - name: Install dependencies
-        run: caffeinate -dims npm ci
+        run: npm ci
 
       # The bundled tmux (resources/bin/tmux → <app>/Contents/Resources/bin/tmux via the mac
       # extraResources entry). Without a tmux on the machine the app silently degrades to plain
@@ -56,83 +47,43 @@ jobs:
       # A SEPARATE STEP, before electron-builder, on purpose: a missing extraResources source is
       # only a WARNING to electron-builder, so a failure folded into the release command could
       # publish a DMG with no tmux in it and nobody would notice. Here a build failure fails the
-      # job. Idempotent — a rerun with the binary already present is a no-op, so the retry loop in
-      # the next step costs nothing.
+      # job. Idempotent — a rerun with the binary already present is a no-op.
       #
       # RUNNER TOOLCHAIN: the Xcode command line tools and nothing else — curl, cc, make, ar, yacc,
-      # lipo, strip, otool, nm. Explicitly NOT needed: cmake (utf8proc is built through its plain
-      # Makefile, not its CMakeLists), autoconf (release tarballs ship a generated `configure`, and
-      # each arch is extracted fresh so no maintainer rule fires), pkg-config (deliberately
-      # disabled — a Homebrew .pc file would link the bundle to dylibs users don't have), Homebrew,
-      # Rosetta (the cross slice is configured with --host, so no test binary is ever executed) and
-      # npm packages (node stdlib only).
+      # lipo, strip, otool, nm. Explicitly NOT needed: cmake, autoconf, pkg-config, Homebrew,
+      # Rosetta (the cross slice is configured with --host), npm packages (node stdlib only).
       - name: Build bundled tmux (universal, static libevent + utf8proc)
-        run: caffeinate -dims node scripts/build-tmux.mjs
+        run: node scripts/build-tmux.mjs
 
-      # ELECTRON-BUILDER FLOOR — 26.16.1, and the `^26.16.1` range in package.json is what keeps
-      # it. Up to and including 26.16.0, createKeychain generated a random keychain password but
-      # then handed `security set-key-partition-list` the P12 password instead
-      # (app-builder-lib/out/codeSign/macCodeSign.js: random at :137, wrong one passed at :168).
-      # macOS tolerated the mismatch for years; the runner's upgrade to Darwin 27 stopped
-      # tolerating it, and every signing run died on
-      #   security: SecKeychainUnlock: The user name or passphrase you entered is not correct.
-      # — which reads exactly like a bad CSC_* secret and is not one. 26.16.1 threads the real
-      # keychain password through. Do not drop below it; note npm's `latest` dist-tag still
-      # points at 26.15.3, so `npm i electron-builder@latest` installs the broken one.
-      - name: Build, sign & notarize
+      # Unsigned macOS release (arm64 + x64): same electron-builder flags as local `npm run dist`,
+      # plus both arches and nodeTermUpdates=manual — passive update notice only until signing exists.
+      # No CSC_* / APPLE_* secrets on this fork.
+      - name: Build macOS packages (DMG + zip, unsigned)
+        run: npm run dist:mac:release
+
+      - name: Verify expected artifacts
         run: |
-          printf '%s' "$APPLE_API_KEY_B64" | base64 --decode > "$RUNNER_TEMP/notary-key.p8"
-          export APPLE_API_KEY="$RUNNER_TEMP/notary-key.p8"
-          # Apple's notarization can take a long time, and @electron/notarize has no retry: a single
-          # transient network blip while polling appstoreconnect (NSURLError -1009) fails the whole
-          # build even though the submission gets Accepted. Retry the release up to 3 times so one
-          # blip during a long poll doesn't sink the release.
-          # caffeinate: the runner is a MacBook Air, and idle sleep mid-notarization disconnects
-          # the runner — GitHub then marks the job "cancelled" (bit v0.2.16 and v0.2.18). Assert
-          # no-sleep for exactly as long as the release command runs.
-          n=1
-          until caffeinate -dims npm run release; do
-            if [ "$n" -ge 3 ]; then
-              echo "::error::release failed after $n attempts"
-              exit 1
-            fi
-            echo "::warning::release attempt $n failed (likely transient notarization network error); retrying in 60s…"
-            n=$((n + 1))
-            sleep 60
-          done
-        env:
-          # Developer ID Application cert, base64-encoded .p12 + its password.
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # Apple notarization via App Store Connect API key: the .p8 is stored base64-encoded in
-          # a secret, decoded to a file at runtime, and its path handed to electron-builder.
-          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          ls -la dist
+          version=$(node -p "require('./package.json').version")
+          test -f dist/latest-mac.yml || { echo "::error::latest-mac.yml (update notice feed) missing"; exit 1; }
+          ls dist/*.dmg >/dev/null 2>&1 || { echo "::error::mac DMG missing"; exit 1; }
+          ls dist/*-mac.zip >/dev/null 2>&1 || { echo "::error::mac zip missing"; exit 1; }
 
       # NOTE: there is deliberately no actions/upload-artifact step. Each release is ~800 MB of
-      # DMGs + zips, and Actions artifact storage is a small, billed quota that those copies filled
-      # up (the release then failed with "Artifact storage quota has been hit"). The GitHub Release
-      # below is the canonical store — it does not consume that quota — so the extra 90-day copy
-      # bought nothing. Don't add it back.
+      # DMGs + zips, and Actions artifact storage is a small, billed quota. The GitHub Release
+      # below is the canonical store — it does not consume that quota.
 
-      # Canonical copy of every release on GitHub. The update feed itself lives on
-      # nodeterm.dev (see the deploy step below), but keeping a GitHub Release means
-      # there is always a downloadable, versioned backup.
+      # Canonical copy of every release on GitHub. The update feed itself may be mirrored at
+      # nodeterm.dev (see verify-feed below), but keeping a GitHub Release means there is always
+      # a downloadable, versioned backup.
       #
-      # Shell + `gh release upload --clobber` instead of softprops: uploading ~800 MB from the
-      # self-hosted runner hit a mid-upload `write EPIPE` (v0.2.17) that softprops cannot retry,
-      # leaving latest-mac.yml pointing at binaries that were never uploaded. --clobber makes
-      # every retry idempotent, so a half-uploaded attempt heals on the next one.
+      # Shell + `gh release upload --clobber` instead of softprops: uploading large assets from a
+      # runner can hit mid-upload network errors that softprops cannot retry. --clobber makes every
+      # retry idempotent.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Keep the Air awake for THIS step too. caffeinate wrapped only build+notarize; an
-          # ~800MB upload is long enough for idle sleep to disconnect the runner mid-transfer,
-          # which cancels the step (v0.2.25) — and a cancel, unlike an error, the retry loop
-          # below can't catch. `-w $$` ties the assertion to this shell's lifetime.
-          caffeinate -dims -w $$ &
           tag="${GITHUB_REF_NAME}"
           # Another platform job may already have created the release for this tag; tolerate the race.
           # Created as PRERELEASE: a half-built release must never become "latest" (the site and
@@ -150,17 +101,6 @@ jobs:
             n=$((n + 1))
             sleep 30
           done
-
-      # Publish the feed to nodeterm.dev/updates. Fill in for your host. Example for
-      # SSH/rsync (store the private key as the DEPLOY_SSH_KEY secret):
-      #
-      # - name: Deploy update feed to nodeterm.dev
-      #   run: |
-      #     mkdir -p ~/.ssh && echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
-      #     chmod 600 ~/.ssh/id_ed25519
-      #     ssh-keyscan nodeterm.dev >> ~/.ssh/known_hosts
-      #     rsync -avz dist/*.dmg dist/*.zip dist/*.yml dist/*.blockmap \
-      #       deploy@nodeterm.dev:/var/www/nodeterm.dev/updates/
 
   # Windows build: UNSIGNED BETA (#454), on a plain GitHub runner. Publishes the NSIS
   # installer + zip + latest.yml as assets on the same tag's GitHub Release. latest.yml is a
@@ -344,24 +284,17 @@ jobs:
   # dependency into a visible result, AFTER the release is already promoted: it never holds a
   # release back, a red run is the alarm.
   #
+  # Forks that do not mirror releases to nodeterm.dev skip this job entirely (GitHub Release is
+  # the canonical artifact store for them).
+  #
   # STRICT files fail the job when the mirror does not serve this tag's version within the retry
   # window (mirror sync / CDN delay); ADVISORY files only warn. latest.yml is advisory until the
   # mirror is confirmed to serve it — move it to STRICT then. It is checked only when release-win
   # itself succeeded (that job is best-effort and may finish later or need a rerun).
-  #
-  # The budget is ONE deadline for the whole job, not a retry count per file, and that is the
-  # v0.4.4 lesson. Measured on run 39079366383: publish promoted at 00:25:02, this job started at
-  # 00:25:03 — one second later — and the mirror did not serve 0.4.4 until somewhere inside
-  # 00:29:43…00:30:14, i.e. ~5 minutes behind the promote. A shared deadline charges the
-  # one lag once — the first file waits, the rest are free — and it bounds a genuinely dead mirror
-  # to BUDGET_MINUTES instead of BUDGET_MINUTES × files. If STRICT spends the whole budget then
-  # ADVISORY gets exactly one attempt, deliberately: the mirror is demonstrably behind and a second
-  # full wait buys a warning nobody is waiting for. Do NOT "fix" a red run here by reordering the
-  # file list — the lag is global, so whichever file is checked first is the one that fails.
   verify-feed:
     runs-on: ubuntu-latest
     needs: [publish, release-win]
-    if: ${{ always() && needs.publish.result == 'success' }}
+    if: ${{ always() && needs.publish.result == 'success' && github.repository == 'eneskirca/nodeterm' }}
     steps:
       - name: Verify the update feed serves this release
         env:
