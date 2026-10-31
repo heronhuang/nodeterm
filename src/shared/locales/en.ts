@@ -13,7 +13,8 @@ export const enMessages = {
     confirm: 'Confirm',
     back: 'Back',
     search: 'Search',
-    dismiss: 'Dismiss'
+    dismiss: 'Dismiss',
+    testOnlyFallback: 'English fallback string'
   },
   confirm: {
     cancel: 'Cancel',
@@ -179,6 +180,89 @@ export const enMessages = {
   dialog: {
     ok: 'OK',
     cancel: 'Cancel'
+  },
+  sidebar: {
+    title: 'Sessions',
+    pin: 'Pin',
+    unpin: 'Unpin',
+    close: 'Close',
+    groupByAria: 'Group sessions by',
+    tabProject: 'Project',
+    tabStatus: 'Status',
+    filterPlaceholder: 'Filter sessions…',
+    clearFilter: 'Clear filter',
+    clearFilterTitle: 'Clear filter (Esc)',
+    noMatch: 'No sessions match “{query}”.',
+    noSessions: 'No sessions yet.',
+    noSessionsInProject: 'No sessions',
+    ungrouped: 'Ungrouped',
+    expand: 'Expand',
+    collapse: 'Collapse',
+    expandProject: 'Expand {name}',
+    collapseProject: 'Collapse {name}',
+    dropRemoveFromGroup: 'Drop here to remove from group',
+    addNode: 'Add a node to this project',
+    dropSessionHere: 'Drop a session or group here',
+    showGroupOnCanvas: 'Click to show the group on the canvas',
+    renameGroup: 'Double-click to rename group',
+    nameGroupAi: 'Name group with AI (from every session below it)',
+    signals: {
+      project: {
+        attention: 'Sessions that need you',
+        unread: 'Finished — new for you',
+        working: 'Sessions running right now'
+      },
+      group: {
+        attention: 'Sessions in this group that need you',
+        unread: 'Finished in this group — new for you',
+        working: 'CLIs running in this group right now'
+      }
+    }
+  },
+  onboarding: {
+    setupKindSetup: 'Setup',
+    setupKindArchive: 'Archive',
+    skip: 'Skip',
+    approve: 'Approve',
+    runOnce: 'Run once',
+    agentsMessage: 'Use the shared agent launch settings for “{name}”?',
+    agentsChanged: 'These settings have changed since you approved them for this project.',
+    agentsIntro:
+      'They come from the project’s shared .nodeterm/settings.json, so anyone who can commit to the repo can change them. One answer covers the launch command and every variable below.',
+    launchCommand: 'Launch command',
+    environment: 'Environment',
+    shellMessage: 'Use the shared terminal shell for “{name}”?',
+    shellChanged: 'This setting has changed since you approved it for this project.',
+    shellIntro:
+      'It comes from the project’s shared .nodeterm/settings.json, so anyone who can commit to the repo can change it. Every terminal you open for this project starts this program.',
+    shellLabel: 'Shell',
+    setupMessage: 'Run the {kind} script for “{name}”?',
+    setupChanged: 'These scripts have changed since you approved them for this project.',
+    setupIntro:
+      'They come from the project’s shared .nodeterm/settings.json, so anyone who can commit to the repo can change them. One answer covers both.',
+    scriptAboutToRun: ' (about to run)'
+  },
+  projectLimit: {
+    checking: 'Checking your free allowance…',
+    connectionTitle: 'Connection needed',
+    connectionBody:
+      'Checking your free allowance and upgrading need a connection to api.nodeterm.dev. Only license checks are sent — telemetry stays off. You can turn this off in Settings → Privacy.',
+    openTitle: '{open} of {limit} free projects are open',
+    openBody:
+      'Close one to make room. Closing never deletes anything — its terminals keep running and it stays one click away in Recently closed.',
+    checkFailed: 'Couldn’t check your free allowance with api.nodeterm.dev.',
+    retry: 'Retry',
+    mismatchBase: 'Your free allowance is tied to another computer.',
+    mismatchDate: 'Your free allowance is tied to another computer. It can move to this one on {date}.',
+    openProjectsAria: 'Open projects',
+    closeProject: 'Close',
+    closeProjectAria: 'Close {name}',
+    cancel: 'Cancel',
+    allowAndCheck: 'Allow and check',
+    upgradeCta: 'Unlimited with Pro — $10/mo'
+  },
+  announcement: {
+    learnMore: 'Learn more'
   },
   addMenu: {
     hints: {

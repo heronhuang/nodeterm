@@ -180,6 +180,89 @@ export const zhMessages = {
     ok: '确定',
     cancel: '取消'
   },
+  sidebar: {
+    title: '会话',
+    pin: '固定',
+    unpin: '取消固定',
+    close: '关闭',
+    groupByAria: '会话分组依据',
+    tabProject: '项目',
+    tabStatus: '状态',
+    filterPlaceholder: '筛选会话…',
+    clearFilter: '清除筛选',
+    clearFilterTitle: '清除筛选 (Esc)',
+    noMatch: '没有与「{query}」匹配的会话。',
+    noSessions: '尚无会话。',
+    noSessionsInProject: '无会话',
+    ungrouped: '未分组',
+    expand: '展开',
+    collapse: '折叠',
+    expandProject: '展开 {name}',
+    collapseProject: '折叠 {name}',
+    dropRemoveFromGroup: '拖放到此处以从分组移除',
+    addNode: '向此项目添加节点',
+    dropSessionHere: '将会话或分组拖放到此处',
+    showGroupOnCanvas: '点击在画布上显示该分组',
+    renameGroup: '双击重命名分组',
+    nameGroupAi: '用 AI 命名分组（依据其下所有会话）',
+    signals: {
+      project: {
+        attention: '需要你处理的会话',
+        unread: '已完成 — 对你为新',
+        working: '正在运行的会话'
+      },
+      group: {
+        attention: '此分组中需要你处理的会话',
+        unread: '此分组中已完成 — 对你为新',
+        working: '此分组中正在运行的 CLI'
+      }
+    }
+  },
+  onboarding: {
+    setupKindSetup: 'Setup',
+    setupKindArchive: 'Archive',
+    skip: '跳过',
+    approve: '批准',
+    runOnce: '运行一次',
+    agentsMessage: '为「{name}」使用共享的 Agent 启动设置？',
+    agentsChanged: '这些设置自你批准此项目以来已变更。',
+    agentsIntro:
+      '它们来自项目共享的 .nodeterm/settings.json，任何能向仓库提交的人均可修改。一次回答涵盖启动命令与下方所有变量。',
+    launchCommand: '启动命令',
+    environment: '环境',
+    shellMessage: '为「{name}」使用共享的终端 Shell？',
+    shellChanged: '此设置自你批准此项目以来已变更。',
+    shellIntro:
+      '它来自项目共享的 .nodeterm/settings.json，任何能向仓库提交的人均可修改。为此项目打开的每个终端都会启动此程序。',
+    shellLabel: 'Shell',
+    setupMessage: '为「{name}」运行 {kind} 脚本？',
+    setupChanged: '这些脚本自你批准此项目以来已变更。',
+    setupIntro:
+      '它们来自项目共享的 .nodeterm/settings.json，任何能向仓库提交的人均可修改。一次回答涵盖两者。',
+    scriptAboutToRun: '（即将运行）'
+  },
+  projectLimit: {
+    checking: '正在检查免费额度…',
+    connectionTitle: '需要连接',
+    connectionBody:
+      '检查免费额度与升级需要连接 api.nodeterm.dev。仅发送许可证检查 — 遥测保持关闭。可在 设置 → 隐私 中关闭。',
+    openTitle: '已打开 {open} / {limit} 个免费项目',
+    openBody:
+      '关闭一个以腾出位置。关闭不会删除任何内容 — 终端继续运行，且仍可从「最近关闭」一键恢复。',
+    checkFailed: '无法通过 api.nodeterm.dev 检查免费额度。',
+    retry: '重试',
+    mismatchBase: '你的免费额度绑定在另一台计算机上。',
+    mismatchDate: '你的免费额度绑定在另一台计算机上。可在 {date} 迁移到本机。',
+    openProjectsAria: '已打开的项目',
+    closeProject: '关闭',
+    closeProjectAria: '关闭 {name}',
+    cancel: '取消',
+    allowAndCheck: '允许并检查',
+    upgradeCta: 'Pro 无限项目 — $10/月'
+  },
+  announcement: {
+    learnMore: '了解更多'
+  },
   addMenu: {
     hints: {
       worktreeSsh: 'SSH 项目尚不支持',

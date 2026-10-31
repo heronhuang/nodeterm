@@ -1,367 +1,417 @@
 /** Remaining settings section strings (简体中文). */
 export const settingsRestZh = {
   appearance: {
-    title: "外观",
-    description: "用于 ⌘M 输出与聊天视图以及编辑器的 Markdown 预览。其中的代码使用终端字体。",
+    title: '外观',
+    description: '用于 ⌘M 输出与聊天视图以及编辑器的 Markdown 预览。其中的代码使用终端字体。',
     markdownFontDescription:
-      "用于 ⌘M 输出与聊天视图以及编辑器的 Markdown 预览。其中的代码使用终端字体。",
+      '用于 ⌘M 输出与聊天视图以及编辑器的 Markdown 预览。其中的代码使用终端字体。',
     rows: {
       appTheme: {
-        title: "外观",
+        title: '外观',
       },
       uiScale: {
-        title: "UI scale",
+        title: '界面缩放',
       },
       tabBarHeight: {
-        title: "Tab bar height",
+        title: '标签栏高度',
       },
       stickyNoteBacking: {
-        title: "Sticky note background",
+        title: '便签背景',
       },
       groupFrameBacking: {
-        title: "Group frame background",
+        title: '分组框背景',
       },
       markdownFont: {
-        title: "Markdown font",
+        title: 'Markdown 字体',
       },
       markdownFontSize: {
-        title: "Markdown font size",
+        title: 'Markdown 字号',
       },
       accent: {
-        title: "Accent",
+        title: '强调色',
       },
       wallpaper: {
-        title: "Desktop wallpaper",
+        title: '桌面壁纸',
       },
       windowTitle: {
-        title: "Window title",
+        title: '窗口标题',
       },
       glassTint: {
-        title: "Glass",
+        title: '玻璃效果',
       },
       glassBlurWhileMoving: {
-        title: "Keep blur while moving",
+        title: '移动时保持模糊',
       },
       canvasDots: {
-        title: "Show grid dots",
+        title: '显示网格点',
       },
       resumeCard: {
-        title: "Resume card",
+        title: '恢复卡片',
       },
       menuItems: {
-        title: "Node menu items",
+        title: '节点菜单项',
       },
       headerButtons: {
-        title: "Terminal header buttons",
+        title: '终端标题栏按钮',
       },
       reset: {
-        title: "Reset appearance",
+        title: '重置外观',
       },
     },
+    appThemeDescription:
+      '「跟随终端」与设置 → 终端 中的主题一致。「Liquid Glass」同样跟随终端，并在桌面壁纸上 Frost 整个界面，无窗口色强调。',
+    appThemeDescriptionGlassExtra:
+      ' 常规文本在玻璃上保持 4.5:1 对比度；次要文本与彩色输出在明亮壁纸上可能变淡。',
+    themeFollowTerminal: '跟随终端',
+    themeDark: '深色',
+    themeLight: '浅色',
+    themeLiquidGlass: 'Liquid Glass',
+    glassReduceTransparency:
+      '系统设置中已开启「降低透明度」，玻璃为不透明。请在系统中关闭以使用此滑块。',
+    glassMoreContrast:
+      '系统设置中已开启「增强对比度」，玻璃保持着色并加强边缘。',
+    glassClearer:
+      '比「可读」更通透：更多壁纸透出，终端文本仍可读。',
+    glassReadable: '常规文本在任何壁纸上保持 4.5:1 对比度。',
+    glassBlurDescription: '平移与缩放时使用更多 GPU。',
+    uiScaleDescription:
+      '缩放整个应用界面 — 菜单、节点标题、对话框、侧栏 — 类似浏览器页面缩放。终端文字也会缩放：终端字号（设置 → 终端）会乘以此值，若希望终端文字不变，请在终端设置中调低字号。',
+    uiScaleBrowserNote:
+      '在浏览器中请使用浏览器自带的页面缩放（Cmd/Ctrl + + / −）— 效果相同且按站点记忆。',
+    tabBarHeightDescription: '窗口顶部项目标签条的高度，单位为像素。',
+    stickyNoteBackingDescription:
+      '便签后方内容透出程度：0% 为透明（默认），100% 为实心。便签颜色不变。',
+    groupFrameBackingDescription:
+      '分组框后画布透出程度：0% 为透明（默认），100% 为实心。框颜色不变。',
+    markdownFontSizeDescription:
+      '上述视图中的正文字号，像素（{min}–{max}；默认 {default}）。标题与代码随比例缩放。',
+    systemFont: '系统字体',
+    windowTitleFieldLabel: '在窗口标题中显示活动会话',
+    windowTitleDescription:
+      '将原生窗口标题（Server Edition 上为浏览器标签）设为当前节点与项目 — 如「api server — myrepo — node-terminal」— 便于 ActivityWatch 等基于窗口标题的计时器区分会话。关闭则保持静态标题。',
+    windowTitleAria: '在窗口标题中显示活动会话',
+    canvasDotsDescription:
+      '在画布上绘制点状网格。仅影响点的显示；对齐网格与 snap 行为不变。',
+    resumeCardDescription:
+      '激活项目时提供「从上次离开处继续」卡片，列出最近几个节点位置。Cmd+[ / Cmd+] 与 Dock 箭头走同一条轨迹。',
+    resumeCardAria: '项目激活时显示恢复卡片',
+    menuItemsDescription:
+      '节点右键菜单显示哪些行（「颜色」亦影响分组框色条）— 对下一次右键生效。删除、重启 Agent 等破坏性/恢复操作永不可隐藏。',
+    menuItemsVisibilityWhere: '在节点菜单中',
+    headerButtonsDescription:
+      '终端节点标题栏显示哪些图标按钮。模型与上下文计量在看板卡片与卡片模态中也会隐藏。关闭与终端搜索按钮始终显示；右键菜单中的删除、重启 Agent 等同理。',
+    headerButtonsVisibilityWhere: '在终端标题栏中',
+    showVisibilityAria: '在{where}显示 {label}',
+    resetAppearanceWhat: '外观设置',
+    wallpaperNone: '无',
+    wallpaperYourImage: '你的图片',
+    wallpaperChooseImage: '选择图片…',
   },
   terminal: {
-    title: "终端",
-    description: "Applies to every terminal — on the canvas and in kanban cards. A light theme also turns the app light (Settings → Appearance).",
+    title: '终端',
+    description: '适用于画布与看板卡片中的所有终端。浅色终端主题也会将应用设为浅色（设置 → 外观）。',
     rows: {
       theme: {
-        title: "Colour theme",
+        title: '配色主题',
       },
       fontFamily: {
-        title: "Font",
+        title: '字体',
       },
       fontSize: {
-        title: "Size and weight",
+        title: '大小与字重',
       },
       fontZoomKeys: {
-        title: "Font size keys",
+        title: '字号快捷键',
       },
       spacing: {
-        title: "Spacing",
+        title: '间距',
       },
       cursor: {
-        title: "Cursor",
+        title: '光标',
       },
       cursorInactive: {
-        title: "Cursor when unfocused",
+        title: '未聚焦时的光标',
       },
       middleClickPaste: {
-        title: "Middle-click paste",
+        title: '中键粘贴',
       },
       copyOnSelect: {
-        title: "Copy on select",
+        title: '选中即复制',
       },
       wordSeparator: {
-        title: "Word selection",
+        title: '选词规则',
       },
       boldBright: {
-        title: "Bold text uses bright colours",
+        title: '粗体使用亮色',
       },
       minContrast: {
-        title: "Minimum contrast",
+        title: '最低对比度',
       },
       gpu: {
-        title: "Terminal rendering",
+        title: '终端渲染',
       },
       reset: {
-        title: "Reset terminal appearance",
+        title: '重置终端外观',
       },
     },
   },
   agents: {
-    title: "Agent",
-    description: "Which agents appear in the Add menus, the Dock and ⌘K, and which one “New agent” opens. Hiding one only changes the menus — nothing is installed or removed.",
+    title: 'Agent',
+    description: '控制哪些 Agent 出现在添加菜单、Dock 与 ⌘K 中，以及「新建 Agent」默认打开哪一个。隐藏仅影响菜单 — 不会安装或卸载任何内容。',
     rows: {
       integrations: {
-        title: "Hooks & skills (integrations)",
+        title: 'Hooks 与 skills（集成）',
       },
       agents: {
-        title: "Show in Add menus",
+        title: '在添加菜单中显示',
       },
       launchCommands: {
-        title: "Launch commands",
+        title: '启动命令',
       },
       vanillaLaunch: {
-        title: "Launch mode",
+        title: '启动模式',
       },
       messagingDefault: {
-        title: "Agent messaging in projects that do not set it",
+        title: '未单独设置的项目中的 Agent 消息',
       },
       permissionMode: {
-        title: "Permission mode",
+        title: '权限模式',
       },
       hookReplyApprovals: {
-        title: "One-click approvals",
+        title: '一键批准',
       },
       autoHideFinishedSubagentCards: {
-        title: "Hide finished subagent cards",
+        title: '隐藏已完成的子 Agent 卡片',
       },
       controlConfirm: {
-        title: "Destructive canvas-control confirmations",
+        title: '破坏性画布控制确认',
       },
       nodeIdentity: {
-        title: "Verified node identity",
+        title: '已验证节点身份',
       },
       browserControl: {
-        title: "Browser control",
+        title: '浏览器控制',
       },
       hibernation: {
-        title: "Hibernate idle agents",
+        title: '休眠空闲 Agent',
       },
     },
   },
   accounts: {
-    title: "账户",
-    description: "Use more than one Claude or Codex login side by side. Each account keeps its own login, settings and history. Pick one when you open an agent; move a running agent to another from its right-click menu.",
+    title: '账户',
+    description: '并排使用多个 Claude 或 Codex 登录。每个账户保留独立登录、设置与历史。打开 Agent 时选择账户；运行中的 Agent 可通过右键菜单切换到另一账户。',
     rows: {
       accounts: {
-        title: "Claude & Codex accounts",
+        title: 'Claude 与 Codex 账户',
       },
     },
   },
   customAgents: {
-    title: "自定义 Agent",
-    description: "Bring your own agent CLI, or wrap a built-in harness (e.g. Claude) to redirect inference to your own proxy. Env values support ${env:VAR} and ${env:VAR:fallback} expansion against your shell environment.",
+    title: '自定义 Agent',
+    description: '使用自有 Agent CLI，或包装内置 harness（如 Claude）将推理指向自有代理。环境变量值支持针对 shell 环境的 ${env:VAR} 与 ${env:VAR:fallback} 展开。',
     rows: {
       custom: {
-        title: "自定义 Agent",
+        title: '自定义 Agent',
       },
     },
   },
   githubIssues: {
-    title: "GitHub Issues",
-    description: "Use a fine-grained token with repository metadata read access and issues read and write access. The token is write only in this screen.",
+    title: 'GitHub Issues',
+    description: '使用具有仓库元数据读取及 Issues 读写权限的 fine-grained token。Token 仅在本页面写入。',
     dispatchDescription:
-      "When you move an issue card into this column, an agent session starts on it by itself — the same run as “Start with agent”. Only a move you make in this app on this machine starts one — never a label change on GitHub, a teammate’s move, or a board that arrives by git pull. One run per issue; further runs queue. This setting is for this machine only.",
+      '将 issue 卡片移入此列时，会自动在其上启动 Agent 会话 — 与「使用 Agent 开始」相同。仅本机本应用内的移动会触发 — 非 GitHub 标签变更、队友移动或 git pull 同步的看板。每个 issue 一次运行；后续排队。此设置仅本机有效。',
     rows: {
       enable: {
-        title: "GitHub Issues",
+        title: 'GitHub Issues',
       },
       repository: {
-        title: "Repository",
+        title: '仓库',
       },
       authentication: {
-        title: "Authentication",
+        title: '认证',
       },
       mapping: {
-        title: "Column labels",
+        title: '列标签',
       },
       pullAutoMove: {
-        title: "Move merged session cards",
+        title: '移动已合并的会话卡片',
       },
       dispatch: {
-        title: "Dispatch agents",
+        title: '派发 Agent',
       },
       data: {
-        title: "Sync and local data",
+        title: '同步与本地数据',
       },
     },
   },
   modelGateway: {
-    title: "模型网关",
-    description: "Configure one gateway, discover models through the OpenAI-compatible Models API, and switch a supported agent node without creating a custom agent for every model.",
+    title: '模型网关',
+    description: '配置单一网关，通过 OpenAI 兼容 Models API 发现模型，并在支持的 Agent 节点间切换，无需为每个模型创建自定义 Agent。',
     rows: {
       endpoint: {
-        title: "Gateway URL",
+        title: '网关 URL',
       },
       discoveryPath: {
-        title: "Discovery path",
+        title: '发现路径',
       },
       key: {
-        title: "API key",
+        title: 'API 密钥',
       },
       discovery: {
-        title: "Available models",
+        title: '可用模型',
       },
       defaultModel: {
-        title: "Default model",
+        title: '默认模型',
       },
     },
   },
   notifications: {
-    title: "通知",
-    description: "Get notified when an agent finishes while the app is in the background.",
+    title: '通知',
+    description: '应用在后台时，Agent 完成一轮工作后通知你。',
     rows: {
       notify: {
-        title: "Notify when a turn finishes in the background",
+        title: '后台完成一轮工作时通知',
       },
       sound: {
-        title: "Play a sound when a turn finishes or needs you",
+        title: '完成或需要你时播放提示音',
       },
       mobilePush: {
-        title: "Send push notifications to your paired phone",
+        title: '向已配对手机发送推送',
       },
     },
   },
   phone: {
-    title: "Phone",
-    description: "Pair the nodeterm mobile app so it can connect to this machine over your local network — no terminal commands needed.",
+    title: '手机',
+    description: '配对 nodeterm 移动应用，使其通过局域网连接本机 — 无需终端命令。',
     rows: {
       remote: {
-        title: "Remote access from your phone",
+        title: '手机远程访问',
       },
       pair: {
-        title: "Pair phone",
+        title: '配对手机',
       },
       devices: {
-        title: "Paired devices",
+        title: '已配对设备',
       },
       webhook: {
-        title: "Push webhook",
+        title: '推送 Webhook',
       },
     },
   },
   projectSettings: {
-    description: "Shown on the tab and in the project switcher.",
+    description: '显示在标签与项目切换器中。',
     rows: {
       name: {
-        title: "Project name",
+        title: '项目名称',
       },
       folder: {
-        title: "Folder",
+        title: '文件夹',
       },
       color: {
-        title: "Icon & color",
+        title: '图标与颜色',
       },
       permission: {
-        title: "Default permission mode",
+        title: '默认权限模式',
       },
       account: {
-        title: "Default Claude account",
+        title: '默认 Claude 账户',
       },
     },
   },
   remote: {
-    title: "远程访问",
-    description: "Open terminals that run on another machine you own — end-to-end encrypted over the relay. Hosting (sharing this machine) is Pro; connecting to a host is free.",
+    title: '远程访问',
+    description: '打开在你拥有的另一台机器上运行的终端 — 经 relay 端到端加密。托管（共享本机）为 Pro；连接主机免费。',
     rows: {
       allow: {
-        title: "Allow remote access",
+        title: '允许远程访问',
       },
       connect: {
-        title: "Connect to a host",
+        title: '连接到主机',
       },
     },
   },
   speech: {
-    title: "Speech",
-    description: "Dictate into any terminal or chat node. Local Whisper runs fully on-device — nothing leaves this machine.",
+    title: '语音',
+    description: '向任意终端或聊天节点听写。本地 Whisper 完全在设备上运行 — 数据不会离开本机。',
     rows: {
       engine: {
-        title: "Speech engine",
+        title: '语音引擎',
       },
       shortcut: {
-        title: "Dictation shortcut",
+        title: '听写快捷键',
       },
       models: {
-        title: "Whisper models",
+        title: 'Whisper 模型',
       },
       language: {
-        title: "Language",
+        title: '语言',
       },
     },
   },
   ssh: {
-    title: "远程 (SSH)",
-    description: "Saved SSH servers appear under “New remote”, and can host nodes on a local canvas. Each also becomes a machine in Accounts, where its own isolated Codex logins live. Opening remote terminals over SSH is free.",
+    title: '远程 (SSH)',
+    description: '已保存的 SSH 服务器出现在「新建远程」下，可在本地画布托管节点。每个也会在账户中成为一台机器，拥有独立的 Codex 登录。通过 SSH 打开远程终端免费。',
     rows: {
       servers: {
-        title: "Saved SSH servers",
+        title: '已保存的 SSH 服务器',
       },
       windowsAgent: {
-        title: "Keep unlocked keys in the Windows ssh-agent",
+        title: '在 Windows ssh-agent 中保留已解锁密钥',
       },
     },
   },
   teamAccess: {
-    title: "团队席位",
-    description: "Share {machine} with your team — Pro includes 3 seats, extra seats $5/seat/month.",
+    title: '团队席位',
+    description: '与团队共享 {machine} — Pro 含 3 席位，额外席位 $5/席位/月。',
     rows: {
       team: {
-        title: "Team Access",
+        title: '团队访问',
       },
     },
   },
   usage: {
-    title: "用量",
-    description: "Subscription limits shown in the pill at the bottom-left of the canvas. Hiding a provider is a display choice — credentials are untouched, so re-enabling is instant.",
+    title: '用量',
+    description: '订阅限额显示在画布左下角胶囊中。隐藏提供商仅为显示选择 — 凭据不变，重新启用即时生效。',
     rows: {
       percentMode: {
-        title: "Usage percentages",
+        title: '用量百分比',
       },
       visibility: {
-        title: "Providers",
+        title: '提供商',
       },
       cookies: {
-        title: "Web-console sign-in",
+        title: 'Web 控制台登录',
       },
     },
   },
   license: {
-    title: "许可证",
-    description: "Manage your nodeterm Pro subscription.",
+    title: '许可证',
+    description: '管理 nodeterm Pro 订阅。',
     rows: {
       license: {
-        title: "许可证",
+        title: '许可证',
       },
     },
   },
   liveLinks: {
-    title: "实时链接",
-    description: "A read-only browser link to one terminal. Viewers need nothing installed; links end on their own.",
+    title: '实时链接',
+    description: '指向单个终端的只读浏览器链接。查看者无需安装；链接会自行过期。',
     rows: {
       links: {
-        title: "Active live links",
+        title: '活动实时链接',
       },
     },
   },
   shortcuts: {
-    title: "键盘快捷键",
+    title: '键盘快捷键',
+    description:
+      '重映射任意命令。覆盖保存在 settings.json 的 `keybindings` 中；「禁用」关闭命令快捷键，「重置」恢复默认。Reload（⌘R / ⌘⇧R）无法录制 — 始终属于应用；菜单保留的系统级组合键 — ⌘Q（退出）、⌘H（隐藏）及开发者角色 — 在录制时仍生效，请勿尝试绑定。',
     rows: {
       filter: {
-        title: "Filter shortcuts",
+        title: '筛选快捷键',
       },
       policy: {
-        title: "While a terminal has focus",
+        title: '终端聚焦时',
       },
     },
   },

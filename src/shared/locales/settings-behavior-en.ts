@@ -98,5 +98,9 @@ export const behaviorEn = {
   nodeSizeLabel: 'Default node size (px)',
   nodeSizeDescription: 'Size new nodes of the chosen kind open at. Existing nodes keep their size.',
   nodeKindAria: 'Node kind',
-  reset: 'Reset'
+  reset: 'Reset',
+  backgroundCloseDescriptionWindows:
+    'Closing the window hides nodeterm to the notification area so phone access, agent notifications and updates keep working. Quit from the tray icon or File → Exit. Automatic keeps it running on Windows.',
+  backgroundCloseDescriptionLinux:
+    'Closing the window hides nodeterm to the system tray so phone access, agent notifications and updates keep working. Quit from the tray icon or Ctrl+Q. Automatic quits on Linux, where a tray icon depends on your desktop.'
 } as const

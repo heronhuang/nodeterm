@@ -162,6 +162,7 @@ function VisibilityToggles({
   where: string
   onChange: (next: string[]) => void
 }): React.JSX.Element {
+  const { t } = useI18n()
   return (
     <div className="mt-3 space-y-3 border-l border-border pl-4">
       {rows.map((row) => (
@@ -172,7 +173,7 @@ function VisibilityToggles({
             <Switch
               checked={!isHidden(row.id, hidden)}
               onChange={(shown) => onChange(withShown(hidden, row.id, shown))}
-              ariaLabel={`Show ${row.label} ${where}`}
+              ariaLabel={t('settings.appearance.showVisibilityAria', { label: row.label, where })}
             />
           }
         />
@@ -186,6 +187,7 @@ function VisibilityToggles({
  *  teaches nothing — the house rule the SSH-worktree affordances follow): a browser page cannot
  *  set its own page zoom, and the browser's Cmd/Ctrl+± already does the identical thing. */
 function UiScaleRow(): React.JSX.Element {
+  const { t } = useI18n()
   const uiScale = useSettings((s) => s.settings.uiScale)
   const update = useSettings((s) => s.update)
   const inBrowser = isBrowserRuntime()
@@ -197,25 +199,16 @@ function UiScaleRow(): React.JSX.Element {
     : [...UI_SCALE_CHOICES, resolved].sort((a, b) => a - b)
   return (
     <FieldRow
-      label="UI scale"
+      label={t('settings.appearance.rows.uiScale.title')}
       htmlFor="ui-scale"
-      description={
-        'Scales the whole application UI — menus, node headers, dialogs, sidebars — like a ' +
-        "browser's page zoom. Terminal text scales with it too: the terminal font size " +
-        '(Settings → Terminal) is multiplied by this, so lower it there if you want terminal ' +
-        'text to stay as it is.'
-      }
-      note={
-        inBrowser
-          ? "In the browser, use your browser's own page zoom (Cmd/Ctrl and + / −) — it does the same thing and the browser remembers it per site."
-          : undefined
-      }
+      description={t('settings.appearance.uiScaleDescription')}
+      note={inBrowser ? t('settings.appearance.uiScaleBrowserNote') : undefined}
       control={
         <Select
           id="ui-scale"
           value={String(resolved)}
           disabled={inBrowser}
-          aria-label="UI scale"
+          aria-label={t('settings.appearance.rows.uiScale.title')}
           onChange={(e) => update({ uiScale: Number(e.target.value) })}
         >
           {choices.map((c) => (
@@ -236,14 +229,16 @@ function UiScaleRow(): React.JSX.Element {
  *  else moves. The copy names no platform: `machineName.guard.test.ts` forbids "Mac" in
  *  user-visible renderer strings, and a browser viewer's OS says nothing about the server's. */
 function TabBarHeightRow(): React.JSX.Element {
+  const { t } = useI18n()
   const tabBarHeight = useSettings((s) => s.settings.tabBarHeight)
   const update = useSettings((s) => s.update)
   const resolved = resolveTabBarHeight(tabBarHeight)
+  const label = t('settings.appearance.rows.tabBarHeight.title')
   return (
     <FieldRow
-      label="Tab bar height"
+      label={label}
       htmlFor="tab-bar-height"
-      description="Height of the project tab strip at the top of the window, in pixels."
+      description={t('settings.appearance.tabBarHeightDescription')}
       control={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <NumberField
@@ -251,7 +246,7 @@ function TabBarHeightRow(): React.JSX.Element {
             min={TABBAR_HEIGHT_MIN_PX}
             max={TABBAR_HEIGHT_MAX_PX}
             step={2}
-            ariaLabel="Tab bar height"
+            ariaLabel={label}
             onChange={(v) => update({ tabBarHeight: resolveTabBarHeight(v) })}
           />
           <span style={{ opacity: 0.6 }}>px</span>
@@ -264,17 +259,22 @@ function TabBarHeightRow(): React.JSX.Element {
 /** How solid a sticky note / group frame is behind its colour tint (issue #1113). 0 = the
  *  original see-through look; the tint itself never changes. */
 function CanvasBackingRow({ kind }: { kind: 'stickyNoteBacking' | 'groupFrameBacking' }): React.JSX.Element {
+  const { t } = useI18n()
   const value = useSettings((s) => s.settings[kind])
   const update = useSettings((s) => s.update)
   const sticky = kind === 'stickyNoteBacking'
-  const label = sticky ? 'Sticky note background' : 'Group frame background'
+  const label = sticky
+    ? t('settings.appearance.rows.stickyNoteBacking.title')
+    : t('settings.appearance.rows.groupFrameBacking.title')
   return (
     <FieldRow
       label={label}
       htmlFor={kind}
-      description={sticky
-        ? `How much of what lies behind a sticky note shows through it: 0% is see-through (default), 100% is solid. The note keeps its colour either way.`
-        : `How much of the canvas shows through a group frame: 0% is see-through (default), 100% is solid. The frame keeps its colour either way.`}
+      description={
+        sticky
+          ? t('settings.appearance.stickyNoteBackingDescription')
+          : t('settings.appearance.groupFrameBackingDescription')
+      }
       control={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <NumberField
@@ -312,31 +312,35 @@ function MarkdownFontRows(): React.JSX.Element {
     <>
       <SearchableRow {...rows.markdownFont}>
         <FieldRow
-          label="Markdown font"
+          label={rows.markdownFont.title}
           description={t('settings.appearance.markdownFontDescription')}
           control={
             <FontPicker
-              label="Markdown font"
+              label={rows.markdownFont.title}
               value={resolveMarkdownFontFamily(family)}
               onChange={(stack) => update({ markdownFontFamily: stack })}
               catalog={PROSE_FONT_CATALOG}
               buildStack={buildProseFontStack}
-              systemOption={{ label: 'System font', stack: DEFAULT_MARKDOWN_FONT_FAMILY }}
+              systemOption={{ label: t('settings.appearance.systemFont'), stack: DEFAULT_MARKDOWN_FONT_FAMILY }}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.markdownFontSize}>
         <FieldRow
-          label="Markdown font size"
-          description={`Body text size in the same views, in pixels (${MARKDOWN_FONT_SIZE_MIN}–${MARKDOWN_FONT_SIZE_MAX}; default ${DEFAULT_MARKDOWN_FONT_SIZE}). Headings and code scale with it.`}
+          label={rows.markdownFontSize.title}
+          description={t('settings.appearance.markdownFontSizeDescription', {
+            min: MARKDOWN_FONT_SIZE_MIN,
+            max: MARKDOWN_FONT_SIZE_MAX,
+            default: DEFAULT_MARKDOWN_FONT_SIZE
+          })}
           control={
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <NumberField
                 value={resolveMarkdownFontSize(size)}
                 min={MARKDOWN_FONT_SIZE_MIN}
                 max={MARKDOWN_FONT_SIZE_MAX}
-                ariaLabel="Markdown font size"
+                ariaLabel={rows.markdownFontSize.title}
                 onChange={(v) => update({ markdownFontSize: resolveMarkdownFontSize(v) })}
               />
               <span style={{ opacity: 0.6 }}>px</span>
@@ -564,24 +568,22 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
     >
       <SearchableRow {...rows.appTheme}>
         <FieldRow
-          label="Appearance"
+          label={rows.appTheme.title}
           description={
-            'Follow terminal matches the theme picked in Settings → Terminal. Liquid Glass does too, and frosts the whole interface over the desktop wallpaper, without window colour accents.' +
-            (isLiquidGlass(appTheme)
-              ? ' Regular text keeps 4.5:1 contrast on glass; secondary text and coloured output can fade over bright wallpaper.'
-              : '')
+            t('settings.appearance.appThemeDescription') +
+            (isLiquidGlass(appTheme) ? t('settings.appearance.appThemeDescriptionGlassExtra') : '')
           }
           control={
             <SegmentedPill
               value={appTheme}
               options={[
-                { value: 'auto', label: 'Follow terminal' },
-                { value: 'dark', label: 'Dark' },
-                { value: 'light', label: 'Light' },
-                { value: 'liquid-glass', label: 'Liquid Glass' }
+                { value: 'auto', label: t('settings.appearance.themeFollowTerminal') },
+                { value: 'dark', label: t('settings.appearance.themeDark') },
+                { value: 'light', label: t('settings.appearance.themeLight') },
+                { value: 'liquid-glass', label: t('settings.appearance.themeLiquidGlass') }
               ]}
               onChange={(v) => void chooseAppTheme(v)}
-              ariaLabel="Appearance"
+              ariaLabel={rows.appTheme.title}
             />
           }
         />
@@ -589,15 +591,15 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
       {isLiquidGlass(appTheme) && (
         <SearchableRow {...rows.glassTint}>
           <FieldRow
-            label="Glass"
+            label={rows.glassTint.title}
             description={
               glassA11y.reduceTransparency
-                ? 'Reduce Transparency is on in your system settings, so glass is opaque. Turn it off there to use this slider.'
+                ? t('settings.appearance.glassReduceTransparency')
                 : glassA11y.moreContrast
-                ? 'Increase Contrast is on in your system settings, so glass stays at Tinted with stronger edges.'
+                ? t('settings.appearance.glassMoreContrast')
                 : glassSlider < GLASS_READABLE_TICK
-                ? 'Clearer than Readable: more of the wallpaper shows through, and terminal text stays readable.'
-                : 'Regular text keeps 4.5:1 contrast over any wallpaper.'
+                ? t('settings.appearance.glassClearer')
+                : t('settings.appearance.glassReadable')
             }
             control={
               <GlassSlider
@@ -612,13 +614,13 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
       {isLiquidGlass(appTheme) && (
         <SearchableRow {...rows.glassBlurWhileMoving}>
           <FieldRow
-            label="Keep blur while moving"
-            description="Uses more GPU while panning and zooming."
+            label={rows.glassBlurWhileMoving.title}
+            description={t('settings.appearance.glassBlurDescription')}
             control={
               <Switch
                 checked={glassBlurWhileMoving}
                 onChange={(v) => update({ glassBlurWhileMoving: v })}
-                ariaLabel="Keep blur while moving"
+                ariaLabel={rows.glassBlurWhileMoving.title}
               />
             }
           />
@@ -639,7 +641,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
       <MarkdownFontRows />
       <SearchableRow {...rows.accent}>
         <div className="flex items-center justify-between gap-4 py-2.5">
-          <span className="text-[13px] text-text">Accent</span>
+          <span className="text-[13px] text-text">{rows.accent.title}</span>
           <div className="flex flex-wrap gap-2">
             {/* The SYSTEM subset only, never the whole palette: `--accent` is painted as an
                 opaque background under hardcoded #fff (.dock-add, the dictation button, the
@@ -668,44 +670,39 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
       </SearchableRow>
       <SearchableRow {...rows.windowTitle}>
         <FieldRow
-          label="Show active session in window title"
-          description={
-            'Sets the native window title (and the browser tab, on the Server Edition) to the ' +
-            'focused node and project — "api server — myrepo — node-terminal" — so ' +
-            'window-title-based time trackers like ActivityWatch can tell sessions apart. ' +
-            'Off keeps the static title.'
-          }
+          label={t('settings.appearance.windowTitleFieldLabel')}
+          description={t('settings.appearance.windowTitleDescription')}
           control={
             <Switch
               checked={windowTitleActiveSession}
               onChange={(v) => update({ windowTitleActiveSession: v })}
-              ariaLabel="Show the active session in the window title"
+              ariaLabel={t('settings.appearance.windowTitleAria')}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.canvasDots}>
         <FieldRow
-          label="Show grid dots"
-          description="Draw the dot grid on the canvas. Only the dots: snapping and align to grid work the same either way."
+          label={rows.canvasDots.title}
+          description={t('settings.appearance.canvasDotsDescription')}
           control={
             <Switch
               checked={showCanvasDots(canvasDots)}
               onChange={(v) => update({ canvasDots: v })}
-              ariaLabel="Show grid dots"
+              ariaLabel={rows.canvasDots.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.resumeCard}>
         <FieldRow
-          label="Resume card"
-          description='Offer a "Resume where you left off" card when a project is activated, listing your last few node landings. Cmd+[ / Cmd+] and the Dock arrows walk the same trail either way.'
+          label={rows.resumeCard.title}
+          description={t('settings.appearance.resumeCardDescription')}
           control={
             <Switch
               checked={showResumeCard}
               onChange={(v) => update({ showResumeCard: v })}
-              ariaLabel="Show the resume card on project activation"
+              ariaLabel={t('settings.appearance.resumeCardAria')}
             />
           }
         />
@@ -714,33 +711,28 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
           every direct child, so a heading + caption + list must arrive as a single node. */}
       <SearchableRow {...rows.menuItems}>
         <div>
-          <h4 className="text-[13px] font-medium text-text">Node menu items</h4>
+          <h4 className="text-[13px] font-medium text-text">{rows.menuItems.title}</h4>
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
-            Which rows the node right-click menu offers (and, for Colors, the group frame's colour
-            strip too) — it applies to the next right-click. Destructive and recovery actions
-            (Delete, Restart agent) are never hidden here.
+            {t('settings.appearance.menuItemsDescription')}
           </p>
           <VisibilityToggles
             rows={HIDEABLE_MENU_ITEMS}
             hidden={hiddenNodeMenuItems}
-            where="in the node menu"
+            where={t('settings.appearance.menuItemsVisibilityWhere')}
             onChange={(next) => update({ hiddenNodeMenuItems: next })}
           />
         </div>
       </SearchableRow>
       <SearchableRow {...rows.headerButtons}>
         <div>
-          <h4 className="text-[13px] font-medium text-text">Terminal header buttons</h4>
+          <h4 className="text-[13px] font-medium text-text">{rows.headerButtons.title}</h4>
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
-            Which icon buttons the terminal node header shows. The model &amp; context meter
-            hides on kanban cards and in the card modal too. Close and the terminal Search
-            button are always shown, as are the right-click menu's destructive and recovery
-            actions (Delete, Restart agent).
+            {t('settings.appearance.headerButtonsDescription')}
           </p>
           <VisibilityToggles
             rows={HIDEABLE_HEADER_BUTTONS}
             hidden={hiddenHeaderButtons}
-            where="in the terminal header"
+            where={t('settings.appearance.headerButtonsVisibilityWhere')}
             onChange={(next) => update({ hiddenHeaderButtons: next })}
           />
         </div>
@@ -748,8 +740,8 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
       <SearchableRow {...rows.reset}>
         <SectionReset
           keys={APPEARANCE_RESET_KEYS}
-          label="Reset appearance"
-          what="the appearance settings"
+          label={rows.reset.title}
+          what={t('settings.appearance.resetAppearanceWhat')}
         />
       </SearchableRow>
     </SettingsSection>

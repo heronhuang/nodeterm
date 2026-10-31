@@ -12,7 +12,7 @@ import { Input } from '@renderer/ui/Input'
 import { hintLabel, isMacPlatform, isWindowsPlatform } from '@shared/platform-utils'
 import { trackpadRoutingSupported } from '@renderer/canvas/wheel-gesture'
 import { isBrowserRuntime } from '@renderer/bridge/runtime'
-import { backgroundCloseDescription, backgroundCloseRowVisible } from '@renderer/lib/backgroundClose'
+import { backgroundCloseRowVisible } from '@renderer/lib/backgroundClose'
 import type { BackgroundOnCloseSetting } from '@shared/types'
 import { clampWheelZoomSpeed } from '@renderer/canvas/wheel-zoom'
 import { DEFAULT_WORKTREE_PATH_TEMPLATE } from '@shared/worktree'
@@ -176,49 +176,49 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
     <SettingsSection id="behavior" title={t('settings.behavior.title')} isActive={isActive} searchEntries={entries}>
       <SearchableRow {...rows.defaultView}>
         <FieldRow
-          label="Default view"
+          label={t('settings.behavior.defaultViewLabel')}
           description={t('settings.behavior.defaultViewDescription')}
           control={
             <Select
-              aria-label="Default view"
+              aria-label={t('settings.behavior.defaultViewLabel')}
               value={settings.defaultProjectView === 'kanban' ? 'kanban' : 'canvas'}
               onChange={(e) => update({ defaultProjectView: e.target.value as 'canvas' | 'kanban' })}
             >
-              <option value="canvas">Canvas</option>
-              <option value="kanban">Kanban board</option>
+              <option value="canvas">{t('settings.behavior.viewCanvas')}</option>
+              <option value="kanban">{t('settings.behavior.viewKanban')}</option>
             </Select>
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.omniKanban}>
         <FieldRow
-          label="Omni Kanban (global swimlanes)"
-          description="When enabled, the global Kanban overview is available via its dedicated shortcut (Settings → Keyboard Shortcuts → Toggle global kanban). Default OFF — existing users see no change."
+          label={t('settings.behavior.omniKanbanLabel')}
+          description={t('settings.behavior.omniKanbanDescription')}
           control={
             <Switch
               checked={settings.omniKanbanEnabled === true}
               onChange={(v) => update({ omniKanbanEnabled: v })}
-              ariaLabel="Omni Kanban"
+              ariaLabel={t('settings.behavior.omniKanbanAria')}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.omniKanbanDefault}>
         <FieldRow
-          label="Make Omni the default for Cmd+Shift+B"
-          description="When enabled, Cmd+Shift+B opens the global overview instead of the per-project board. The dedicated global shortcut always opens Omni regardless. Opt-in, per user."
+          label={t('settings.behavior.omniDefaultLabel')}
+          description={t('settings.behavior.omniDefaultDescription')}
           control={
             <Switch
               checked={settings.omniKanbanAsDefault === true}
               onChange={(v) => update({ omniKanbanAsDefault: v })}
-              ariaLabel="Omni as default"
+              ariaLabel={t('settings.behavior.omniDefaultAria')}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.gridSize}>
         <FieldRow
-          label="Grid size"
+          label={t('settings.behavior.gridSizeLabel')}
           control={
             <NumberField
               value={settings.gridSize}
@@ -234,53 +234,53 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.snap}>
         <FieldRow
-          label="Snap to grid"
+          label={t('settings.behavior.snapLabel')}
           control={
             <Switch
               checked={settings.snapToGrid}
               onChange={(v) => update({ snapToGrid: v })}
-              ariaLabel="Snap to grid"
+              ariaLabel={t('settings.behavior.snapLabel')}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.autoAlign}>
         <FieldRow
-          label="Snap to grid mode"
-          description="Arranges every node to the grid at the moment you turn it on — like a desktop “Auto arrange”. Distinct from the drag-snap toggle above, which only constrains dragging."
+          label={t('settings.behavior.autoAlignLabel')}
+          description={t('settings.behavior.autoAlignDescription')}
           control={
             <Switch
               checked={settings.autoAlignGrid}
               onChange={(v) => update({ autoAlignGrid: v })}
-              ariaLabel="Snap to grid mode"
+              ariaLabel={t('settings.behavior.autoAlignLabel')}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.focusFollowsPointer}>
         <FieldRow
-          label="Terminal focus follows pointer"
+          label={rows.focusFollowsPointer.title}
           description={
             settings.terminalFocusFollowsPointer
-              ? 'On: hovering a terminal for the pan-hover delay gives it the keyboard. It keeps the keyboard when the pointer moves off — until you hover another terminal, or click another node, the empty canvas or a field. Turn off for click to focus.'
-              : 'Off (click to focus): click a terminal to type in it. It keeps the keyboard until you click another node, the empty canvas or a field — moving the pointer away changes nothing.'
+              ? t('settings.behavior.focusFollowsPointerOn')
+              : t('settings.behavior.focusFollowsPointerOff')
           }
           control={
             <Switch
               checked={settings.terminalFocusFollowsPointer}
               onChange={(v) => update({ terminalFocusFollowsPointer: v })}
-              ariaLabel="Terminal focus follows pointer"
+              ariaLabel={rows.focusFollowsPointer.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.panHover}>
         <FieldRow
-          label="Pan-hover delay (ms)"
+          label={rows.panHover.title}
           description={
             settings.terminalFocusFollowsPointer
               ? undefined
-              : 'Not used in click-to-focus mode (Terminal focus follows pointer is off): hovering never takes the keyboard.'
+              : t('settings.behavior.panHoverUnused')
           }
           control={
             <NumberField
@@ -295,51 +295,51 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.doubleClick}>
         <FieldRow
-          label="Double-click to focus"
+          label={rows.doubleClick.title}
           control={
             <Switch
               checked={settings.doubleClickFocus}
               onChange={(v) => update({ doubleClickFocus: v })}
-              ariaLabel="Double-click to focus"
+              ariaLabel={rows.doubleClick.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.focusZoom}>
         <FieldRow
-          label="Zoom when going to a node"
-          description="Off: going to a node keeps your current zoom and only pans to it."
+          label={rows.focusZoom.title}
+          description={t('settings.behavior.focusZoomDescription')}
           control={
             <Switch
               checked={settings.focusZoomToNode}
               onChange={(v) => update({ focusZoomToNode: v })}
-              ariaLabel="Zoom when going to a node"
+              ariaLabel={rows.focusZoom.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.closeProjectOnLastSession}>
         <FieldRow
-          label="Offer to close a project after its last session"
-          description="When you close the last terminal or agent node in a project with ×, ask whether to close the project too. It stays reopenable from Recently closed."
+          label={rows.closeProjectOnLastSession.title}
+          description={t('settings.behavior.closeProjectDescription')}
           control={
             <Switch
               checked={settings.offerCloseProjectOnLastSession}
               onChange={(v) => update({ offerCloseProjectOnLastSession: v })}
-              ariaLabel="Offer to close a project after its last session"
+              ariaLabel={rows.closeProjectOnLastSession.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.rememberLock}>
         <FieldRow
-          label="Remember the canvas lock"
-          description="The bottom-left lock stays on across restarts until you turn it off. Off: every launch starts unlocked."
+          label={rows.rememberLock.title}
+          description={t('settings.behavior.rememberLockDescription')}
           control={
             <Switch
               checked={settings.rememberCanvasLock}
               onChange={(v) => update({ rememberCanvasLock: v })}
-              ariaLabel="Remember the canvas lock"
+              ariaLabel={rows.rememberLock.title}
             />
           }
         />
@@ -347,13 +347,13 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       {SHOW_OPEN_LINKS && (
         <SearchableRow {...rows.openLinks}>
           <FieldRow
-            label="Allow nodeterm:// links"
-            description="Lets other apps, scripts and web pages ask nodeterm to open one agent or terminal node, or pre-fill a pairing code. Every link shows a confirm sheet first and opens nothing until you click Open. Off: links are ignored."
+            label={rows.openLinks.title}
+            description={t('settings.behavior.openLinksDescription')}
             control={
               <Switch
                 checked={settings.allowOpenLinks}
                 onChange={(v) => update({ allowOpenLinks: v })}
-                ariaLabel="Allow nodeterm:// links"
+                ariaLabel={rows.openLinks.title}
               />
             }
           />
@@ -361,41 +361,41 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       )}
       <SearchableRow {...rows.mdPreview}>
         <FieldRow
-          label="Open Markdown in preview"
-          description="Markdown files open rendered instead of as editable text. The node's Preview/Edit toggle still switches either way."
+          label={rows.mdPreview.title}
+          description={t('settings.behavior.mdPreviewDescription')}
           control={
             <Switch
               checked={settings.openMarkdownPreview}
               onChange={(v) => update({ openMarkdownPreview: v })}
-              ariaLabel="Open Markdown in preview"
+              ariaLabel={rows.mdPreview.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.sidebarCollapse}>
         <FieldRow
-          label="Sidebar: collapse inactive by default"
-          description="Projects without an explicit choice start collapsed when inactive. Your project and group chevron choices are remembered."
+          label={rows.sidebarCollapse.title}
+          description={t('settings.behavior.sidebarCollapseDescription')}
           control={
             <Switch
               checked={settings.sidebarAutoCollapse}
               onChange={(v) => update({ sidebarAutoCollapse: v })}
-              ariaLabel="Sidebar: collapse inactive by default"
+              ariaLabel={rows.sidebarCollapse.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.sidebarGrouping}>
         <FieldRow
-          label="Sidebar: group sessions by"
-          description="Group the sessions sidebar by project (the default) or by live status, so sessions needing attention float to the top across all projects. Status reflects local-core sessions; remote sessions show as idle."
+          label={t('settings.behavior.sidebarGroupingLabel')}
+          description={t('settings.behavior.sidebarGroupingDescription')}
           control={
             <SegmentedPill<'project' | 'status'>
               value={settings.sidebarGrouping}
-              ariaLabel="Group sessions by"
+              ariaLabel={t('settings.behavior.groupSessionsAria')}
               options={[
-                { value: 'project', label: 'Project' },
-                { value: 'status', label: 'Status' }
+                { value: 'project', label: t('settings.behavior.groupByProject') },
+                { value: 'status', label: t('settings.behavior.groupByStatus') }
               ]}
               onChange={(v) => update({ sidebarGrouping: v })}
             />
@@ -404,30 +404,28 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.projectStorage}>
         <FieldRow
-          label="New folder projects store their canvas"
-          description="In the folder writes .nodeterm/project.json there, to share through git. In app data writes nothing into the folder. A folder that already has a project.json opens as it is. Move an existing project from its tab menu."
+          label={rows.projectStorage.title}
+          description={t('settings.behavior.projectStorageDescription')}
           control={
             <Select
-              aria-label="New folder projects store their canvas"
+              aria-label={rows.projectStorage.title}
               value={settings.newProjectStorage}
               onChange={(e) => update({ newProjectStorage: e.target.value as NewProjectStorage })}
             >
-              <option value="folder">In the folder</option>
-              <option value="appData">In app data</option>
+              <option value="folder">{t('settings.behavior.storageInFolder')}</option>
+              <option value="appData">{t('settings.behavior.storageInAppData')}</option>
             </Select>
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.worktreePath}>
         <FieldRow
-          label="Worktree path template"
-          description={
-            'Resolved from the repository root. Supports $repoName (also $reponame or $defaultFolderName) and $branch; a missing branch is appended automatically.'
-          }
+          label={rows.worktreePath.title}
+          description={t('settings.behavior.worktreePathDescription')}
           control={
             <Input
               className="w-80 font-mono"
-              aria-label="Worktree path template"
+              aria-label={rows.worktreePath.title}
               placeholder={DEFAULT_WORKTREE_PATH_TEMPLATE}
               value={settings.worktreePathTemplate}
               onChange={(e) => update({ worktreePathTemplate: e.target.value })}
@@ -437,13 +435,13 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       <SearchableRow {...rows.wheelZoom}>
         <FieldRow
-          label="Scroll wheel zooms"
-          description={hintLabel('Zoom with a plain mouse wheel (no ⌘). Turns off scroll-to-pan — pan by dragging.')}
+          label={rows.wheelZoom.title}
+          description={hintLabel(t('settings.behavior.wheelZoomDescription'))}
           control={
             <Switch
               checked={settings.wheelZoom}
               onChange={(v) => update({ wheelZoom: v })}
-              ariaLabel="Scroll wheel zooms"
+              ariaLabel={rows.wheelZoom.title}
             />
           }
         />
@@ -457,8 +455,8 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       >
         <SearchableRow {...rows.wheelZoomSpeed}>
           <FieldRow
-            label="Wheel zoom speed"
-            description="How far one wheel click zooms. Turn it down if a single click jumps too far (common on high-resolution wheels like the MX Master)."
+            label={rows.wheelZoomSpeed.title}
+            description={t('settings.behavior.wheelZoomSpeedDescription')}
             control={
               <div className="flex items-center gap-3">
                 <input
@@ -467,7 +465,7 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
                   max={2}
                   step={0.1}
                   value={clampWheelZoomSpeed(settings.wheelZoomSpeed)}
-                  aria-label="Wheel zoom speed"
+                  aria-label={rows.wheelZoomSpeed.title}
                   onChange={(e) => update({ wheelZoomSpeed: Number(e.target.value) })}
                   className="w-40 accent-[var(--accent)]"
                 />
@@ -482,15 +480,13 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       {trackpadRoutingSupported({ mac: isMacPlatform(), windows: isWindowsPlatform() }) && (
         <SearchableRow {...rows.trackpadPan}>
           <FieldRow
-            label="Trackpad scroll pans"
-            description={hintLabel(
-              'A two-finger trackpad scroll pans the canvas even with wheel zoom on, while a wheel mouse still zooms. The macOS desktop app tells mouse and trackpad apart directly; on Windows and in the browser (Server Edition) detection is heuristic — turn off if a smooth-scrolling mouse (Magic Mouse, MX) pans when you meant to zoom.'
-            )}
+            label={rows.trackpadPan.title}
+            description={hintLabel(t('settings.behavior.trackpadPanDescription'))}
             control={
               <Switch
                 checked={settings.trackpadPan}
                 onChange={(v) => update({ trackpadPan: v })}
-                ariaLabel="Trackpad scroll pans"
+                ariaLabel={rows.trackpadPan.title}
               />
             }
           />
@@ -498,55 +494,55 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       )}
       <SearchableRow {...rows.dragMode}>
         <FieldRow
-          label="Canvas left-drag"
-          description="What dragging empty canvas does. Pan moves the map directly (box-select moves to Shift+drag); Select rubber-band selects, panning stays on middle-drag / two-finger scroll."
+          label={rows.dragMode.title}
+          description={t('settings.behavior.dragModeDescription')}
           control={
             <Select
-              aria-label="Canvas left-drag"
+              aria-label={rows.dragMode.title}
               value={settings.canvasDragMode}
               onChange={(e) => update({ canvasDragMode: e.target.value as 'select' | 'pan' })}
             >
-              <option value="select">Select (default)</option>
-              <option value="pan">Pan the canvas</option>
+              <option value="select">{t('settings.behavior.dragSelect')}</option>
+              <option value="pan">{t('settings.behavior.dragPan')}</option>
             </Select>
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.browserSaver}>
         <FieldRow
-          label="Browser memory saver"
-          description="Free a hidden browser page's memory after 5 minutes; it reloads when shown. Each page is a whole Chromium process."
+          label={rows.browserSaver.title}
+          description={t('settings.behavior.browserSaverDescription')}
           control={
             <Switch
               checked={settings.browserMemorySaver}
               onChange={(v) => update({ browserMemorySaver: v })}
-              ariaLabel="Browser memory saver"
+              ariaLabel={rows.browserSaver.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.keepAwake}>
         <FieldRow
-          label="Keep awake while agents work"
-          description="Holds off idle sleep while a local agent is running. Lets the machine sleep on battery below 5% or when it runs critically hot. A closed lid still sleeps the machine, except on macOS when plugged in with an external display connected."
+          label={rows.keepAwake.title}
+          description={t('settings.behavior.keepAwakeDescription')}
           control={
             <Switch
               checked={settings.keepAwakeWhileAgentsWork}
               onChange={(v) => update({ keepAwakeWhileAgentsWork: v })}
-              ariaLabel="Keep awake while agents work"
+              ariaLabel={rows.keepAwake.title}
             />
           }
         />
       </SearchableRow>
       <SearchableRow {...rows.confirmQuit}>
         <FieldRow
-          label="Confirm before quitting"
-          description="Ask before the app quits (⌘Q / Ctrl+Q or the title-bar close). Terminal sessions survive a quit either way."
+          label={rows.confirmQuit.title}
+          description={t('settings.behavior.confirmQuitDescription')}
           control={
             <Switch
               checked={settings.confirmBeforeQuit}
               onChange={(v) => update({ confirmBeforeQuit: v })}
-              ariaLabel="Confirm before quitting"
+              ariaLabel={rows.confirmQuit.title}
             />
           }
         />
@@ -554,17 +550,21 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
       {SHOW_BACKGROUND_CLOSE && (
         <SearchableRow {...rows.backgroundClose}>
           <FieldRow
-            label="Keep running when the window closes"
-            description={backgroundCloseDescription(isWindowsPlatform())}
+            label={rows.backgroundClose.title}
+            description={
+              isWindowsPlatform()
+                ? t('settings.behavior.backgroundCloseDescriptionWindows')
+                : t('settings.behavior.backgroundCloseDescriptionLinux')
+            }
             control={
               <Select
-                aria-label="Keep running when the window closes"
+                aria-label={rows.backgroundClose.title}
                 value={settings.runInBackgroundOnClose}
                 onChange={(e) => update({ runInBackgroundOnClose: e.target.value as BackgroundOnCloseSetting })}
               >
-                <option value="auto">Automatic</option>
-                <option value="on">Always</option>
-                <option value="off">Never (closing quits)</option>
+                <option value="auto">{t('settings.behavior.backgroundAuto')}</option>
+                <option value="on">{t('settings.behavior.backgroundOn')}</option>
+                <option value="off">{t('settings.behavior.backgroundOff')}</option>
               </Select>
             }
           />
@@ -580,6 +580,7 @@ export function BehaviorSection({ isActive }: { isActive: boolean }): React.JSX.
  * lib/defaultNodeSizeSetting.ts.
  */
 function DefaultNodeSizeRow(): React.JSX.Element {
+  const { t } = useI18n()
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
   const [choice, setChoice] = useState<NodeSizeChoice>('terminal')
@@ -589,12 +590,12 @@ function DefaultNodeSizeRow(): React.JSX.Element {
   }
   return (
     <FieldRow
-      label="Default node size (px)"
-      description="Size new nodes of the chosen kind open at. Existing nodes keep their size."
+      label={t('settings.behavior.nodeSizeLabel')}
+      description={t('settings.behavior.nodeSizeDescription')}
       control={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <Select
-            aria-label="Node kind"
+            aria-label={t('settings.behavior.nodeKindAria')}
             value={choice}
             onChange={(e) => setChoice(e.target.value as NodeSizeChoice)}
           >
@@ -623,7 +624,7 @@ function DefaultNodeSizeRow(): React.JSX.Element {
           />
           {field.isCustom && (
             <Button variant="ghost" onClick={() => update(nodeSizeResetPatch(settings, choice))}>
-              Reset
+              {t('settings.behavior.reset')}
             </Button>
           )}
         </div>

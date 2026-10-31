@@ -31,26 +31,9 @@ import { useAgentStatus } from '../state/agentStatus'
 import { useSessionNaming } from '../state/sessionNaming'
 import { ProjectBranch } from './ProjectBranch'
 import { useDragAutoScroll } from '../lib/dragAutoScroll'
+import { useI18n } from '@renderer/i18n/useI18n'
 
 const HISTORY_COLLAPSE_KEY = 'history'
-
-/**
- * Titles per scope. Spelled out rather than composed from a fragment: the group's `working` badge
- * answers a different question from the project's ("is this delegated task still moving?"), and a
- * concatenated suffix would bury that difference.
- */
-const SIGNAL_TITLES = {
-  project: {
-    attention: 'Sessions that need you',
-    unread: 'Finished — new for you',
-    working: 'Sessions running right now'
-  },
-  group: {
-    attention: 'Sessions in this group that need you',
-    unread: 'Finished in this group — new for you',
-    working: 'CLIs running in this group right now'
-  }
-} as const
 
 /**
  * The three header badges, rendered identically for a project and for a canvas frame. ONE
@@ -66,7 +49,13 @@ function SignalBadges({
   counts: SignalCounts
   scope: 'project' | 'group'
 }): JSX.Element {
-  const titles = SIGNAL_TITLES[scope]
+  const { t } = useI18n()
+  const prefix = scope === 'project' ? 'sidebar.signals.project' : 'sidebar.signals.group'
+  const titles = {
+    attention: t(`${prefix}.attention`),
+    unread: t(`${prefix}.unread`),
+    working: t(`${prefix}.working`)
+  }
   return (
     <>
       {counts.attention > 0 && (
@@ -141,6 +130,7 @@ export interface SessionsSidebarProps {
 }
 
 export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null {
+  const { t } = useI18n()
   const { open, pinned, liveActiveNodes } = props
   const allProjects = useProjects((s) => s.projects)
   // Closed projects are hidden from the tab bar; hide them from the sidebar too.
@@ -369,7 +359,7 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
         />
         <div
           className={`ss-subgroup__head${dropClass(projectId, bucket.id)}`}
-          title="Click to show the group on the canvas"
+          title={t('sidebar.showGroupOnCanvas')}
           onClick={() => props.onFocusNode(bucket.id)}
           onContextMenu={(e) => props.onRowContextMenu(e, projectId, bucket.id)}
           draggable
@@ -387,7 +377,11 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
           <button
             type="button"
             className="ss-group__chev"
-            aria-label={collapsed ? `Expand ${bucket.title}` : `Collapse ${bucket.title}`}
+            aria-label={
+              collapsed
+                ? t('sidebar.expandProject', { name: bucket.title })
+                : t('sidebar.collapseProject', { name: bucket.title })
+            }
             aria-expanded={!collapsed}
             draggable={false}
             onClick={(e) => {
@@ -419,7 +413,7 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
           ) : (
             <span
               className="ss-subgroup__name"
-              title="Double-click to rename group"
+              title={t('sidebar.renameGroup')}
               onDoubleClick={(e) => {
                 e.stopPropagation()
                 setEditGroup({ id: bucket.id, draft: bucket.title })
@@ -437,7 +431,7 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
           {members.length > 0 && (
             <button
               className="ss-subgroup__ai"
-              title="Name group with AI (from every session below it)"
+              title={t('sidebar.nameGroupAi')}
               disabled={!!namingById[bucket.id]}
               onClick={(e) => {
                 e.stopPropagation()
@@ -488,7 +482,7 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
               />
             )}
             {bucket.sessions.length === 0 && bucket.children.length === 0 ? (
-              <div className="ss-group__empty">Drop a session or group here</div>
+              <div className="ss-group__empty">{t('sidebar.dropSessionHere')}</div>
             ) : (
               bucket.sessions.map((row) => renderRow(projectId, row))
             )}
@@ -529,17 +523,17 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
       onMouseLeave={props.onMouseLeave}
     >
       <div className="sessions-sidebar__head">
-        <span className="sessions-sidebar__title">Sessions</span>
+        <span className="sessions-sidebar__title">{t('sidebar.title')}</span>
         <span className="sessions-sidebar__count">{total}</span>
         <div className="sessions-sidebar__head-actions">
           <button
             className={pinned ? 'is-on' : ''}
-            title={pinned ? 'Unpin' : 'Pin'}
+            title={pinned ? t('sidebar.unpin') : t('sidebar.pin')}
             onClick={props.onTogglePin}
           >
             <IconPin />
           </button>
-          <button title="Close" onClick={props.onClose}>
+          <button title={t('sidebar.close')} onClick={props.onClose}>
             <IconClose />
           </button>
         </div>
@@ -547,14 +541,14 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
 
       {/* Grouping tabs: plain text with a 2px accent underline on the active one, sitting on the
           hairline that separates the header from the list — quieter than a pill toggle. */}
-      <div className="ss-tabs" role="tablist" aria-label="Group sessions by">
+      <div className="ss-tabs" role="tablist" aria-label={t('sidebar.groupByAria')}>
         <button
           role="tab"
           aria-selected={grouping === 'project'}
           className={`ss-tab${grouping === 'project' ? ' is-active' : ''}`}
           onClick={() => updateSettings({ sidebarGrouping: 'project' })}
         >
-          Project
+          {t('sidebar.tabProject')}
         </button>
         <button
           role="tab"
@@ -562,13 +556,13 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
           className={`ss-tab${grouping === 'status' ? ' is-active' : ''}`}
           onClick={() => updateSettings({ sidebarGrouping: 'status' })}
         >
-          Status
+          {t('sidebar.tabStatus')}
         </button>
       </div>
 
       <div className="sessions-sidebar__search">
         <input
-          placeholder="Filter sessions…"
+          placeholder={t('sidebar.filterPlaceholder')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           // Escape clears the filter in ONE action (issue #505) instead of select-all-delete.
@@ -585,8 +579,8 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
           <button
             type="button"
             className="sessions-sidebar__search-clear"
-            title="Clear filter (Esc)"
-            aria-label="Clear filter"
+            title={t('sidebar.clearFilterTitle')}
+            aria-label={t('sidebar.clearFilter')}
             onClick={clearFilter}
           >
             ×
@@ -616,14 +610,14 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
           // A filtered list that came back empty says so — and offers the one action that undoes
           // it, in both grouping modes (status mode had no empty state at all).
           <div className="sessions-sidebar__empty">
-            <div>No sessions match “{filter.trim()}”.</div>
+            <div>{t('sidebar.noMatch', { query: filter.trim() })}</div>
             <button type="button" className="sessions-sidebar__empty-clear" onClick={clearFilter}>
-              Clear filter
+              {t('sidebar.clearFilter')}
             </button>
           </div>
         )}
         {emptyState === 'no-sessions' && (
-          <div className="sessions-sidebar__empty">No sessions yet.</div>
+          <div className="sessions-sidebar__empty">{t('sidebar.noSessions')}</div>
         )}
         {grouping === 'status' ? (
           statusSections.map((section: StatusSection) => (
@@ -671,7 +665,7 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
                   else toggleCollapse(collapseKey, isCollapsed)
                 }}
                 onContextMenu={(e) => props.onProjectContextMenu(e, g.projectId)}
-                title={drag?.projectId === g.projectId ? 'Drop here to remove from group' : undefined}
+                title={drag?.projectId === g.projectId ? t('sidebar.dropRemoveFromGroup') : undefined}
                 draggable
                 onDragStart={(e) => {
                   e.dataTransfer.effectAllowed = 'move'
@@ -689,8 +683,12 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
                 <button
                   type="button"
                   className="ss-group__chev"
-                  title={isCollapsed ? 'Expand' : 'Collapse'}
-                  aria-label={isCollapsed ? `Expand ${g.projectName}` : `Collapse ${g.projectName}`}
+                  title={isCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+                  aria-label={
+                    isCollapsed
+                      ? t('sidebar.expandProject', { name: g.projectName })
+                      : t('sidebar.collapseProject', { name: g.projectName })
+                  }
                   aria-expanded={!isCollapsed}
                   draggable={false}
                   onClick={(e) => {
@@ -713,7 +711,7 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
                 <span className="ss-group__count">{projectCount(g)}</span>
                 <button
                   className="ss-group__add"
-                  title="Add a node to this project"
+                  title={t('sidebar.addNode')}
                   onClick={(e) => {
                     e.stopPropagation()
                     props.onAddToProject(g.projectId, { clientX: e.clientX, clientY: e.clientY })
@@ -756,14 +754,14 @@ export function SessionsSidebar(props: SessionsSidebarProps): JSX.Element | null
                     />
                   )}
                   {g.ungrouped.length === 0 && g.groups.length === 0 ? (
-                    <div className="ss-group__empty">No sessions</div>
+                    <div className="ss-group__empty">{t('sidebar.noSessionsInProject')}</div>
                   ) : (
                     <div
                       className={`ss-ungrouped${dropClass(g.projectId, null)}`}
                       {...dropProps(g.projectId, null)}
                     >
                       {g.groups.length > 0 && g.ungrouped.length > 0 && (
-                        <div className="ss-ungrouped__label">Ungrouped</div>
+                        <div className="ss-ungrouped__label">{t('sidebar.ungrouped')}</div>
                       )}
                       {g.ungrouped.map((row) => renderRow(g.projectId, row))}
                     </div>

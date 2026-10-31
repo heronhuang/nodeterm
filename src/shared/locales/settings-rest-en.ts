@@ -58,6 +58,54 @@ export const settingsRestEn = {
         title: "Reset appearance",
       },
     },
+    appThemeDescription:
+      "Follow terminal matches the theme picked in Settings → Terminal. Liquid Glass does too, and frosts the whole interface over the desktop wallpaper, without window colour accents.",
+    appThemeDescriptionGlassExtra:
+      " Regular text keeps 4.5:1 contrast on glass; secondary text and coloured output can fade over bright wallpaper.",
+    themeFollowTerminal: "Follow terminal",
+    themeDark: "Dark",
+    themeLight: "Light",
+    themeLiquidGlass: "Liquid Glass",
+    glassReduceTransparency:
+      "Reduce Transparency is on in your system settings, so glass is opaque. Turn it off there to use this slider.",
+    glassMoreContrast:
+      "Increase Contrast is on in your system settings, so glass stays at Tinted with stronger edges.",
+    glassClearer:
+      "Clearer than Readable: more of the wallpaper shows through, and terminal text stays readable.",
+    glassReadable: "Regular text keeps 4.5:1 contrast over any wallpaper.",
+    glassBlurDescription: "Uses more GPU while panning and zooming.",
+    uiScaleDescription:
+      "Scales the whole application UI — menus, node headers, dialogs, sidebars — like a browser's page zoom. Terminal text scales with it too: the terminal font size (Settings → Terminal) is multiplied by this, so lower it there if you want terminal text to stay as it is.",
+    uiScaleBrowserNote:
+      "In the browser, use your browser's own page zoom (Cmd/Ctrl and + / −) — it does the same thing and the browser remembers it per site.",
+    tabBarHeightDescription: "Height of the project tab strip at the top of the window, in pixels.",
+    stickyNoteBackingDescription:
+      "How much of what lies behind a sticky note shows through it: 0% is see-through (default), 100% is solid. The note keeps its colour either way.",
+    groupFrameBackingDescription:
+      "How much of the canvas shows through a group frame: 0% is see-through (default), 100% is solid. The frame keeps its colour either way.",
+    markdownFontSizeDescription:
+      "Body text size in the same views, in pixels ({min}–{max}; default {default}). Headings and code scale with it.",
+    systemFont: "System font",
+    windowTitleFieldLabel: "Show active session in window title",
+    windowTitleDescription:
+      'Sets the native window title (and the browser tab, on the Server Edition) to the focused node and project — "api server — myrepo — node-terminal" — so window-title-based time trackers like ActivityWatch can tell sessions apart. Off keeps the static title.',
+    windowTitleAria: "Show the active session in the window title",
+    canvasDotsDescription:
+      "Draw the dot grid on the canvas. Only the dots: snapping and align to grid work the same either way.",
+    resumeCardDescription:
+      'Offer a "Resume where you left off" card when a project is activated, listing your last few node landings. Cmd+[ / Cmd+] and the Dock arrows walk the same trail either way.',
+    resumeCardAria: "Show the resume card on project activation",
+    menuItemsDescription:
+      "Which rows the node right-click menu offers (and, for Colors, the group frame's colour strip too) — it applies to the next right-click. Destructive and recovery actions (Delete, Restart agent) are never hidden here.",
+    menuItemsVisibilityWhere: "in the node menu",
+    headerButtonsDescription:
+      "Which icon buttons the terminal node header shows. The model & context meter hides on kanban cards and in the card modal too. Close and the terminal Search button are always shown, as are the right-click menu's destructive and recovery actions (Delete, Restart agent).",
+    headerButtonsVisibilityWhere: "in the terminal header",
+    showVisibilityAria: "Show {label} {where}",
+    wallpaperNone: "None",
+    wallpaperYourImage: "Your image",
+    wallpaperChooseImage: "Choose image…",
+    resetAppearanceWhat: "the appearance settings",
   },
   terminal: {
     title: "Terminal",

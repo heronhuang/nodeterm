@@ -22,6 +22,17 @@ describe('SettingsStore nested-default merge', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('defaults uiLanguage to zh and normalizes garbage on merge', () => {
+    expect(DEFAULT_SETTINGS.uiLanguage).toBe('zh')
+    writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ uiLanguage: 'fr' }), 'utf-8')
+    const store = new SettingsStore()
+    store.init()
+    expect(store.get().uiLanguage).toBe('zh')
+    writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ uiLanguage: 'en' }), 'utf-8')
+    store.init()
+    expect(store.get().uiLanguage).toBe('en')
+  })
+
   it('fills a missing nested speech.shortcut from an OLD settings.json (speech present, shortcut absent)', () => {
     writeFileSync(
       path.join(dir, 'settings.json'),
