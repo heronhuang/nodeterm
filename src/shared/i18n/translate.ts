@@ -2,11 +2,13 @@ import type { TranslateParams, UiLanguage } from './types'
 import { enMessages } from '../locales/en'
 import { zhMessages } from '../locales/zh'
 
-type MessageTree = Record<string, string | MessageTree>
+interface MessageTree {
+  [key: string]: string | MessageTree
+}
 
 const CATALOGS: Record<UiLanguage, MessageTree> = {
-  en: enMessages,
-  zh: zhMessages
+  en: enMessages as MessageTree,
+  zh: zhMessages as MessageTree
 }
 
 function lookup(tree: MessageTree, key: string): string | undefined {

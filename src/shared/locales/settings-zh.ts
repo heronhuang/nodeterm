@@ -1,3 +1,6 @@
+import { behaviorZh } from './settings-behavior-zh'
+import { settingsRestZh } from './settings-rest-zh'
+
 /** 设置各区块文案（简体中文）— 合并进 zhMessages.settings。 */
 export const settingsSectionZh = {
   shell: {
@@ -150,5 +153,7 @@ export const settingsSectionZh = {
     saved: '已保存',
     footnote:
       '若未设置名称，对他人显示为「Someone」。这与登录或许可证无关 — 仅用于实时协作中的标识。'
-  }
+  },
+  behavior: behaviorZh,
+  ...settingsRestZh
 } as const

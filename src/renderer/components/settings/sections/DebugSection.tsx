@@ -25,7 +25,7 @@ export function DebugSection({ isActive }: { isActive: boolean }): React.JSX.Ele
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={row}>
+      <SearchableRow {...row}>
         <FieldRow
           label={t('settings.debug.logPanelLabel')}
           description={t('settings.debug.logPanelDescription')}

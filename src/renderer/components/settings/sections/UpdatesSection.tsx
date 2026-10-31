@@ -26,7 +26,7 @@ export function UpdatesSection({ isActive }: { isActive: boolean }): React.JSX.E
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={row}>
+      <SearchableRow {...row}>
         <div className="space-y-3">
           <FieldRow
             label={t('settings.updates.currentVersion')}

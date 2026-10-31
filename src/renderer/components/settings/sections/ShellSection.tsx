@@ -25,7 +25,7 @@ export function ShellSection({ isActive }: { isActive: boolean }): React.JSX.Ele
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={row}>
+      <SearchableRow {...row}>
         <FieldRow
           label={t('settings.shell.rows.shell.title')}
           control={

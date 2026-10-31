@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import {
   MODEL_GATEWAY_SECRET_REF,
   modelGatewayCredentialKind,
@@ -15,31 +16,25 @@ import { FieldRow } from '../FieldRow'
 import { SearchableRow } from '../SearchableRow'
 import { SettingsSection } from '../SettingsSection'
 
-const ROWS = {
+const ROW_DEFS = {
   endpoint: {
-    title: 'Gateway URL',
-    description: 'One gateway root URL for OpenAI-compatible discovery and agent routes.',
+    key: 'settings.modelGateway.rows.endpoint.title',
     keywords: ['openai compatible', 'bifrost', 'litellm', 'model', 'provider', 'base url', 'endpoint']
   },
   discoveryPath: {
-    title: 'Discovery path',
-    description: 'Path the model catalogue is read from, appended to the gateway root.',
+    key: 'settings.modelGateway.rows.discoveryPath.title',
     keywords: ['discover', 'models route', 'v1/models', 'openai/v1/models', 'catalogue path']
   },
   key: {
-    title: 'API key',
-    description: 'A gateway bearer key from protected storage or an environment variable.',
+    key: 'settings.modelGateway.rows.key.title',
     keywords: ['token', 'secret', 'virtual key', 'authentication', 'environment variable', 'env']
   },
   discovery: {
-    title: 'Available models',
-    description: 'Refresh the model catalogue used by agent-node context menus.',
+    key: 'settings.modelGateway.rows.discovery.title',
     keywords: ['discover', 'refresh', 'switch model', 'catalogue']
   },
   defaultModel: {
-    title: 'Default model',
-    description:
-      'A model new canvas agent sessions launch on when the Agents “Launch mode” is set to “Gateway (default model)”.',
+    key: 'settings.modelGateway.rows.defaultModel.title',
     keywords: [
       'default',
       'model',
@@ -51,8 +46,7 @@ const ROWS = {
       'copilot'
     ]
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/
 type CredentialMode = 'environment' | 'stored'
 
@@ -67,6 +61,19 @@ function credentialMessage(error: unknown): string {
 }
 
 export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const gateway = useSettings((s) => s.settings.modelGateway)
   const defaultModel = useSettings((s) => s.settings.modelGatewayDefaultModel)
   const update = useSettings((s) => s.update)
@@ -199,12 +206,12 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
   return (
     <SettingsSection
       id="model-gateway"
-      title="Model gateway"
-      description="Configure one gateway, discover models through the OpenAI-compatible Models API, and switch a supported agent node without creating a custom agent for every model."
+      title={t('settings.modelGateway.title')}
+      description={t('settings.modelGateway.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.endpoint}>
+      <SearchableRow {...rows.endpoint}>
         <FieldRow
           label="Gateway URL"
           description="Enter the server root. Discovery uses the OpenAI-compatible /v1/models endpoint; agent launches use the configured provider routes."
@@ -233,7 +240,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
         ) : null}
       </SearchableRow>
 
-      <SearchableRow {...ROWS.discoveryPath}>
+      <SearchableRow {...rows.discoveryPath}>
         <div className="space-y-2">
           <div className="flex items-start justify-between gap-6">
             <div>
@@ -364,7 +371,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
         </div>
       </SearchableRow>
 
-      <SearchableRow {...ROWS.key}>
+      <SearchableRow {...rows.key}>
         <div className="space-y-3">
           <FieldRow
             label="Credential source"
@@ -461,7 +468,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
         </div>
       </SearchableRow>
 
-      <SearchableRow {...ROWS.discovery}>
+      <SearchableRow {...rows.discovery}>
         <div className="flex items-center justify-between gap-6">
           <div>
             <div className="text-sm font-medium text-text">Available models</div>
@@ -490,7 +497,7 @@ export function ModelGatewaySection({ isActive }: { isActive: boolean }): React.
         ) : null}
       </SearchableRow>
 
-      <SearchableRow {...ROWS.defaultModel}>
+      <SearchableRow {...rows.defaultModel}>
         <FieldRow
           label="Default model"
           description="New canvas agent sessions launch on this model when Settings → Agents → Launch mode is “Gateway (default model)”. Picked from the discovered catalogue — discover models first."

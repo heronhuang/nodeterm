@@ -81,7 +81,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={rows.enabled}>
+      <SearchableRow {...rows.enabled}>
         <FieldRow
           label={t('settings.tmux.persistentSessions')}
           description={persistenceDescription(status)}
@@ -95,7 +95,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
         />
       </SearchableRow>
       {status?.zellij ? (
-        <SearchableRow entry={rows.backend}>
+        <SearchableRow {...rows.backend}>
           <FieldRow
             label={t('settings.tmux.sessionBackend')}
             description={sessionBackendNote(status.zellij)}
@@ -117,7 +117,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           />
         </SearchableRow>
       ) : null}
-      <SearchableRow entry={rows.scrollback}>
+      <SearchableRow {...rows.scrollback}>
         <FieldRow
           label={t('settings.tmux.scrollbackLines')}
           description={
@@ -135,7 +135,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow entry={rows.leadPane}>
+      <SearchableRow {...rows.leadPane}>
         <FieldRow
           label={t('settings.tmux.leadPane')}
           description={
@@ -168,7 +168,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow entry={rows.parkMinutes}>
+      <SearchableRow {...rows.parkMinutes}>
         <FieldRow
           label={t('settings.tmux.parkMinutes')}
           description={
@@ -194,7 +194,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow entry={rows.parkMax}>
+      <SearchableRow {...rows.parkMax}>
         <FieldRow
           label={t('settings.tmux.parkMax')}
           description={
@@ -216,7 +216,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow entry={rows.offscreen}>
+      <SearchableRow {...rows.offscreen}>
         <FieldRow
           label={t('settings.tmux.offscreen')}
           description={t('settings.tmux.offscreenDescription')}

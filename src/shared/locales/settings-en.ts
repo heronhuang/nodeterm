@@ -1,3 +1,6 @@
+import { behaviorEn } from './settings-behavior-en'
+import { settingsRestEn } from './settings-rest-en'
+
 /** Settings section strings (English) — merged into enMessages.settings. */
 export const settingsSectionEn = {
   shell: {
@@ -152,5 +155,7 @@ export const settingsSectionEn = {
     saved: 'Saved',
     footnote:
       'If you never pick a name you appear to others as “Someone”. This is separate from your login or license — it only labels you during live collaboration.'
-  }
+  },
+  behavior: behaviorEn,
+  ...settingsRestEn
 } as const

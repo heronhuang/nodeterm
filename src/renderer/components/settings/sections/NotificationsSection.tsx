@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useSettings } from '../../../state/settings'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -19,21 +20,20 @@ import {
   type CustomAlertSounds
 } from '@shared/alert-sound'
 
-const ROWS = {
+const ROW_DEFS = {
   notify: {
-    title: 'Notify when a turn finishes in the background',
+    key: 'settings.notifications.rows.notify.title',
     keywords: ['notify', 'notification', 'claude', 'background', 'turn', 'done']
   },
   sound: {
-    title: 'Play a sound when a turn finishes or needs you',
+    key: 'settings.notifications.rows.sound.title',
     keywords: ['sound', 'audio', 'sfx', 'effect', 'chime', 'beep', 'retro', '8-bit', 'chiptune', 'volume', 'mute', 'finished', 'needs you', 'custom', 'file', 'mp3', 'wav', 'own sound']
   },
   mobilePush: {
-    title: 'Send push notifications to your paired phone',
+    key: 'settings.notifications.rows.mobilePush.title',
     keywords: ['push', 'phone', 'mobile', 'apns', 'fcm', 'ios', 'android', 'notification', 'approval', 'question', 'done', 'completed', 'needs you', 'live update', 'live updates', 'live activity', 'live activities', 'ongoing notification', 'dynamic island', 'lock screen', 'presence', 'idle', 'hold', 'defer', 'at this computer']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 const SOUND_LABELS: Record<AlertSoundKind, string> = { done: 'Finished sound', needsYou: 'Needs-you sound' }
 
@@ -153,6 +153,19 @@ function CustomSoundRow({ kind, volume }: { kind: AlertSoundKind; volume: number
 const blockedCopy = notificationsBlockedCopy(isMacPlatform() ? 'mac' : isWindowsPlatform() ? 'windows' : 'other')
 
 export function NotificationsSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const notifyOnClaudeDone = useSettings((s) => s.settings.notifyOnClaudeDone)
   const soundEffects = useSettings((s) => s.settings.soundEffects)
   const soundVolume = useSettings((s) => s.settings.soundVolume)
@@ -169,12 +182,12 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
   return (
     <SettingsSection
       id="notifications"
-      title="Notifications"
-      description="Get notified when an agent finishes while the app is in the background."
+      title={t('settings.notifications.title')}
+      description={t('settings.notifications.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.notify}>
+      <SearchableRow {...rows.notify}>
         <FieldRow
           label="Notify when a turn finishes in the background"
           control={
@@ -211,7 +224,7 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
           </div>
         )}
       </SearchableRow>
-      <SearchableRow {...ROWS.sound}>
+      <SearchableRow {...rows.sound}>
         <FieldRow
           label="Play a sound when a turn finishes or needs you"
           description="A short retro chirp for a finished turn and a crackly one when a session needs you — or your own sound file for either. Plays whether or not the window is focused, so you catch a finish while looking at another node."
@@ -260,7 +273,7 @@ export function NotificationsSection({ isActive }: { isActive: boolean }): React
           <CustomSoundRow kind="needsYou" volume={soundVolume} />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.mobilePush}>
+      <SearchableRow {...rows.mobilePush}>
         <FieldRow
           label="Send push notifications to your paired phone"
           description="Fires when an agent needs approval, asks a question, or finishes — only if you've paired a phone."

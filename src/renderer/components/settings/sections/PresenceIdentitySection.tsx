@@ -51,7 +51,7 @@ export function PresenceIdentitySection({ isActive }: { isActive: boolean }): Re
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={row}>
+      <SearchableRow {...row}>
         <div className="space-y-4">
           <FieldRow
             label={t('settings.presence.displayName')}

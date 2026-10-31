@@ -85,7 +85,7 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={rows.enabled}>
+      <SearchableRow {...rows.enabled}>
         <FieldRow
           label={t('settings.notch.showHud')}
           description={t('settings.notch.showHudDescription')}
@@ -106,7 +106,7 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
         }
         aria-disabled={!notchHud}
       >
-        <SearchableRow entry={rows.side}>
+        <SearchableRow {...rows.side}>
           <FieldRow
             label={t('settings.notch.capsuleSide')}
             description={t('settings.notch.capsuleSideDescription')}
@@ -125,7 +125,7 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           />
         </SearchableRow>
 
-        <SearchableRow entry={rows.offset}>
+        <SearchableRow {...rows.offset}>
           <FieldRow
             label={t('settings.notch.verticalPosition')}
             description={t('settings.notch.verticalPositionDescription')}
@@ -149,7 +149,7 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           />
         </SearchableRow>
 
-        <SearchableRow entry={rows.width}>
+        <SearchableRow {...rows.width}>
           <FieldRow
             label={t('settings.notch.notchWidth')}
             description={t('settings.notch.notchWidthDescription')}
@@ -173,7 +173,7 @@ export function NotchSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           />
         </SearchableRow>
 
-        <SearchableRow entry={rows.hover}>
+        <SearchableRow {...rows.hover}>
           <FieldRow
             label={t('settings.notch.expandOnHover')}
             description={t('settings.notch.expandOnHoverDescription')}

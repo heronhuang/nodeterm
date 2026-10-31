@@ -1,5 +1,6 @@
 import { CANVAS_BACKING_MAX, CANVAS_BACKING_MIN, resolveCanvasBacking } from '@shared/canvas-backing'
-import { useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
+import { useMemo, useEffect, useState } from 'react'
 import { useSettings } from '../../../state/settings'
 import { useWallpaperBackgroundFor } from '../../../state/wallpaper'
 import { isLiquidGlass } from '@renderer/lib/appTheme'
@@ -58,42 +59,45 @@ import {
 import { SectionReset } from '../SectionReset'
 import { APPEARANCE_RESET_KEYS } from '@renderer/lib/settingsReset'
 
-const ROWS = {
+const ROW_DEFS = {
   appTheme: {
-    title: 'Appearance',
+    key: 'settings.appearance.rows.appTheme.title',
     keywords: ['appearance', 'theme', 'light', 'dark', 'mode', 'colour', 'color', 'chrome', 'liquid', 'glass', 'blur', 'translucent', 'frosted']
   },
   uiScale: {
-    title: 'UI scale',
+    key: 'settings.appearance.rows.uiScale.title',
     keywords: ['ui', 'scale', 'zoom', 'size', 'text', 'bigger', 'larger', '4k', 'hidpi', 'dpi', 'display', 'readability']
   },
   tabBarHeight: {
-    title: 'Tab bar height',
+    key: 'settings.appearance.rows.tabBarHeight.title',
     keywords: ['tab', 'bar', 'height', 'strip', 'top', 'title bar', 'thickness', 'compact', 'dense']
   },
   stickyNoteBacking: {
-    title: 'Sticky note background',
+    key: 'settings.appearance.rows.stickyNoteBacking.title',
     keywords: ['sticky', 'note', 'notes', 'transparency', 'transparent', 'opacity', 'opaque', 'solid', 'see-through', 'background', 'readability']
   },
   groupFrameBacking: {
-    title: 'Group frame background',
+    key: 'settings.appearance.rows.groupFrameBacking.title',
     keywords: ['group', 'frame', 'frames', 'transparency', 'transparent', 'opacity', 'opaque', 'solid', 'see-through', 'background']
   },
   markdownFont: {
-    title: 'Markdown font',
+    key: 'settings.appearance.rows.markdownFont.title',
     keywords: ['markdown', 'font', 'family', 'typeface', 'chat', 'preview', 'reading', 'output', 'text', 'serif', 'sans']
   },
   markdownFontSize: {
-    title: 'Markdown font size',
+    key: 'settings.appearance.rows.markdownFontSize.title',
     keywords: ['markdown', 'font', 'size', 'text', 'bigger', 'larger', 'smaller', 'chat', 'preview', 'reading', 'readability']
   },
-  accent: { title: 'Accent', keywords: ['accent', 'color', 'theme', 'appearance'] },
+  accent: {
+    key: 'settings.appearance.rows.accent.title',
+    keywords: ['accent', 'color', 'theme', 'appearance']
+  },
   wallpaper: {
-    title: 'Desktop wallpaper',
+    key: 'settings.appearance.rows.wallpaper.title',
     keywords: ['wallpaper', 'background', 'desktop', 'image', 'picture', 'gradient', 'sonoma', 'canvas', 'aerial', 'aerials', 'video', 'shuffle', 'moving']
   },
   windowTitle: {
-    title: 'Window title',
+    key: 'settings.appearance.rows.windowTitle.title',
     keywords: [
       'window',
       'title',
@@ -107,35 +111,34 @@ const ROWS = {
     ]
   },
   glassTint: {
-    title: 'Glass',
+    key: 'settings.appearance.rows.glassTint.title',
     keywords: ['glass', 'liquid', 'transparency', 'clear', 'tinted', 'frosted', 'blur', 'opacity']
   },
   glassBlurWhileMoving: {
-    title: 'Keep blur while moving',
+    key: 'settings.appearance.rows.glassBlurWhileMoving.title',
     keywords: ['glass', 'blur', 'pan', 'zoom', 'moving', 'gpu', 'performance', 'refraction']
   },
   canvasDots: {
-    title: 'Show grid dots',
+    key: 'settings.appearance.rows.canvasDots.title',
     keywords: ['grid', 'dots', 'dot', 'canvas', 'background', 'pattern']
   },
   resumeCard: {
-    title: 'Resume card',
+    key: 'settings.appearance.rows.resumeCard.title',
     keywords: ['resume', 'where you left off', 'breadcrumb', 'card', 'popup', 'trail']
   },
   menuItems: {
-    title: 'Node menu items',
+    key: 'settings.appearance.rows.menuItems.title',
     keywords: ['menu', 'context', 'right click', 'items', 'hide']
   },
   headerButtons: {
-    title: 'Terminal header buttons',
+    key: 'settings.appearance.rows.headerButtons.title',
     keywords: ['terminal', 'header', 'buttons', 'icons', 'hide', 'context', 'meter', 'model', 'usage']
   },
   reset: {
-    title: 'Reset appearance',
+    key: 'settings.appearance.rows.reset.title',
     keywords: ['reset', 'default', 'defaults', 'factory', 'restore', 'revert', 'undo']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 /** Settings store what is HIDDEN, the switches say "show" — so showing drops the id and hiding
  *  appends it. Filtering first also keeps a hand-edited list free of duplicates. */
@@ -240,7 +243,7 @@ function TabBarHeightRow(): React.JSX.Element {
     <FieldRow
       label="Tab bar height"
       htmlFor="tab-bar-height"
-      description={`Height of the top project tab bar, in pixels (${TABBAR_HEIGHT_MIN_PX}–${TABBAR_HEIGHT_MAX_PX}; default ${TABBAR_HEIGHT_PX}). The tabs follow it, and so do the window buttons where they sit inside the bar.`}
+      description="Height of the project tab strip at the top of the window, in pixels."
       control={
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <NumberField
@@ -291,15 +294,26 @@ function CanvasBackingRow({ kind }: { kind: 'stickyNoteBacking' | 'groupFrameBac
 
 /** Applies to the ⌘M output and chat views and the editor's Markdown preview (@shared/markdown-font). */
 function MarkdownFontRows(): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
   const family = useSettings((s) => s.settings.markdownFontFamily)
   const size = useSettings((s) => s.settings.markdownFontSize)
   const update = useSettings((s) => s.update)
   return (
     <>
-      <SearchableRow {...ROWS.markdownFont}>
+      <SearchableRow {...rows.markdownFont}>
         <FieldRow
           label="Markdown font"
-          description="Used by the ⌘M output and chat views and the editor's Markdown preview. Code inside them uses your terminal font."
+          description={t('settings.appearance.markdownFontDescription')}
           control={
             <FontPicker
               label="Markdown font"
@@ -312,7 +326,7 @@ function MarkdownFontRows(): React.JSX.Element {
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.markdownFontSize}>
+      <SearchableRow {...rows.markdownFontSize}>
         <FieldRow
           label="Markdown font size"
           description={`Body text size in the same views, in pixels (${MARKDOWN_FONT_SIZE_MIN}–${MARKDOWN_FONT_SIZE_MAX}; default ${DEFAULT_MARKDOWN_FONT_SIZE}). Headings and code scale with it.`}
@@ -499,6 +513,19 @@ function WallpaperPicker(): React.JSX.Element {
 }
 
 export function AppearanceSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const appTheme = useSettings((s) => s.settings.appTheme)
   const accent = useSettings((s) => s.settings.accent)
   const hiddenNodeMenuItems = useSettings((s) => s.settings.hiddenNodeMenuItems)
@@ -531,11 +558,11 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
   return (
     <SettingsSection
       id="appearance"
-      title="Appearance"
+      title={t('settings.appearance.title')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.appTheme}>
+      <SearchableRow {...rows.appTheme}>
         <FieldRow
           label="Appearance"
           description={
@@ -560,7 +587,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
         />
       </SearchableRow>
       {isLiquidGlass(appTheme) && (
-        <SearchableRow {...ROWS.glassTint}>
+        <SearchableRow {...rows.glassTint}>
           <FieldRow
             label="Glass"
             description={
@@ -583,7 +610,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
         </SearchableRow>
       )}
       {isLiquidGlass(appTheme) && (
-        <SearchableRow {...ROWS.glassBlurWhileMoving}>
+        <SearchableRow {...rows.glassBlurWhileMoving}>
           <FieldRow
             label="Keep blur while moving"
             description="Uses more GPU while panning and zooming."
@@ -597,20 +624,20 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
           />
         </SearchableRow>
       )}
-      <SearchableRow {...ROWS.uiScale}>
+      <SearchableRow {...rows.uiScale}>
         <UiScaleRow />
       </SearchableRow>
-      <SearchableRow {...ROWS.tabBarHeight}>
+      <SearchableRow {...rows.tabBarHeight}>
         <TabBarHeightRow />
       </SearchableRow>
-      <SearchableRow {...ROWS.stickyNoteBacking}>
+      <SearchableRow {...rows.stickyNoteBacking}>
         <CanvasBackingRow kind="stickyNoteBacking" />
       </SearchableRow>
-      <SearchableRow {...ROWS.groupFrameBacking}>
+      <SearchableRow {...rows.groupFrameBacking}>
         <CanvasBackingRow kind="groupFrameBacking" />
       </SearchableRow>
       <MarkdownFontRows />
-      <SearchableRow {...ROWS.accent}>
+      <SearchableRow {...rows.accent}>
         <div className="flex items-center justify-between gap-4 py-2.5">
           <span className="text-[13px] text-text">Accent</span>
           <div className="flex flex-wrap gap-2">
@@ -636,10 +663,10 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
           </div>
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.wallpaper}>
+      <SearchableRow {...rows.wallpaper}>
         <WallpaperPicker />
       </SearchableRow>
-      <SearchableRow {...ROWS.windowTitle}>
+      <SearchableRow {...rows.windowTitle}>
         <FieldRow
           label="Show active session in window title"
           description={
@@ -657,7 +684,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.canvasDots}>
+      <SearchableRow {...rows.canvasDots}>
         <FieldRow
           label="Show grid dots"
           description="Draw the dot grid on the canvas. Only the dots: snapping and align to grid work the same either way."
@@ -670,7 +697,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.resumeCard}>
+      <SearchableRow {...rows.resumeCard}>
         <FieldRow
           label="Resume card"
           description='Offer a "Resume where you left off" card when a project is activated, listing your last few node landings. Cmd+[ / Cmd+] and the Dock arrows walk the same trail either way.'
@@ -685,7 +712,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
       </SearchableRow>
       {/* One wrapper element per row: the section body puts a divider and its own padding around
           every direct child, so a heading + caption + list must arrive as a single node. */}
-      <SearchableRow {...ROWS.menuItems}>
+      <SearchableRow {...rows.menuItems}>
         <div>
           <h4 className="text-[13px] font-medium text-text">Node menu items</h4>
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
@@ -701,7 +728,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
           />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.headerButtons}>
+      <SearchableRow {...rows.headerButtons}>
         <div>
           <h4 className="text-[13px] font-medium text-text">Terminal header buttons</h4>
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
@@ -718,7 +745,7 @@ export function AppearanceSection({ isActive }: { isActive: boolean }): React.JS
           />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.reset}>
+      <SearchableRow {...rows.reset}>
         <SectionReset
           keys={APPEARANCE_RESET_KEYS}
           label="Reset appearance"

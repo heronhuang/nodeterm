@@ -53,7 +53,7 @@ export function PrivacySection({ isActive }: { isActive: boolean }): React.JSX.E
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={rows.telemetry}>
+      <SearchableRow {...rows.telemetry}>
         <FieldRow
           label={t('settings.privacy.telemetryLabel')}
           description={telemetryDescription}
@@ -67,7 +67,7 @@ export function PrivacySection({ isActive }: { isActive: boolean }): React.JSX.E
         />
       </SearchableRow>
       {dnt ? (
-        <SearchableRow entry={consentRow}>
+        <SearchableRow {...consentRow}>
           <FieldRow
             label={t('settings.privacy.licenseConsentLabel')}
             description={

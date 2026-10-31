@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useSettings } from '../../../state/settings'
 import { removeCustomAgent } from '../../../state/agentAvailability'
 import type { CustomAgent } from '@shared/types'
@@ -18,13 +19,12 @@ import { uuid } from '@renderer/lib/uuid'
 import { assembleLaunchCommand } from '@shared/agents/launch'
 import { agentEnvSnapshot } from '@renderer/lib/agentEnv'
 
-const ROWS = {
+const ROW_DEFS = {
   custom: {
-    title: 'Custom agents',
+    key: 'settings.customAgents.rows.custom.title',
     keywords: ['custom', 'agent', 'cli', 'byo', 'aider', 'proxy', 'env', 'base url', 'api key']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 const INJECTION_MODES: PromptInjectionMode[] = [
   'argv',
@@ -34,6 +34,19 @@ const INJECTION_MODES: PromptInjectionMode[] = [
 ]
 
 export function CustomAgentsSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const customAgents = useSettings((s) => s.settings.customAgents)
   const update = useSettings((s) => s.update)
   const patchAgent = (id: string, patch: Partial<CustomAgent>) =>
@@ -58,12 +71,12 @@ export function CustomAgentsSection({ isActive }: { isActive: boolean }): React.
   return (
     <SettingsSection
       id="custom-agents"
-      title="Custom agents"
-      description="Bring your own agent CLI, or wrap a built-in harness (e.g. Claude) to redirect inference to your own proxy. Env values support ${env:VAR} and ${env:VAR:fallback} expansion against your shell environment."
+      title={t('settings.customAgents.title')}
+      description={t('settings.customAgents.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.custom}>
+      <SearchableRow {...rows.custom}>
         <div className="space-y-4">
           {customAgents.map((agent) => (
             <AgentCard key={agent.id} agent={agent} onPatch={patchAgent} onRemove={removeAgent} />

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useSettings } from '../../../state/settings'
 import { useProjects } from '../../../state/projects'
 import { useBrowserLease, drivingNodeIds } from '../../../state/browserLease'
@@ -61,17 +62,17 @@ import { SearchableRow } from '../SearchableRow'
 import { FieldRow } from '../FieldRow'
 import { IntegrationSettings } from '../IntegrationConsent'
 
-const ROWS = {
+const ROW_DEFS = {
   integrations: {
-    title: 'Hooks & skills (integrations)',
+    key: 'settings.agents.rows.integrations.title',
     keywords: ['agent integrations', 'integration', 'remove', 'uninstall', 'consent', 'hook', 'hooks', 'skill', 'skills', 'install', 'opt out', 'decline', 'clean up', 'ssh', 'host', 'agents.md', 'gemini.md']
   },
   agents: {
-    title: 'Show in Add menus',
+    key: 'settings.agents.rows.agents.title',
     keywords: ['agent', 'claude', 'codex', 'gemini', 'cursor', 'enable', 'disable', 'show', 'hide', 'menu', 'default']
   },
   launchCommands: {
-    title: 'Launch commands',
+    key: 'settings.agents.rows.launchCommands.title',
     keywords: [
       'launch',
       'command',
@@ -91,7 +92,7 @@ const ROWS = {
     ]
   },
   vanillaLaunch: {
-    title: 'Launch mode',
+    key: 'settings.agents.rows.vanillaLaunch.title',
     keywords: [
       'launch mode',
       'subscription',
@@ -110,11 +111,11 @@ const ROWS = {
     ]
   },
   messagingDefault: {
-    title: 'Agent messaging in projects that do not set it',
+    key: 'settings.agents.rows.messagingDefault.title',
     keywords: ['agent', 'message', 'messaging', 'default', 'project', 'send', 'reply', 'orchestration']
   },
   permissionMode: {
-    title: 'Permission mode',
+    key: 'settings.agents.rows.permissionMode.title',
     keywords: [
       'permission',
       'mode',
@@ -135,11 +136,11 @@ const ROWS = {
     ]
   },
   hookReplyApprovals: {
-    title: 'One-click approvals',
+    key: 'settings.agents.rows.hookReplyApprovals.title',
     keywords: ['approve', 'deny', 'approval', 'permission', 'hook', 'phone', 'canvas', 'one click', 'claude']
   },
   autoHideFinishedSubagentCards: {
-    title: 'Hide finished subagent cards',
+    key: 'settings.agents.rows.autoHideFinishedSubagentCards.title',
     keywords: [
       'subagent',
       'card',
@@ -154,7 +155,7 @@ const ROWS = {
     ]
   },
   controlConfirm: {
-    title: 'Destructive canvas-control confirmations',
+    key: 'settings.agents.rows.controlConfirm.title',
     keywords: [
       'confirm',
       'confirmation',
@@ -173,7 +174,7 @@ const ROWS = {
     ]
   },
   nodeIdentity: {
-    title: 'Verified node identity',
+    key: 'settings.agents.rows.nodeIdentity.title',
     keywords: [
       'identity',
       'verify',
@@ -189,7 +190,7 @@ const ROWS = {
     ]
   },
   browserControl: {
-    title: 'Browser control',
+    key: 'settings.agents.rows.browserControl.title',
     keywords: [
       'browser',
       'control',
@@ -204,7 +205,7 @@ const ROWS = {
     ]
   },
   hibernation: {
-    title: 'Hibernate idle agents',
+    key: 'settings.agents.rows.hibernation.title',
     keywords: [
       'hibernate',
       'eco',
@@ -222,7 +223,7 @@ const ROWS = {
       'reopen'
     ]
   }
-}
+} as const
 /**
  * The per-project capability rows are GENERATED from PROJECT_CAPABILITIES — search registry
  * included. A hand-written row list that happens to match the union is the documented
@@ -240,10 +241,6 @@ const CAPABILITY_ROWS = PROJECT_CAPABILITIES.map((cap) => ({
   ]
 }))
 const CAPABILITY_CHOICES: readonly CapabilityChoice[] = ['default', 'on', 'off']
-const ENTRIES = [
-  ...Object.values(ROWS),
-  ...CAPABILITY_ROWS.map(({ title, keywords }) => ({ title, keywords }))
-]
 
 /**
  * Every fact in this sentence is DERIVED from the per-agent mapping (`@shared/agents/approval-mode`):
@@ -339,6 +336,25 @@ function identityValue(choice: IdentityChoice): boolean | undefined {
 }
 
 export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(
+    () => [
+      ...Object.values(rows),
+      ...CAPABILITY_ROWS.map(({ title, keywords }) => ({ title, keywords }))
+    ],
+    [rows]
+  )
+
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
   // Per-project capability rows act on the ACTIVE project. Subscribed (not getState()) so an
@@ -412,7 +428,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
     nodeTitle: nodeTitleById(nodeId),
     ownerTitle: nodeTitleById(browserLeaseEntries[nodeId].ownerNodeId)
   }))
-  const rows: { id: AgentId; label: string; isBuiltin: boolean }[] = [
+  const agentRows: { id: AgentId; label: string; isBuiltin: boolean }[] = [
     ...BUILTIN_AGENT_IDS.map((id) => ({ id, label: AGENT_CONFIG[id].label, isBuiltin: true })),
     ...settings.customAgents.map((c) => ({ id: c.id, label: c.label || c.id, isBuiltin: false }))
   ]
@@ -454,21 +470,21 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
   return (
     <SettingsSection
       id="agents"
-      title="Agents"
+      title={t('settings.agents.title')}
       description={agentChip
         ? `Choose which agents the Add menus show and the default (${agentChip}), and whether nodeterm installs its hooks and skills into each agent.`
         : 'Choose which agents the Add menus show and the default, and whether nodeterm installs its hooks and skills into each agent.'}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.agents}>
+      <SearchableRow {...rows.agents}>
         <FieldRow
           label="Show in Add menus"
-          description="Which agents appear in the Add menus, the Dock and ⌘K, and which one “New agent” opens. Hiding one only changes the menus — nothing is installed or removed."
+          description={t('settings.agents.description')}
           control={null}
         />
         <div className="space-y-2">
-          {rows.map((row) => {
+          {agentRows.map((row) => {
             const enabled = isAgentEnabled(settings, row.id)
             const isDefault = settings.defaultAgent === row.id
             return (
@@ -498,7 +514,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           })}
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.integrations}>
+      <SearchableRow {...rows.integrations}>
         <FieldRow
           label="Hooks & skills (integrations)"
           description={
@@ -510,7 +526,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
         />
         <IntegrationSettings />
       </SearchableRow>
-      <SearchableRow {...ROWS.launchCommands}>
+      <SearchableRow {...rows.launchCommands}>
         <FieldRow
           label="Launch commands"
           description={
@@ -555,7 +571,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           ))}
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.vanillaLaunch}>
+      <SearchableRow {...rows.vanillaLaunch}>
         <FieldRow
           label="Launch mode"
           description="The default provider behavior for a fresh canvas agent session. “Gateway (CLI default)” injects the model gateway but lets the CLI pick its own default model. “Gateway (default model)” additionally launches on the default model chosen in Settings → Model gateway. “Subscription” strips the gateway + inherited provider env so the agent runs against its OWN provider (Claude’s subscription, Copilot’s GitHub routing) — the global counterpart of the per-node “Restart on subscription” action. The managed-account config dir is kept, so account isolation survives."
@@ -578,7 +594,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.permissionMode}>
+      <SearchableRow {...rows.permissionMode}>
         <FieldRow
           label="Permission mode"
           note={autoNote}
@@ -602,7 +618,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.hookReplyApprovals}>
+      <SearchableRow {...rows.hookReplyApprovals}>
         <FieldRow
           label="One-click approvals"
           description="Phone/canvas Approve & Deny answer Claude's permission hook directly; the interactive prompt appears after 45s if unanswered. Claude terminal sessions only."
@@ -615,7 +631,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.autoHideFinishedSubagentCards}>
+      <SearchableRow {...rows.autoHideFinishedSubagentCards}>
         <FieldRow
           label="Hide finished subagent cards"
           description="Remove a subagent's card from the canvas as soon as that subagent finishes, instead of keeping it until the agent's next turn. Cards for subagents that are still running are never removed."
@@ -628,7 +644,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.controlConfirm}>
+      <SearchableRow {...rows.controlConfirm}>
         <div className="space-y-4">
           {waivableVerbs.map((v) => {
             const copy =
@@ -723,10 +739,10 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.nodeIdentity}>
+      <SearchableRow {...rows.nodeIdentity}>
         <FieldRow
           label="Require verified node identity for canvas control"
-          description={`Commands that open, write to or close nodes — and that read a linked node's context — must present the identity NodeTerm issued to the node they say they came from. Automatic starts refusing the ones that can't from ${NODE_IDENTITY_STRICT_DATE}; until then they still run and the reply tells you to restart that node. Set this to "Not required" if an upgrade left a running session unable to drive the canvas: it restores the behaviour from before this feature, past ${NODE_IDENTITY_STRICT_DATE} as well. Browser control is the one exception — it always requires verified identity and this setting never releases it. An identity that is actually forged is refused whatever you pick here.`}
+          description={t('settings.agents.description')}
           control={
             <Select
               aria-label="Require verified node identity"
@@ -744,7 +760,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.browserControl}>
+      <SearchableRow {...rows.browserControl}>
         <FieldRow
           label="Browser control"
           description="Browser nodes an agent is driving right now, across every open project. Stop ends it immediately — the debugger is detached and the agent is told you stopped it, so it reports that instead of retrying. One place to stop it, so you never have to hunt from node to node."
@@ -775,14 +791,14 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           )}
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.messagingDefault}>
+      <SearchableRow {...rows.messagingDefault}>
         <FieldRow
-          label={ROWS.messagingDefault.title}
+          label={rows.messagingDefault.title}
           description="What agent messaging does in a project whose settings do not say. It is stored on this computer only, never in a project file: a project set to on or off keeps its own setting, and a project file that turns messaging on still asks you to confirm it before it takes effect here."
           control={
             <Switch
               checked={settings.agentMessagingDefault === true}
-              ariaLabel={ROWS.messagingDefault.title}
+              ariaLabel={rows.messagingDefault.title}
               onChange={(on) => update({ agentMessagingDefault: on })}
             />
           }
@@ -860,7 +876,7 @@ export function AgentsSection({ isActive }: { isActive: boolean }): React.JSX.El
           </SearchableRow>
         )
       )}
-      <SearchableRow {...ROWS.hibernation}>
+      <SearchableRow {...rows.hibernation}>
         <FieldRow
           label="Hibernate idle agents"
           description="Exit an agent CLI that has been idle and offscreen this long, freeing its memory; the conversation resumes automatically when you view the node. While this is on, the terminal view of an offscreen agent is kept until the agent hibernates, so the bigger saving happens first. Scheduled, /loop and /cron agents — and sessions with subagents still running — are never touched."

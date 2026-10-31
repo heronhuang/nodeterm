@@ -58,7 +58,7 @@ export function SignInSection({ isActive }: { isActive: boolean }): React.JSX.El
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={rows.signOut}>
+      <SearchableRow {...rows.signOut}>
         <FieldRow
           label={t('settings.signIn.signOutLabel')}
           description={t('settings.signIn.signOutDescription')}
@@ -69,7 +69,7 @@ export function SignInSection({ isActive }: { isActive: boolean }): React.JSX.El
           }
         />
       </SearchableRow>
-      <SearchableRow entry={rows.signOutEverywhere}>
+      <SearchableRow {...rows.signOutEverywhere}>
         <FieldRow
           label={t('settings.signIn.signOutEverywhereLabel')}
           description={t('settings.signIn.signOutEverywhereDescription')}

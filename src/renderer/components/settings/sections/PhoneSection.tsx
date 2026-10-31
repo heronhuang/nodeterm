@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo, useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import type { PairedDevice } from '@shared/types'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -19,30 +20,27 @@ import { thisMachine } from '../../../lib/machineName'
 import { isBrowserRuntime } from '@renderer/bridge/runtime'
 import { PushWebhookPanel } from './PushWebhookPanel'
 
-const ROWS = {
+const ROW_DEFS = {
   remote: {
-    title: 'Remote access from your phone',
+    key: 'settings.phone.rows.remote.title',
     keywords: ['phone', 'remote', 'anywhere', 'relay', 'encrypted', 'access', 'cellular']
   },
   pair: {
-    title: 'Pair phone',
+    key: 'settings.phone.rows.pair.title',
     keywords: ['phone', 'pair', 'qr', 'ios', 'android', 'mobile', 'ssh', 'scan', 'nodeterm']
   },
   devices: {
-    title: 'Paired devices',
+    key: 'settings.phone.rows.devices.title',
     keywords: ['phone', 'device', 'devices', 'paired', 'revoke', 'ios', 'iphone', 'android', 'remove']
   },
   webhook: {
-    title: 'Push webhook',
+    key: 'settings.phone.rows.webhook.title',
     keywords: ['webhook', 'push', 'notification', 'notify', 'ci', 'build', 'script', 'curl', 'token']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 // The webhook needs this machine's relay host key, which a browser tab on the Server Edition does
 // not have (its bridge answers E_UNSUPPORTED) — so the row and its search entry are desktop-only.
 // Asked at render, not at import: the boot switch marks the browser runtime after modules load.
-const BROWSER_ENTRIES = ENTRIES.filter((r) => r !== ROWS.webhook)
-
 /** Format an epoch-ms pairing time as a short local date. */
 function formatPairedAt(ms: number): string {
   if (!ms) return ''
@@ -58,6 +56,23 @@ function formatPairedAt(ms: number): string {
 const sshServer = sshServerCopy(hostOsFromNavigator())
 
 export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+  const browserEntries = useMemo(
+    () => entries.filter((r) => r !== rows.webhook),
+    [entries, rows.webhook]
+  )
+
   const [devices, setDevices] = useState<PairedDevice[]>([])
   const [pendingRevoke, setPendingRevoke] = useState<PairedDevice | null>(null)
   // What the last revoke has to say, and whether it is a WARNING or a receipt. A successful
@@ -179,12 +194,12 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
   return (
     <SettingsSection
       id="phone"
-      title="Phone"
-      description="Pair the nodeterm mobile app so it can connect to this machine over your local network — no terminal commands needed."
+      title={t('settings.phone.title')}
+      description={t('settings.phone.description')}
       isActive={isActive}
-      searchEntries={showWebhook ? ENTRIES : BROWSER_ENTRIES}
+      searchEntries={showWebhook ? entries : browserEntries}
     >
-      <SearchableRow {...ROWS.remote}>
+      <SearchableRow {...rows.remote}>
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -205,7 +220,7 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
         </div>
       </SearchableRow>
 
-      <SearchableRow {...ROWS.pair}>
+      <SearchableRow {...rows.pair}>
         <div className="space-y-4">
           <h4 className="text-[13px] font-medium text-text">Pair phone</h4>
           <p className="text-sm text-muted">
@@ -370,7 +385,7 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
         </div>
       </SearchableRow>
 
-      <SearchableRow {...ROWS.devices}>
+      <SearchableRow {...rows.devices}>
         <div className="space-y-3">
           <h4 className="text-[13px] font-medium text-text">Paired devices</h4>
           {devices.length === 0 ? (
@@ -407,7 +422,7 @@ export function PhoneSection({ isActive }: { isActive: boolean }): React.JSX.Ele
       </SearchableRow>
 
       {showWebhook ? (
-        <SearchableRow {...ROWS.webhook}>
+        <SearchableRow {...rows.webhook}>
           <PushWebhookPanel />
         </SearchableRow>
       ) : null}

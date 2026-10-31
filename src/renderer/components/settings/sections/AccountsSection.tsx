@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useMemo, Fragment, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { AgentIcon } from '../../../lib/agentIcons'
 import type { ClaudeAccount, ClaudeSkillShareResult } from '@shared/types'
 import type { CodexAccount } from '@shared/codex-account'
@@ -41,9 +42,9 @@ import { Switch } from '@renderer/ui/Switch'
 import { cn } from '@renderer/ui/cn'
 import { thisMachine, thisMachineCap } from '../../../lib/machineName'
 
-const ROWS = {
+const ROW_DEFS = {
   accounts: {
-    title: 'Claude & Codex accounts',
+    key: 'settings.accounts.rows.accounts.title',
     keywords: [
       'account',
       'claude',
@@ -63,8 +64,7 @@ const ROWS = {
       'remote'
     ]
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 /** The bridge's "this shell registers no such handler" rejection (renderer/bridge/stubs.ts). It is
  *  a fact about the SURFACE, not about this account — worth a different sentence than a failure. */
@@ -436,6 +436,19 @@ function countNodesUsing(accountId: string): number {
 }
 
 export function AccountsSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const accounts = useSettings((s) => s.settings.claudeAccounts)
   const codexAccounts = useSettings((s) => s.settings.codexAccounts)
   const systemLabelSetting = useSettings((s) => s.settings.systemAccountLabel)
@@ -1222,11 +1235,11 @@ export function AccountsSection({ isActive }: { isActive: boolean }): React.JSX.
     <SettingsSection
       id="accounts"
       title="Accounts"
-      description="Use more than one Claude or Codex login side by side. Each account keeps its own login, settings and history. Pick one when you open an agent; move a running agent to another from its right-click menu."
+      description={t('settings.accounts.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.accounts}>
+      <SearchableRow {...rows.accounts}>
         <div className="space-y-4">
           {versionWarning ? (
             <div className="flex items-start justify-between gap-3 rounded-md border border-[color:var(--danger)]/40 bg-[color:var(--danger)]/10 px-3 py-2 text-[13px] leading-relaxed text-[color:var(--danger)]">

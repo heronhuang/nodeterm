@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useSshServers } from '../../../state/sshServers'
 import type { SshServer } from '@shared/ssh'
 import { SettingsSection } from '../SettingsSection'
@@ -12,27 +13,39 @@ import { useSettings } from '../../../state/settings'
 import { isWindowsPlatform } from '@shared/platform-utils'
 import { isBrowserRuntime } from '../../../bridge/runtime'
 
-const ROWS = {
+const ROW_DEFS = {
   servers: {
-    title: 'Saved SSH servers',
+    key: 'settings.ssh.rows.servers.title',
     keywords: [
       'ssh', 'remote', 'server', 'host', 'connect', 'identity', 'key',
       'test', 'folder', 'directory', 'cwd', 'working directory'
     ]
   },
   windowsAgent: {
-    title: 'Keep unlocked keys in the Windows ssh-agent',
+    key: 'settings.ssh.rows.windowsAgent.title',
     keywords: ['ssh-agent', 'agent', 'passphrase', 'key', 'windows', 'AddKeysToAgent', 'ssh-add', 'prompt']
   }
-}
+} as const
 /** The native SSH transport (and with it this switch) is the Windows desktop's; a browser tab's
  *  SSH is the server's business, whatever OS the viewer runs. */
 function showsWindowsAgentRow(): boolean {
   return typeof navigator !== 'undefined' && !isBrowserRuntime() && isWindowsPlatform()
 }
-const ENTRIES = showsWindowsAgentRow() ? Object.values(ROWS) : [ROWS.servers]
 
 export function SshSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const sshServers = useSshServers((s) => s.servers)
   const agentAddKeys = useSettings((s) => s.settings.windowsSshAgentAddKeys)
   const updateSettings = useSettings((s) => s.update)
@@ -122,12 +135,12 @@ export function SshSection({ isActive }: { isActive: boolean }): React.JSX.Eleme
   return (
     <SettingsSection
       id="ssh"
-      title="Remote (SSH)"
-      description="Saved SSH servers appear under “New remote”, and can host nodes on a local canvas. Each also becomes a machine in Accounts, where its own isolated Codex logins live. Opening remote terminals over SSH is free."
+      title={t('settings.ssh.title')}
+      description={t('settings.ssh.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.servers}>
+      <SearchableRow {...rows.servers}>
         <div className="space-y-4">
           {sshServers.map((server) => (
             <div
@@ -308,7 +321,7 @@ export function SshSection({ isActive }: { isActive: boolean }): React.JSX.Eleme
       </SearchableRow>
 
       {showsWindowsAgentRow() ? (
-        <SearchableRow {...ROWS.windowsAgent}>
+        <SearchableRow {...rows.windowsAgent}>
           <FieldRow
             label="Keep unlocked keys in the Windows ssh-agent"
             description="Off by default. On, a key you unlock with its passphrase for an SSH project is also added to the Windows OpenSSH Authentication Agent service (when it is running), so later connections — and your own ssh — stop asking. Windows stores the key, encrypted for your account, until you remove it (ssh-add -d, or ssh-add -D for all); it stays after nodeterm quits and after a restart. Hosts whose ~/.ssh/config says AddKeysToAgent yes get this without the switch."

@@ -50,7 +50,7 @@ export function CommitSection({ isActive }: { isActive: boolean }): React.JSX.El
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow entry={rows.autoFetch}>
+      <SearchableRow {...rows.autoFetch}>
         <FieldRow
           label={t('settings.commit.autoFetchLabel')}
           description={t('settings.commit.autoFetchDescription')}
@@ -63,7 +63,7 @@ export function CommitSection({ isActive }: { isActive: boolean }): React.JSX.El
           }
         />
       </SearchableRow>
-      <SearchableRow entry={rows.agent}>
+      <SearchableRow {...rows.agent}>
         <FieldRow
           label={t('settings.commit.agentLabel')}
           control={
@@ -81,7 +81,7 @@ export function CommitSection({ isActive }: { isActive: boolean }): React.JSX.El
         />
       </SearchableRow>
       {settings.commitAgent === 'custom' && (
-        <SearchableRow entry={rows.command}>
+        <SearchableRow {...rows.command}>
           <FieldRow
             label={t('settings.commit.commandLabel')}
             description={t('settings.commit.commandDescription')}
@@ -96,7 +96,7 @@ export function CommitSection({ isActive }: { isActive: boolean }): React.JSX.El
           />
         </SearchableRow>
       )}
-      <SearchableRow entry={rows.extra}>
+      <SearchableRow {...rows.extra}>
         <div className="py-2.5">
           <label className="block text-[13px] text-text">{t('settings.commit.extraLabel')}</label>
           <textarea

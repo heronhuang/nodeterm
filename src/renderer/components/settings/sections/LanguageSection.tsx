@@ -32,14 +32,17 @@ export function LanguageSection({ isActive }: { isActive: boolean }): React.JSX.
       isActive={isActive}
       searchEntries={[row]}
     >
-      <SearchableRow entry={row}>
-        <FieldRow label={t('settings.language.label')}>
-          <SegmentedPill
-            value={uiLanguage}
-            options={choices}
-            onChange={(v) => update({ uiLanguage: v as UiLanguage })}
-          />
-        </FieldRow>
+      <SearchableRow {...row}>
+        <FieldRow
+          label={t('settings.language.label')}
+          control={
+            <SegmentedPill
+              value={uiLanguage}
+              options={choices}
+              onChange={(v) => update({ uiLanguage: v as UiLanguage })}
+            />
+          }
+        />
       </SearchableRow>
     </SettingsSection>
   )
