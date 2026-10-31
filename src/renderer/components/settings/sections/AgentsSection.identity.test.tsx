@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { NODE_IDENTITY_STRICT_DATE } from '@shared/node-identity'
+import { createTranslator } from '@shared/i18n/translate'
 import { useSettings } from '../../../state/settings'
 import { AgentsSection } from './AgentsSection'
 
@@ -90,12 +91,13 @@ describe('the node-identity escape hatch in Settings', () => {
   })
 
   it('tells the user what it does, in their terms, and names the cutoff date', () => {
+    const t = createTranslator('en')
     const text = host.textContent ?? ''
     expect(text).toContain('Require verified node identity for canvas control')
     // The date is imported from @shared, never typed into the copy: a Settings page promising a
     // different cutoff from the one the hook server enforces is worse than no copy at all.
     expect(text).toContain(NODE_IDENTITY_STRICT_DATE)
-    // …and it says what turning it off buys, since that is the sentence a stranded user is hunting.
-    expect(text).toMatch(/restores the behaviour from before this feature/)
+    // Row description comes from the English catalog under Vitest's en default (same as the UI).
+    expect(text).toContain(t('settings.agents.description'))
   })
 })
