@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useEntitlement } from '../../../state/entitlement'
 import { useTeamAccess } from '../../../state/teamAccess'
 import { listSeats, usedCount, type SeatEntry } from '../../../state/teamAccessCore'
@@ -11,13 +12,12 @@ import { thisMachine } from '@renderer/lib/machineName'
 import { CopyButton } from '@renderer/ui/CopyButton'
 import { Input } from '@renderer/ui/Input'
 
-const ROWS = {
+const ROW_DEFS = {
   team: {
-    title: 'Team Access',
+    key: 'settings.teamAccess.rows.team.title',
     keywords: ['team', 'seat', 'invite', 'share', 'collaborate', 'remote']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 function SeatRow({ seat }: { seat: SeatEntry }): React.JSX.Element {
   const label = seat.email?.trim() || 'Teammate'
@@ -41,6 +41,19 @@ export function TeamAccessSection({
   isActive: boolean
   onClose?: () => void
 }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const ent = useEntitlement()
   const seats = useEntitlement((s) => s.seats)
   // Select the table itself and derive from it. `listSeats` builds a NEW array on every call, and
@@ -85,12 +98,12 @@ export function TeamAccessSection({
   return (
     <SettingsSection
       id="team-access"
-      title="Team seats"
-      description={`Share ${thisMachine()} with your team — Pro includes 3 seats, extra seats $5/seat/month.`}
+      title={t('settings.teamAccess.title')}
+      description={t('settings.teamAccess.description', { machine: thisMachine() })}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.team}>
+      <SearchableRow {...rows.team}>
         {!view.gated ? (
           <div className="space-y-5">
             {/* Seat counter */}

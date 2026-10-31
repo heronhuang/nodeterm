@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import type {
   GitHubAuthProvider,
   GitHubAuthStatus,
@@ -37,40 +38,36 @@ import {
   githubUnreachableSentence
 } from '../../../lib/githubSyncStatus'
 
-const ROWS = {
+const ROW_DEFS = {
   enable: {
-    title: 'GitHub Issues',
-    description: 'Show repository issues on this project Kanban board.',
+    key: 'settings.githubIssues.rows.enable.title',
     keywords: ['github', 'issues', 'kanban', 'sync', 'repository']
   },
   repository: {
-    title: 'Repository',
+    key: 'settings.githubIssues.rows.repository.title',
     keywords: ['github', 'origin', 'owner', 'repository', 'override']
   },
   authentication: {
-    title: 'Authentication',
+    key: 'settings.githubIssues.rows.authentication.title',
     keywords: ['github', 'token', 'personal access token', 'cli', 'authentication']
   },
   mapping: {
-    title: 'Column labels',
+    key: 'settings.githubIssues.rows.mapping.title',
     keywords: ['github', 'labels', 'columns', 'mapping', 'workflow', 'completion']
   },
   pullAutoMove: {
-    title: 'Move merged session cards',
-    description: 'When every pull request linked to a session card has merged, move the card to this column.',
+    key: 'settings.githubIssues.rows.pullAutoMove.title',
     keywords: ['github', 'pull request', 'merged', 'move', 'automation', 'worktree', 'session']
   },
   dispatch: {
-    title: 'Dispatch agents',
-    description: 'When you move an issue card into this column, an agent session starts on it by itself — the same run as “Start with agent”.',
+    key: 'settings.githubIssues.rows.dispatch.title',
     keywords: ['github', 'dispatch', 'agent', 'automation', 'queue', 'start with agent', 'issue', 'pause']
   },
   data: {
-    title: 'Sync and local data',
+    key: 'settings.githubIssues.rows.data.title',
     keywords: ['github', 'refresh', 'cache', 'revoke', 'labels']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 /** The host reads the GitHub config from the project FILE, which a local edit reaches only through
  *  the debounced autosave — so a status read right after an edit would describe the old mapping
@@ -120,6 +117,19 @@ function messageFor(error: unknown): string {
 }
 
 export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const projectId = useProjects((state) => state.activeProjectId)
   const project = useProjects((state) => state.projects.find((item) => item.id === state.activeProjectId))
   const setProjectKanban = useProjects((state) => state.setProjectKanban)
@@ -349,7 +359,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
 
   if (!projectId || !project) {
     return (
-      <SettingsSection id="github-issues" title="GitHub Issues" isActive={isActive} searchEntries={ENTRIES}>
+      <SettingsSection id="github-issues" title={t('settings.githubIssues.title')} isActive={isActive} searchEntries={entries}>
         <p className="text-sm text-muted">Open a project to configure GitHub Issues.</p>
       </SettingsSection>
     )
@@ -357,7 +367,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
 
   if (project.remote) {
     return (
-      <SettingsSection id="github-issues" title="GitHub Issues" isActive={isActive} searchEntries={ENTRIES}>
+      <SettingsSection id="github-issues" title="GitHub Issues" isActive={isActive} searchEntries={entries}>
         <p className="text-sm text-muted">Configure GitHub Issues on the computer hosting this project.</p>
       </SettingsSection>
     )
@@ -365,7 +375,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
 
   if (!board) {
     return (
-      <SettingsSection id="github-issues" title="GitHub Issues" isActive={isActive} searchEntries={ENTRIES}>
+      <SettingsSection id="github-issues" title="GitHub Issues" isActive={isActive} searchEntries={entries}>
         <p className="text-sm text-muted">Create this project’s Kanban board before enabling GitHub Issues.</p>
       </SettingsSection>
     )
@@ -408,7 +418,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
   const tokenFieldRow = (
     <FieldRow
       label="Personal access token"
-      description="Use a fine-grained token with repository metadata read access and issues read and write access. The token is write only in this screen."
+      description={t('settings.githubIssues.description')}
       note={view?.auth.storage === 'restricted-file'
         ? 'Encrypted key storage is unavailable. The token is protected in a mode 0600 local file.'
         : undefined}
@@ -480,9 +490,9 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
       title="GitHub Issues"
       description="Show this project’s GitHub issues alongside sessions and keep column movement in sync with exact issue labels."
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.enable}>
+      <SearchableRow {...rows.enable}>
         <FieldRow
           label="Include GitHub issues"
           description="GitHub remains the source of truth. Issues are cached privately on this computer and are not copied into the project file."
@@ -498,7 +508,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
 
       {enabled && (
         <>
-          <SearchableRow {...ROWS.repository}>
+          <SearchableRow {...rows.repository}>
             <div className="space-y-3">
               <FieldRow
                 label="Repository"
@@ -563,7 +573,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
             </div>
           </SearchableRow>
 
-          <SearchableRow {...ROWS.authentication}>
+          <SearchableRow {...rows.authentication}>
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 {!auth ? (
@@ -652,7 +662,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
             </div>
           </SearchableRow>
 
-          <SearchableRow {...ROWS.mapping}>
+          <SearchableRow {...rows.mapping}>
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium text-text">Column labels</h3>
@@ -712,11 +722,11 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
             </div>
           </SearchableRow>
 
-          <SearchableRow {...ROWS.pullAutoMove}>
+          <SearchableRow {...rows.pullAutoMove}>
             <FieldRow
-              label={ROWS.pullAutoMove.title}
+              label={rows.pullAutoMove.title}
               htmlFor="github-pull-auto-move"
-              description={`${ROWS.pullAutoMove.description} Session cards move — those in a worktree group, and those started on an issue — never GitHub issue cards, which GitHub closes itself. A card moves only if this machine saw it waiting on the pull request while it was open, only for merges seen after you turn this on, and never while one of its pull requests closed without merging. This setting is for this machine only.`}
+              description={t('settings.githubIssues.description')}
               control={
                 <Select
                   id="github-pull-auto-move"
@@ -732,12 +742,12 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
             />
           </SearchableRow>
 
-          <SearchableRow {...ROWS.dispatch}>
+          <SearchableRow {...rows.dispatch}>
             <div className="space-y-3">
               <FieldRow
-                label={ROWS.dispatch.title}
+                label={rows.dispatch.title}
                 htmlFor="github-dispatch-column"
-                description={`${ROWS.dispatch.description} Only a move you make in this app on this machine starts one — never a label change on GitHub, a teammate’s move, or a board that arrives by git pull. One run per issue; further runs queue. This setting is for this machine only.`}
+                description={t('settings.githubIssues.dispatchDescription')}
                 control={
                   <Select
                     id="github-dispatch-column"
@@ -831,7 +841,7 @@ export function GitHubIssuesSection({ isActive }: { isActive: boolean }): React.
             </div>
           </SearchableRow>
 
-          <SearchableRow {...ROWS.data}>
+          <SearchableRow {...rows.data}>
             <div className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 <Button disabled={!ready || busy !== ''} onClick={() => setConfirmation('labels')}>

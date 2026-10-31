@@ -1,4 +1,6 @@
+import { useMemo } from 'react'
 import { useSettings } from '../../../state/settings'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
 import { FieldRow } from '../FieldRow'
@@ -34,69 +36,69 @@ import type { Settings, TerminalCursorInactiveStyle, TerminalCursorStyle } from 
  * Rows that carry two related controls (size+weight, line+letter) list the keywords for BOTH, so
  * searching either word still surfaces the row that holds it.
  */
-const ROWS = {
+const ROW_DEFS = {
   theme: {
-    title: 'Colour theme',
+    key: 'settings.terminal.rows.theme.title',
     keywords: [
       'theme', 'color', 'colour', 'scheme', 'palette', 'ansi', 'dracula', 'nord', 'gruvbox',
       'solarized', 'tokyo', 'catppuccin', 'dark', 'light'
     ]
   },
   fontFamily: {
-    title: 'Font',
+    key: 'settings.terminal.rows.fontFamily.title',
     keywords: ['font', 'family', 'typeface', 'monospace', 'mono', 'ligature']
   },
   fontSize: {
-    title: 'Size and weight',
+    key: 'settings.terminal.rows.fontSize.title',
     keywords: ['font', 'size', 'text', 'zoom', 'weight', 'bold', 'thin', 'light', 'heavy']
   },
   fontZoomKeys: {
-    title: 'Font size keys',
+    key: 'settings.terminal.rows.fontZoomKeys.title',
     keywords: [
       'font', 'size', 'zoom', 'bigger', 'smaller', 'cmd', 'ctrl', 'plus', 'minus', 'shortcut',
       'per terminal'
     ]
   },
   spacing: {
-    title: 'Spacing',
+    key: 'settings.terminal.rows.spacing.title',
     keywords: [
       'spacing', 'line', 'height', 'leading', 'density', 'letter', 'tracking', 'character'
     ]
   },
   cursor: {
-    title: 'Cursor',
+    key: 'settings.terminal.rows.cursor.title',
     keywords: ['cursor', 'style', 'block', 'bar', 'beam', 'underline', 'blink', 'caret']
   },
   cursorInactive: {
-    title: 'Cursor when unfocused',
+    key: 'settings.terminal.rows.cursorInactive.title',
     keywords: ['cursor', 'inactive', 'unfocused', 'blurred', 'outline']
   },
   middleClickPaste: {
-    title: 'Middle-click paste',
+    key: 'settings.terminal.rows.middleClickPaste.title',
     keywords: ['middle', 'click', 'mouse', 'paste', 'primary', 'selection', 'x11', 'linux', 'wheel']
   },
   copyOnSelect: {
-    title: 'Copy on select',
+    key: 'settings.terminal.rows.copyOnSelect.title',
     keywords: [
       'copy', 'select', 'selection', 'clipboard', 'drag', 'mouse', 'highlight', 'auto', 'windows'
     ]
   },
   wordSeparator: {
-    title: 'Word selection',
+    key: 'settings.terminal.rows.wordSeparator.title',
     keywords: ['word', 'separator', 'selection', 'double click', 'identifier', 'hyphen']
   },
   boldBright: {
-    title: 'Bold text uses bright colours',
+    key: 'settings.terminal.rows.boldBright.title',
     keywords: ['bold', 'bright', 'color', 'colour', 'intense']
   },
   minContrast: {
-    title: 'Minimum contrast',
+    key: 'settings.terminal.rows.minContrast.title',
     keywords: [
       'contrast', 'readable', 'legible', 'accessibility', 'a11y', 'wcag', 'dim', 'unreadable'
     ]
   },
   gpu: {
-    title: 'Terminal rendering',
+    key: 'settings.terminal.rows.gpu.title',
     keywords: [
       'gpu',
       'webgl',
@@ -113,11 +115,10 @@ const ROWS = {
     ]
   },
   reset: {
-    title: 'Reset terminal appearance',
+    key: 'settings.terminal.rows.reset.title',
     keywords: ['reset', 'default', 'defaults', 'factory', 'restore', 'revert', 'undo']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 const CURSOR_STYLES: { value: TerminalCursorStyle; label: string }[] = [
   { value: 'block', label: 'Block' },
@@ -172,19 +173,32 @@ function Sub({ children }: { children: React.ReactNode }): React.JSX.Element {
 }
 
 export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
   return (
-    <SettingsSection id="terminal" title="Terminal" isActive={isActive} searchEntries={ENTRIES}>
+    <SettingsSection id="terminal" title={t('settings.terminal.title')} isActive={isActive} searchEntries={entries}>
       {/* The preview leads. Every control below changes what it shows, so anchoring it at the top
           means a choice is a look rather than a scroll back up — and it keeps the section short
           enough that the troubleshooting toggle at the foot is still on screen. */}
-      <SearchableRow {...ROWS.theme}>
+      <SearchableRow {...rows.theme}>
         <div className="space-y-3">
           <TerminalPreview />
           <FieldRow
             label="Colour theme"
-            description="Applies to every terminal — on the canvas and in kanban cards. A light theme also turns the app light (Settings → Appearance)."
+            description={t('settings.terminal.description')}
             control={
               <ThemeSelect
                 value={settings.terminalTheme}
@@ -195,7 +209,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         </div>
       </SearchableRow>
 
-      <SearchableRow {...ROWS.fontFamily}>
+      <SearchableRow {...rows.fontFamily}>
         <div className="space-y-3">
           <GroupHeading>Font</GroupHeading>
           <FieldRow
@@ -210,7 +224,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.fontSize}>
+      <SearchableRow {...rows.fontSize}>
         <FieldRow
           label="Size and weight"
           control={
@@ -253,10 +267,10 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       </SearchableRow>
       {/* Issue #915. Behaviour, not appearance: deliberately NOT in TERMINAL_RESET_KEYS (same as
           middle-click paste), so the section's reset button does not flip a key binding. */}
-      <SearchableRow {...ROWS.fontZoomKeys}>
+      <SearchableRow {...rows.fontZoomKeys}>
         <FieldRow
           label="Font size keys"
-          description={`${modKey}+ / ${modKey}− change the focused terminal's own font size; ${modKey}0 puts it back on the size above. Off: those keys do what they did before (${modKey}0 zooms the canvas to 100%).`}
+          description={t('settings.terminal.description')}
           control={
             <Switch
               checked={settings.terminalFontZoomKeys}
@@ -266,7 +280,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.spacing}>
+      <SearchableRow {...rows.spacing}>
         <FieldRow
           label="Spacing"
           description="Line height multiplies the font size; letter spacing adds pixels between characters. Push either far and the box-drawing characters agent CLIs frame their output with stop meeting."
@@ -295,7 +309,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         />
       </SearchableRow>
 
-      <SearchableRow {...ROWS.cursor}>
+      <SearchableRow {...rows.cursor}>
         <div className="space-y-3">
           <GroupHeading>Cursor</GroupHeading>
           <FieldRow
@@ -319,7 +333,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.cursorInactive}>
+      <SearchableRow {...rows.cursorInactive}>
         <FieldRow
           label="When unfocused"
           description="What the cursor looks like in a terminal that isn't taking your keystrokes — the quickest way to tell which of a canvas full of terminals is focused."
@@ -342,7 +356,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         />
       </SearchableRow>
 
-      <SearchableRow {...ROWS.middleClickPaste}>
+      <SearchableRow {...rows.middleClickPaste}>
         <div className="space-y-3">
           <GroupHeading>Advanced</GroupHeading>
           <FieldRow
@@ -359,7 +373,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         </div>
       </SearchableRow>
 
-      <SearchableRow {...ROWS.copyOnSelect}>
+      <SearchableRow {...rows.copyOnSelect}>
         <FieldRow
           label="Copy on select"
           description="Off by default. On, finishing a mouse selection in the terminal itself — a drag, a double or triple click, or inside an app that grabs the mouse an Option-drag (macOS) or Shift-drag (Windows, Linux) — copies it to the clipboard. It cannot copy a selection an app draws itself. Copies a program sends on its own (tmux copy mode, vim) reach the clipboard whether this is on or off."
@@ -373,7 +387,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         />
       </SearchableRow>
 
-      <SearchableRow {...ROWS.wordSeparator}>
+      <SearchableRow {...rows.wordSeparator}>
         <FieldRow
           label="Word separators"
           description="Characters that end a word when you double-click terminal text. Remove a character to keep it inside selections; for example, leave hyphen out to select a full issue ID."
@@ -388,7 +402,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         />
       </SearchableRow>
 
-      <SearchableRow {...ROWS.boldBright}>
+      <SearchableRow {...rows.boldBright}>
         <div className="space-y-3">
           <FieldRow
             label="Bold text uses bright colours"
@@ -403,7 +417,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.minContrast}>
+      <SearchableRow {...rows.minContrast}>
         <FieldRow
           label="Minimum contrast"
           description="Lightens or darkens foreground colours that fall below the ratio against their background — the fix for a theme whose dark blue is unreadable. Costs per-cell work in the renderer, so it is off by default."
@@ -423,7 +437,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.gpu}>
+      <SearchableRow {...rows.gpu}>
         <FieldRow
           label="Terminal rendering"
           description={
@@ -451,7 +465,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         />
       </SearchableRow>
 
-      <SearchableRow {...ROWS.reset}>
+      <SearchableRow {...rows.reset}>
         <SectionReset
           keys={TERMINAL_RESET_KEYS}
           label="Reset terminal appearance"

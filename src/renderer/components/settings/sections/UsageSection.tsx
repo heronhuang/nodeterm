@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useSettings } from '../../../state/settings'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -9,13 +10,13 @@ import { SegmentedPill } from '@renderer/ui/SegmentedPill'
 import { USAGE_PROVIDER_IDS, providerLabel } from '@shared/usage-limits'
 import { AGENT_CONFIG } from '@shared/agents/config'
 
-const ROWS = {
+const ROW_DEFS = {
   percentMode: {
-    title: 'Usage percentages',
+    key: 'settings.usage.rows.percentMode.title',
     keywords: ['usage', 'percent', 'used', 'remaining', 'left', 'display']
   },
   visibility: {
-    title: 'Providers',
+    key: 'settings.usage.rows.visibility.title',
     keywords: [
       'usage',
       'provider',
@@ -38,11 +39,10 @@ const ROWS = {
     ]
   },
   cookies: {
-    title: 'Web-console sign-in',
+    key: 'settings.usage.rows.cookies.title',
     keywords: ['minimax', 'opencode', 'cookie', 'session', 'sign in', 'credential', 'paste']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 /** AGENT_CONFIG is keyed by builtin ids; billing-only providers fall through to the label table. */
 function labelFor(provider: string): string {
@@ -137,6 +137,19 @@ function CookieProviderRow({
 }
 
 export function UsageSection({ isActive }: { isActive: boolean }): React.JSX.Element | null {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
 
@@ -163,12 +176,12 @@ export function UsageSection({ isActive }: { isActive: boolean }): React.JSX.Ele
   return (
     <SettingsSection
       id="usage"
-      title="Usage"
-      description="Subscription limits shown in the pill at the bottom-left of the canvas. Hiding a provider is a display choice — credentials are untouched, so re-enabling is instant."
+      title={t('settings.usage.title')}
+      description={t('settings.usage.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.percentMode}>
+      <SearchableRow {...rows.percentMode}>
         <FieldRow
           label="Usage percentages"
           description="Whether provider limits and context meters show percentage used, percentage remaining, or (context meters only) raw token counts. Provider limits have no token count and fall back to Used."
@@ -186,7 +199,7 @@ export function UsageSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.visibility}>
+      <SearchableRow {...rows.visibility}>
         <div className="space-y-5">
           {USAGE_PROVIDER_IDS.map((id) => (
             <FieldRow
@@ -204,7 +217,7 @@ export function UsageSection({ isActive }: { isActive: boolean }): React.JSX.Ele
           ))}
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.cookies}>
+      <SearchableRow {...rows.cookies}>
         <div className="space-y-5">
           {COOKIE_PROVIDER_ROWS.map((p) => (
             <CookieProviderRow

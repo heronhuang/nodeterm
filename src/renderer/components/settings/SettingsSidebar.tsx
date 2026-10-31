@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
 import { cn } from '@renderer/ui/cn'
 import { Input } from '@renderer/ui/Input'
-import { visibleSettingsGroups, type SettingsGroup, type SettingsSectionId } from './nav'
+import { localizedVisibleSettingsGroups, type SettingsGroup, type SettingsSectionId } from './nav'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { matchesQuery } from './search'
 import { SectionIcon } from './SettingsIcons'
 import { ProjectGlyph } from '../ProjectGlyph'
@@ -27,10 +28,11 @@ export function SettingsSidebar({
    *  subscription of its own). */
   extraGroups?: SettingsGroup[]
 }): React.JSX.Element {
+  const { t } = useI18n()
   const hasQuery = query.trim() !== ''
   const GROUPS = useMemo(
-    () => [...visibleSettingsGroups(isMac, isBrowserRuntime()), ...(extraGroups ?? [])],
-    [extraGroups]
+    () => [...localizedVisibleSettingsGroups(t, isMac, isBrowserRuntime()), ...(extraGroups ?? [])],
+    [extraGroups, t]
   )
   return (
     <aside className="flex w-[256px] shrink-0 flex-col border-r border-border bg-panel">
@@ -41,14 +43,14 @@ export function SettingsSidebar({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Back to app"
+          aria-label={t('settings.sidebar.backToApp')}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           className="flex items-center gap-1.5 rounded-md border-0 bg-transparent px-1.5 py-1 text-sm font-medium text-muted outline-none transition-colors hover:bg-fill-weak hover:text-text"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8.5 3.5 5 7l3.5 3.5" />
           </svg>
-          Back to app
+          {t('settings.sidebar.backToApp')}
         </button>
       </div>
 
@@ -72,8 +74,8 @@ export function SettingsSidebar({
             className="h-8 w-full pl-8"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search settings"
-            aria-label="Search settings"
+            placeholder={t('settings.sidebar.searchSettings')}
+            aria-label={t('settings.sidebar.searchSettings')}
           />
         </div>
       </div>

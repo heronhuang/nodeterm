@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
 import { Button } from '@renderer/ui/Button'
@@ -23,13 +24,12 @@ import { stopAllConfirm, stopAllLiveLinks, stopLiveLinks } from '../../../lib/li
 import { stripBidiControls, type WatchLinkView } from '@shared/watch-link-types'
 import type { Project } from '@shared/types'
 
-const ROWS = {
+const ROW_DEFS = {
   links: {
-    title: 'Active live links',
+    key: 'settings.liveLinks.rows.links.title',
     keywords: ['live', 'link', 'share', 'watch', 'broadcast', 'viewer', 'stop']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 /**
  * Which project a link's node is in, as the row names it (H11): an open project on THIS machine
@@ -96,6 +96,18 @@ function LinkRow({ link, now, projects }: { link: WatchLinkView; now: number; pr
 }
 
 export function LiveLinksSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
   const premium = useEntitlement((s) => s.isPremium)
   const links = useWatchLinks((s) => s.links)
   const projects = useProjects((s) => s.projects)
@@ -110,8 +122,8 @@ export function LiveLinksSection({ isActive }: { isActive: boolean }): React.JSX
   useEffect(() => {
     if (!isActive) return
     setNow(Date.now())
-    const t = setInterval(() => setNow(Date.now()), 30_000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
   }, [isActive])
   const confirm = stopAllConfirm({
     close: () => setConfirmStopAll(false),
@@ -127,12 +139,12 @@ export function LiveLinksSection({ isActive }: { isActive: boolean }): React.JSX
   return (
     <SettingsSection
       id="live-links"
-      title="Live links"
-      description="A read-only browser link to one terminal. Viewers need nothing installed; links end on their own."
+      title={t('settings.liveLinks.title')}
+      description={t('settings.liveLinks.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.links}>
+      <SearchableRow {...rows.links}>
         {links.length > 0 ? (
           // Shown whether or not Pro is active right now: a link keeps running out its term after
           // a lapse, and Stop must stay reachable (H10).

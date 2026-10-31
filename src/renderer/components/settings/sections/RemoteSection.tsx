@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useEntitlement } from '../../../state/entitlement'
 import { useProjects } from '../../../state/projects'
 import { relayShareGrantCopy } from '../../../lib/relayHostShare'
@@ -12,14 +13,16 @@ import { CopyButton } from '@renderer/ui/CopyButton'
 import { Input } from '@renderer/ui/Input'
 import { Select } from '@renderer/ui/Select'
 
-const ROWS = {
-  allow: { title: 'Allow remote access', keywords: ['remote', 'host', 'share', 'pairing', 'ssh'] },
+const ROW_DEFS = {
+  allow: {
+    key: 'settings.remote.rows.allow.title',
+    keywords: ['remote', 'host', 'share', 'pairing', 'ssh']
+  },
   connect: {
-    title: 'Connect to a host',
+    key: 'settings.remote.rows.connect.title',
     keywords: ['remote', 'connect', 'client', 'pairing', 'code']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 export function RemoteSection({
   isActive,
@@ -28,6 +31,19 @@ export function RemoteSection({
   isActive: boolean
   onClose: () => void
 }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const isPremium = useEntitlement((s) => s.isPremium)
   const projects = useProjects((s) => s.projects)
   const activeProjectId = useProjects((s) => s.activeProjectId)
@@ -85,12 +101,12 @@ export function RemoteSection({
   return (
     <SettingsSection
       id="remote"
-      title="Remote access"
-      description="Open terminals that run on another machine you own — end-to-end encrypted over the relay. Hosting (sharing this machine) is Pro; connecting to a host is free."
+      title={t('settings.remote.title')}
+      description={t('settings.remote.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.allow}>
+      <SearchableRow {...rows.allow}>
         <div className="space-y-3">
           <h4 className="text-[13px] font-medium text-text">Allow remote access</h4>
           {isPremium ? (
@@ -163,7 +179,7 @@ export function RemoteSection({
           )}
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.connect}>
+      <SearchableRow {...rows.connect}>
         <div className="mt-4 space-y-3">
           <h4 className="text-[13px] font-medium text-text">Connect to a host</h4>
           <FieldRow

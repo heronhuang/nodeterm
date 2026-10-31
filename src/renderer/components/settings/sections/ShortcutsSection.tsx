@@ -34,6 +34,7 @@
  * `speech.dictation` into the legacy `settings.speech.shortcut` field for one release).
  */
 import { useMemo, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { IconClose } from '../../icons'
 import {
   bindingIdentity,
@@ -342,6 +343,7 @@ interface RowModel {
 }
 
 export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   // Any remap re-renders every row: chips, and the Add/Disable/Reset visibility, are all derived
   // from the override map.
   const overrides = useSettings((s) => s.settings.keybindings)
@@ -368,14 +370,29 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
     return [...byGroup.entries()]
   }, [])
 
+  const policyRow = useMemo(
+    (): SettingsSearchEntry => ({
+      title: t('settings.shortcuts.rows.policy.title'),
+      description: POLICY_DESCRIPTION,
+      keywords: POLICY_ROW.keywords
+    }),
+    [t]
+  )
+  const railRow = useMemo(
+    (): SettingsSearchEntry => ({
+      title: t('settings.shortcuts.rows.filter.title'),
+      keywords: RAIL_ROW.keywords
+    }),
+    [t]
+  )
   const entries = useMemo(
     () => [
-      POLICY_ROW,
-      RAIL_ROW,
+      policyRow,
+      railRow,
       ...groups.map(([group, defs]) => groupEntry(group, defs)),
       ...COMMAND_DEFINITIONS.map(rowEntry)
     ],
-    [groups]
+    [groups, policyRow, railRow]
   )
 
   /**
@@ -587,28 +604,20 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
   return (
     <SettingsSection
       id="shortcuts"
-      title="Keyboard Shortcuts"
-      // The one remaining limitation is the application MENU's, not macOS's: its accelerators are
-      // handled above the page on every platform. While a recorder is armed main now suspends the
-      // items in `menuItemIdsToSuspend` (Minimize, Toggle Kanban Board, Settings, off-mac Close),
-      // so those chords reach the recorder — but RELOAD is deliberately never suspended, because it
-      // is the crash-recovery lever. See `src/main/keydown-intercept.ts`.
-      // The residual clause is the KNOWN GAP `menuItemIdsToSuspend` documents: one list drives
-      // both stand-downs, so the always-on app roles are deliberately left unsuspended and still
-      // act while recording. The ruling stands; the user is simply told.
-      description="Remap any command. Overrides are stored in settings.json under `keybindings`; Disable turns a command's shortcut off, Reset restores its default. Reload (⌘R / ⌘⇧R) cannot be recorded — it always stays with the app; the system-level chords the menu keeps — ⌘Q (Quit), ⌘H (Hide) and the developer roles — also act while recording, so don't try to bind them."
+      title={t('settings.shortcuts.title')}
+      description={t('settings.shortcuts.description')}
       isActive={isActive}
       searchEntries={entries}
     >
-      <SearchableRow {...POLICY_ROW}>
+      <SearchableRow {...policyRow}>
         <div data-setting="terminal-shortcut-policy">
           <FieldRow
-            label={POLICY_LABEL}
+            label={t('settings.shortcuts.rows.policy.title')}
             description={POLICY_DESCRIPTION}
             control={
               <SegmentedPill<TerminalShortcutPolicy>
                 value={policy}
-                ariaLabel={POLICY_LABEL}
+                ariaLabel={t('settings.shortcuts.rows.policy.title')}
                 options={[
                   { value: 'app-first', label: 'App shortcuts first' },
                   { value: 'terminal-first', label: 'Terminal first' }
@@ -620,7 +629,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
         </div>
       </SearchableRow>
 
-      <SearchableRow {...RAIL_ROW}>
+      <SearchableRow {...railRow}>
         <div className="flex items-center justify-between gap-4">
           <div className="relative">
             {/* The sidebar's magnifier, verbatim — one search affordance, one look. */}
@@ -642,8 +651,8 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
               className="h-8 w-[220px] pl-8"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Filter shortcuts"
-              aria-label="Filter shortcuts"
+              placeholder={t('settings.shortcuts.rows.filter.title')}
+              aria-label={t('settings.shortcuts.rows.filter.title')}
             />
           </div>
           <SegmentedPill<ShortcutStatusFilter>
@@ -674,7 +683,7 @@ export function ShortcutsSection({ isActive }: { isActive: boolean }): React.JSX
           policy row alone ('policy', 'shell', 'tui', 'minimize' appear in no command title, id,
           group or note) — and answering that with "No shortcuts match." would describe a filter
           that is not on screen, in a section showing exactly what was asked for. */}
-      <SearchableRow {...RAIL_ROW}>
+      <SearchableRow {...railRow}>
         {visibleGroups.length === 0 ? (
           <p className="text-[13px] text-muted">No shortcuts match.</p>
         ) : null}

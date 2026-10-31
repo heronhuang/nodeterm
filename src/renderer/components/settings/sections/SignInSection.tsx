@@ -1,28 +1,42 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
 import { FieldRow } from '../FieldRow'
 import { Button } from '@renderer/ui/Button'
 import { ConfirmDialog } from '../../ConfirmDialog'
 import { signOutBrowser, type SignOutScope } from '../../../lib/browserSignOut'
+import { useI18n } from '@renderer/i18n/useI18n'
 
-// Server Edition only (the section is not listed under Electron — see nav.ts `browserOnly`).
-const ROWS = {
-  signOut: {
-    title: 'Sign out of this browser',
-    keywords: ['sign out', 'log out', 'logout', 'session', 'password', 'browser']
-  },
-  signOutEverywhere: {
-    title: 'Sign out everywhere',
-    keywords: ['sign out', 'log out', 'logout', 'everywhere', 'all', 'sessions', 'revoke', 'browser', 'stolen']
-  }
-}
-const ENTRIES = Object.values(ROWS)
+const SIGN_OUT_KEYWORDS = ['sign out', 'log out', 'logout', 'session', 'password', 'browser']
+const SIGN_OUT_ALL_KEYWORDS = [
+  'sign out',
+  'log out',
+  'logout',
+  'everywhere',
+  'all',
+  'sessions',
+  'revoke',
+  'browser',
+  'stolen'
+]
 
 export function SignInSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const [busy, setBusy] = useState<SignOutScope | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+
+  const rows = useMemo(
+    () => ({
+      signOut: { title: t('settings.signIn.rows.signOut.title'), keywords: SIGN_OUT_KEYWORDS },
+      signOutEverywhere: {
+        title: t('settings.signIn.rows.signOutEverywhere.title'),
+        keywords: SIGN_OUT_ALL_KEYWORDS
+      }
+    }),
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
 
   const run = async (scope: SignOutScope): Promise<void> => {
     setBusy(scope)
@@ -38,25 +52,32 @@ export function SignInSection({ isActive }: { isActive: boolean }): React.JSX.El
   }
 
   return (
-    <SettingsSection id="sign-in" title="Sign-in" isActive={isActive} searchEntries={ENTRIES}>
-      <SearchableRow {...ROWS.signOut}>
+    <SettingsSection
+      id="sign-in"
+      title={t('settings.signIn.title')}
+      isActive={isActive}
+      searchEntries={entries}
+    >
+      <SearchableRow {...rows.signOut}>
         <FieldRow
-          label="Sign out of this browser"
-          description="Ends this browser's session on the server, so a copy of its cookie stops working too. If you signed in through your proxy's single sign-on, sign out there as well."
+          label={t('settings.signIn.signOutLabel')}
+          description={t('settings.signIn.signOutDescription')}
           control={
             <Button onClick={() => void run('this')} disabled={busy !== null}>
-              {busy === 'this' ? 'Signing out…' : 'Sign out'}
+              {busy === 'this' ? t('settings.signIn.signingOut') : t('settings.signIn.signOutButton')}
             </Button>
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.signOutEverywhere}>
+      <SearchableRow {...rows.signOutEverywhere}>
         <FieldRow
-          label="Sign out everywhere"
-          description="Ends every browser session on this server, this one included. Every open tab is disconnected and has to sign in again with the password. Use it if a device was lost or a session may have been copied."
+          label={t('settings.signIn.signOutEverywhereLabel')}
+          description={t('settings.signIn.signOutEverywhereDescription')}
           control={
             <Button onClick={() => setConfirming(true)} disabled={busy !== null}>
-              {busy === 'everywhere' ? 'Signing out…' : 'Sign out everywhere'}
+              {busy === 'everywhere'
+                ? t('settings.signIn.signingOut')
+                : t('settings.signIn.signOutEverywhereButton')}
             </Button>
           }
         />
@@ -68,8 +89,8 @@ export function SignInSection({ isActive }: { isActive: boolean }): React.JSX.El
       ) : null}
       {confirming ? (
         <ConfirmDialog
-          message="Sign out every browser? Every open tab on this server is disconnected and has to sign in again with the password. Running terminals keep running."
-          confirmLabel="Sign out everywhere"
+          message={t('settings.signIn.confirmMessage')}
+          confirmLabel={t('settings.signIn.confirmLabel')}
           onConfirm={() => {
             setConfirming(false)
             void run('everywhere')

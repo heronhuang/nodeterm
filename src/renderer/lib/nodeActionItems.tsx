@@ -62,6 +62,7 @@ import { tidySeparators } from './tidySeparators'
 import { transferConversationItems, type TransferConversationHandler } from './transferItems'
 import { isHidden } from './ui-visibility'
 import type { NodeWrites } from './nodeWriteRouter'
+import { t } from '@renderer/i18n/runtime'
 
 /** The agent a terminal node was CREATED as. Deliberately NOT `agentIdOf`, whose extra hook-status
  *  fallback also reports a plain terminal someone typed `claude` into by hand: TerminalNode's
@@ -270,13 +271,22 @@ export function buildNodeActionSections(
   const anyTerminal = ids.some((nid) => ctx.nodes.find((n) => n.id === nid)?.type === 'terminal')
   const session = ids.length === 1 ? sessionRows(ids[0], ctx, hidden) : NO_SESSION_ROWS
   return [
-    { id: 'label', items: [{ type: 'label', label: ids.length > 1 ? `${ids.length} nodes` : '1 node' }] },
+    {
+      id: 'label',
+      items: [
+        {
+          type: 'label',
+          label:
+            ids.length > 1 ? t('nodeActions.nodesCount', { count: ids.length }) : t('nodeActions.oneNode')
+        }
+      ]
+    },
     {
       id: 'stop-agent-control',
       items: drivenHere
         ? ([
             {
-              label: 'Stop agent control',
+              label: t('nodeActions.stopAgentControl'),
               onClick: () => window.nodeTerminal.browser.stop(ids[0])
             },
             { type: 'separator' }
@@ -314,17 +324,17 @@ export function buildNodeActionSections(
         if (targetGroups.length === 1 && !isHidden('group', hidden)) {
           const targetGroup = targetGroups[0]
           items.push({
-            label: `Add selection to ${targetGroup.data.title || 'group'}`,
+            label: t('nodeActions.addToGroup', { title: targetGroup.data.title || t('nodeActions.addToGroupFallback') }),
             icon: <IconGroup />,
             onClick: () => ctx.addToExistingGroup(ids, targetGroup.id)
           })
         } else if (targetGroups.length > 1 && !isHidden('group', hidden)) {
           items.push({
             type: 'submenu',
-            label: 'Add selection to group',
+            label: t('nodeActions.addSelectionToGroup'),
             icon: <IconGroup />,
             children: targetGroups.map((targetGroup) => ({
-              label: targetGroup.data.title || 'Group',
+              label: targetGroup.data.title || t('nodeActions.groupFallback'),
               icon: <IconGroup />,
               onClick: () => ctx.addToExistingGroup(ids, targetGroup.id)
             }))
@@ -332,13 +342,13 @@ export function buildNodeActionSections(
         }
         if (groupable && !isHidden('group', hidden))
           items.push({
-            label: rootIds.length > 1 ? 'Group selection' : 'Group node',
+            label: rootIds.length > 1 ? t('nodeActions.groupSelection') : t('nodeActions.groupNode'),
             icon: <IconGroup />,
             onClick: () => ctx.groupSelection(rootIds)
           })
         if (parented && !isHidden('remove-from-group', hidden))
           items.push({
-            label: 'Remove from group',
+            label: t('nodeActions.removeFromGroup'),
             icon: <IconUngroup />,
             onClick: () => ctx.removeFromGroup(ids)
           })
@@ -364,7 +374,7 @@ export function buildNodeActionSections(
         ctx.nodes.find((n) => n.id === ids[0])?.type === 'terminal'
           ? ([
               {
-                label: ctx.nodes.find((n) => n.id === ids[0])?.data.icon ? 'Change icon…' : 'Set icon…',
+                label: ctx.nodes.find((n) => n.id === ids[0])?.data.icon ? t('nodeActions.changeIcon') : t('nodeActions.setIcon'),
                 icon: <IconSmiley />,
                 onClick: () => ctx.pickNodeIcon(ids[0])
               }
@@ -377,7 +387,11 @@ export function buildNodeActionSections(
       items: isHidden('duplicate', hidden)
         ? []
         : ([
-            { label: 'Duplicate', icon: <IconDuplicate />, onClick: () => ctx.duplicateNodes(ids, at) }
+            {
+              label: t('nodeActions.duplicate'),
+              icon: <IconDuplicate />,
+              onClick: () => ctx.duplicateNodes(ids, at)
+            }
           ] as MenuItem[])
     },
     // Zone snap (issue #394 v1): place THIS node into a region of the visible canvas at that
@@ -395,7 +409,7 @@ export function buildNodeActionSections(
           ? ([
               {
                 type: 'submenu',
-                label: 'Snap to zone',
+                label: t('nodeActions.snapToZone'),
                 icon: <IconGrid />,
                 children: ZONES.map((z) => ({
                   label: z.label,
@@ -419,7 +433,7 @@ export function buildNodeActionSections(
           ? []
           : ([
             {
-              label: 'Collapse / Expand',
+              label: t('nodeActions.collapseExpand'),
               icon: <IconCollapse />,
               onClick: () => ctx.toggleCollapseNodes(ids)
             }
@@ -431,7 +445,7 @@ export function buildNodeActionSections(
         anyTerminal && !isHidden('markdown-view', hidden)
           ? [
               {
-                label: 'Markdown view',
+                label: t('nodeActions.markdownView'),
                 icon: <IconMarkdown />,
                 onClick: () => ctx.toggleMarkdown(ids)
               }
@@ -444,7 +458,7 @@ export function buildNodeActionSections(
         anyTerminal && !isHidden('refresh-terminal', hidden)
           ? [
               {
-                label: 'Refresh terminal',
+                label: t('nodeActions.refreshTerminal'),
                 icon: <IconReload />,
                 // One node: it can be rebuilt while the canvas holds it — including a terminal
                 // released off screen, which the respawn revives (so NOT `attached`, which is false
@@ -477,7 +491,7 @@ export function buildNodeActionSections(
         })()
           ? ([
               {
-                label: 'Branch conversation',
+                label: t('nodeActions.branchConversation'),
                 icon: <IconBranch />,
                 onClick: () => void ctx.branchClaude(ids[0], { at })
               }
@@ -510,7 +524,14 @@ export function buildNodeActionSections(
     SEPARATOR,
     {
       id: 'delete',
-      items: [{ label: 'Delete', icon: <IconTrash />, danger: true, onClick: () => ctx.deleteNodes(ids) }]
+      items: [
+        {
+          label: t('nodeActions.delete'),
+          icon: <IconTrash />,
+          danger: true,
+          onClick: () => ctx.deleteNodes(ids)
+        }
+      ]
     }
   ]
 }
@@ -535,7 +556,7 @@ function bulkPauseRows(
   if (agents.length === 1) return sessionRows(agents[0], ctx, hidden).pause
   return [
     {
-      label: `Pause ${agents.length} sessions`,
+      label: t('nodeActions.pauseSessions', { count: agents.length }),
       icon: <IconPower />,
       hint: 'Quits each CLI; busy ones pause after their current turn. Resume brings each back.',
       onClick: () => ctx.pauseNodes(agents)
@@ -612,7 +633,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
     : detachedHint(ctx, ids[0])
   const restartRows: MenuItem[] = [
     {
-      label: 'Restart agent',
+      label: t('nodeActions.restartAgent'),
       icon: <IconPower />,
       disabled: !!why,
       hint: why ?? 'Quits the CLI and relaunches it with --resume (same conversation).',
@@ -624,7 +645,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
     // existing shell never picks up. Same eligibility gate as Restart; the cold-restore
     // auto-resume on the fresh spawn relaunches the agent with --resume <sid>.
     {
-      label: 'Restart agent and shell',
+      label: t('nodeActions.restartAgentAndShell'),
       icon: <IconPower />,
       // A relay session's shell lives on the HOST's core, so recycling it here can't
       // re-source that machine's profile/env — the closure refuses it. Surface that as a
@@ -680,7 +701,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
       ? ([
           {
             type: 'submenu',
-            label: 'Reopen session as',
+            label: t('nodeActions.reopenAs'),
             icon: <IconSwitch />,
             children: variants.map(
               (variant): MenuItem => ({
@@ -702,7 +723,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
       ? ([
           {
             type: 'submenu',
-            label: currentModel ? `Switch model (${currentModel})` : 'Switch model',
+            label: currentModel ? t('nodeActions.switchModelCurrent', { model: currentModel }) : t('nodeActions.switchModel'),
             icon: <IconSwitch />,
             children: compatibleModels.map(
               (model): MenuItem => ({
@@ -720,7 +741,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
         ] as MenuItem[])
       : ([
           {
-            label: 'Switch model',
+            label: t('nodeActions.switchModel'),
             icon: <IconSwitch />,
             disabled: true,
             hint:
@@ -738,7 +759,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
     restart: [
       {
         type: 'submenu',
-        label: 'Restart',
+        label: t('nodeActions.restart'),
         icon: <IconPower />,
         children: tidySeparators(restartRows)
       }
@@ -754,7 +775,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
     pause: st?.paused
       ? ([
           {
-            label: 'Resume session',
+            label: t('nodeActions.resumeSession'),
             icon: <IconPower />,
             disabled: !ctx.attached(ids[0]),
             hint: detachedHint(ctx, ids[0]) ?? 'Brings the conversation back.',
@@ -764,11 +785,11 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
       : ([
           {
             type: 'submenu',
-            label: 'Pause session',
+            label: t('nodeActions.pauseSession'),
             icon: <IconPower />,
             children: [
               {
-                label: 'Pause',
+                label: t('nodeActions.pause'),
                 disabled: !!pauseWhy,
                 hint:
                   pauseWhy ??
@@ -776,7 +797,7 @@ function sessionRows(nodeId: string, ctx: NodeActionCtx, hidden: readonly string
                 onClick: () => void ctx.pauseAgentNode(ids[0], false)
               },
               {
-                label: 'Pause & end session',
+                label: t('nodeActions.pauseEndSession'),
                 // The deep depth recycles the tmux session, which — like the "Restart
                 // agent and shell" recycle it shares the mechanism with — the closure
                 // refuses on a relay session's core (the shell env belongs to the HOST).
@@ -849,7 +870,7 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
           if (unswitchable)
             return [
               {
-                label: 'Switch Claude account',
+                label: t('nodeActions.switchClaudeAccount'),
                 icon: <IconSwitch />,
                 disabled: true,
                 hint: 'Not available for relay sessions.',
@@ -906,7 +927,7 @@ export function buildAccountSwitchRows(nodeId: string, ctx: NodeActionCtx): Menu
           return [
             {
               type: 'submenu',
-              label: 'Switch Codex account',
+              label: t('nodeActions.switchCodexAccount'),
               icon: <IconSwitch />,
               children: [row(undefined, systemCodexLabel), ...onMachine.map((a) => row(a.id, a.label))]
             }

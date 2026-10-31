@@ -315,11 +315,11 @@ describe('the CLI the release workflow runs', () => {
   })
 
   it('is the first step that runs anything in every build job, right after checkout', () => {
-    // First in all three: a refused tag must build and upload nothing anywhere — the Linux and
-    // Windows jobs do not wait for the mac one, and each creates the release on its first upload.
+    // First in both build jobs: a refused tag must build and upload nothing anywhere — the Windows
+    // job does not wait for the mac one, and each creates the release on its first upload.
     const wf = fs.readFileSync(path.resolve(__dirname, '../.github/workflows/release.yml'), 'utf8')
-    const jobs = ['release-mac', 'release-linux', 'release-win', 'publish']
-    for (let i = 0; i < 3; i++) {
+    const jobs = ['release-mac', 'release-win', 'publish']
+    for (let i = 0; i < 2; i++) {
       const job = wf.slice(wf.indexOf(`\n  ${jobs[i]}:\n`), wf.indexOf(`\n  ${jobs[i + 1]}:\n`))
       const guard = job.indexOf('run: node scripts/check-project-limit-deadline.mjs')
       expect(guard, `${jobs[i]} runs the deadline guard`).toBeGreaterThan(-1)

@@ -29,6 +29,12 @@ const PATHS: Record<StaticSettingsSectionId, React.JSX.Element> = {
       <circle cx="6.3" cy="10.5" r="1.4" />
     </>
   ),
+  language: (
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M8 2.5a5.5 5.5 0 0 1 0 11M5.2 5.5h5.6M5.5 8h4.8M5.8 10.5h3.6" />
+    </>
+  ),
   appearance: (
     <>
       <circle cx="8" cy="8" r="5.5" />

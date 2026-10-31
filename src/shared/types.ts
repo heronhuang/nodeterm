@@ -1921,6 +1921,8 @@ export interface Settings {
    *  colour; tint opacities keep the primary text at WCAG 4.5:1 over any backdrop
    *  (renderer/lib/glassContrast.ts). See renderer/lib/appTheme.ts. */
   appTheme: 'auto' | 'dark' | 'light' | 'liquid-glass'
+  /** Renderer UI language (`zh` default for this fork; `en` is the alternate locale). */
+  uiLanguage: import('./i18n/types').UiLanguage
   /** Scale factor for the whole application UI (1 = 100%; issue #299, 4K readability). Applied as
    *  PAGE ZOOM (`webFrame.setZoomFactor`) on desktop, so menus, node headers, dialogs — and
    *  terminal glyphs — all scale together: the terminal font-size setting stays in CSS px, so its
@@ -2507,6 +2509,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // Follows the terminal theme, whose own default is dark — so an install that never touches
   // either setting keeps the dark chrome it has always had.
   appTheme: 'auto',
+  uiLanguage: 'zh',
   uiScale: 1,
   windowTitleActiveSession: false,
   terminalTheme: 'nodeterm-dark',

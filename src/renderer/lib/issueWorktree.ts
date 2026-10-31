@@ -7,7 +7,7 @@ import type {
 import { boundGroups, type ScmScopeNode } from '@shared/scm-scope'
 import { normWorktreePath } from '@shared/worktree-reconcile'
 import type { MenuItem } from '../components/ContextMenu'
-import { WORKTREE_NO_CWD_HINT, WORKTREE_SSH_HINT } from './addMenuSpec'
+import { newFileNoCwdHint, worktreeSshHint } from './addMenuSpec'
 import { groupSizeFor, groupSlot } from './coldOpen'
 
 // The renderer half of "Start with agent in a new worktree" on a GitHub issue card: when the
@@ -42,8 +42,8 @@ export function issueWorktreeRefusal(p: {
   repoRoot: string | null
 }): string | null {
   if (p.relay) return ISSUE_WORKTREE_RELAY_HINT
-  if (p.ssh) return WORKTREE_SSH_HINT
-  if (!p.cwd?.trim()) return WORKTREE_NO_CWD_HINT
+  if (p.ssh) return worktreeSshHint()
+  if (!p.cwd?.trim()) return newFileNoCwdHint()
   if (!p.repoRoot?.trim()) return ISSUE_WORKTREE_NO_REPO_HINT
   return null
 }

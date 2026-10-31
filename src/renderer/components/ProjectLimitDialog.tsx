@@ -7,6 +7,7 @@ import { useProjects } from '../state/projects'
 import { useProjectLimit, type DialogOutcome, type LimitDialogRequest } from '../state/projectLimit'
 import { confirmKeyAction } from './confirm-key'
 import { useDialogStack } from './dialog-stack'
+import { useI18n } from '@renderer/i18n/useI18n'
 
 /**
  * The free-tier limit moment (docs/project-limit.md): the dialog the open gate
@@ -77,12 +78,15 @@ export function ProjectLimitDialog({
   }
 
   if (!checking) return null
-  // No buttons and no outcome: the claim behind it is bounded (core's claim timeout), and whatever
-  // it answers replaces this panel with the dialog or with the open itself.
+  return <CheckingPanel />
+}
+
+function CheckingPanel(): React.JSX.Element {
+  const { t } = useI18n()
   return createPortal(
     <div className="confirm-overlay">
       <div className="confirm project-limit__checking" role="status" aria-live="polite">
-        <p className="confirm__msg">Checking your free allowance…</p>
+        <p className="confirm__msg">{t('projectLimit.checking')}</p>
       </div>
     </div>,
     document.body
@@ -101,6 +105,7 @@ function LimitDialog(props: {
   onCloseProject(id: string): void
 }): React.JSX.Element {
   const { request, open, limit, projects, onCloseProject } = props
+  const { t } = useI18n()
   const isTop = useDialogStack()
   const boxRef = useRef<HTMLDivElement>(null)
   const shownAtRef = useRef(Date.now())
@@ -141,37 +146,30 @@ function LimitDialog(props: {
         {consent ? (
           <>
             <h2 className="project-limit__title" id={titleId}>
-              Connection needed
+              {t('projectLimit.connectionTitle')}
             </h2>
-            <p className="confirm__msg">
-              Checking your free allowance and upgrading need a connection to api.nodeterm.dev. Only
-              license checks are sent — telemetry stays off. You can turn this off in Settings →
-              Privacy.
-            </p>
+            <p className="confirm__msg">{t('projectLimit.connectionBody')}</p>
           </>
         ) : (
           <>
             <h2 className="project-limit__title" id={titleId}>
-              {`${open} of ${limit} free projects are open`}
+              {t('projectLimit.openTitle', { open, limit })}
             </h2>
-            <p className="confirm__msg">
-              Close one to make room. Closing never deletes anything — its terminals keep running and
-              it stays one click away in Recently closed.
-            </p>
+            <p className="confirm__msg">{t('projectLimit.openBody')}</p>
             {request.mode === 'error' && (
               <div className="project-limit__notice" role="alert">
-                <span>Couldn&apos;t check your free allowance with api.nodeterm.dev.</span>
+                <span>{t('projectLimit.checkFailed')}</span>
                 <button className="confirm__btn" onClick={() => resolve('retry')}>
-                  Retry
+                  {t('projectLimit.retry')}
                 </button>
               </div>
             )}
             {request.mode === 'mismatch' && (
               <div className="project-limit__notice" role="alert">
-                <span>{mismatchLine(request.retryAfter)}</span>
+                <span>{mismatchLine(request.retryAfter, t)}</span>
               </div>
             )}
-            <ul className="project-limit__list" aria-label="Open projects">
+            <ul className="project-limit__list" aria-label={t('projectLimit.openProjectsAria')}>
               {projects.map((p) => (
                 <li key={p.id} className="project-limit__row">
                   <span className="project-limit__name" title={p.name}>
@@ -179,10 +177,10 @@ function LimitDialog(props: {
                   </span>
                   <button
                     className="confirm__btn"
-                    aria-label={`Close ${p.name}`}
+                    aria-label={t('projectLimit.closeProjectAria', { name: p.name })}
                     onClick={() => onCloseProject(p.id)}
                   >
-                    Close
+                    {t('projectLimit.closeProject')}
                   </button>
                 </li>
               ))}
@@ -193,17 +191,17 @@ function LimitDialog(props: {
           {/* Focus lands on Cancel, the safe answer: an agent's refusal can raise this while the user
               is typing, and their next Enter/Space must not start a checkout or grant consent. */}
           <button className="confirm__btn" autoFocus onClick={() => resolve('cancel')}>
-            Cancel
+            {t('projectLimit.cancel')}
           </button>
           {consent ? (
             <button className="confirm__btn primary" onClick={() => resolve('consent')}>
-              Allow and check
+              {t('projectLimit.allowAndCheck')}
             </button>
           ) : (
             // Starts the existing checkout. It resolves nothing by itself: Pro arriving through the
             // license broadcast is what lets the open proceed (the automatic rule above).
             <button className="confirm__btn primary" onClick={() => void startUpgrade()}>
-              Unlimited with Pro — $10/mo
+              {t('projectLimit.upgradeCta')}
             </button>
           )}
         </div>
@@ -215,10 +213,16 @@ function LimitDialog(props: {
 
 /** The machine-mismatch line. Without a usable `retryAfter` it states the fact and no date — an
  *  "Invalid Date" is worse than none. */
-function mismatchLine(retryAfter: number | undefined): string {
-  const base = 'Your free allowance is tied to another computer.'
-  if (typeof retryAfter !== 'number' || !Number.isFinite(retryAfter)) return base
-  return `${base} It can move to this one on ${new Date(retryAfter * 1000).toLocaleDateString()}.`
+function mismatchLine(
+  retryAfter: number | undefined,
+  t: (key: string, params?: Record<string, string | number | undefined>) => string
+): string {
+  if (typeof retryAfter !== 'number' || !Number.isFinite(retryAfter)) {
+    return t('projectLimit.mismatchBase')
+  }
+  return t('projectLimit.mismatchDate', {
+    date: new Date(retryAfter * 1000).toLocaleDateString()
+  })
 }
 
 async function startUpgrade(): Promise<void> {

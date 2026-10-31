@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { useEntitlement } from '../../../state/entitlement'
 import { SettingsSection } from '../SettingsSection'
 import { SearchableRow } from '../SearchableRow'
@@ -24,9 +25,9 @@ import {
 /** How long the Copy button reports success before returning to its label. */
 const COPIED_MS = 1600
 
-const ROWS = {
+const ROW_DEFS = {
   license: {
-    title: 'License',
+    key: 'settings.license.rows.license.title',
     keywords: [
       'pro',
       'upgrade',
@@ -57,8 +58,7 @@ const ROWS = {
       'stripe'
     ]
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 // Pairing can expose an existing entitlement; it cannot repair a purchase without a linked
 // phone identity (nodeterm-ios#31). Keep the same qualification beside both purchase routes.
@@ -101,6 +101,19 @@ export function LicenseSection({
   isActive: boolean
   onNavigate: (id: SettingsSectionId) => void
 }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const ent = useEntitlement()
   const [licenseKey, setLicenseKey] = useState('')
   const [upgrading, setUpgrading] = useState(false)
@@ -164,12 +177,12 @@ export function LicenseSection({
   return (
     <SettingsSection
       id="license"
-      title="License"
-      description="Manage your nodeterm Pro subscription."
+      title={t('settings.license.title')}
+      description={t('settings.license.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.license}>
+      <SearchableRow {...rows.license}>
         {ent.isPremium ? (
           <div className="space-y-3">
             <ProCompare />

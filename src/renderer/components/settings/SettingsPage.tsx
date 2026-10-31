@@ -4,7 +4,8 @@ import { useEntitlement } from '../../state/entitlement'
 import { useProjects } from '../../state/projects'
 import { SettingsSearchContext } from './context'
 import { SettingsSidebar } from './SettingsSidebar'
-import { projectsSettingsGroup, type SettingsSectionId } from './nav'
+import { localizedProjectsSettingsGroup, type SettingsSectionId } from './nav'
+import { useI18n } from '@renderer/i18n/useI18n'
 import { projectSectionId } from './project-settings-targets'
 import { useSettingsTarget } from './useSettingsTarget'
 import { SettingsSectionBoundary } from './SettingsSectionBoundary'
@@ -13,6 +14,7 @@ import { TerminalSection } from './sections/TerminalSection'
 import { ShellSection } from './sections/ShellSection'
 import { BehaviorSection } from './sections/BehaviorSection'
 import { AppearanceSection } from './sections/AppearanceSection'
+import { LanguageSection } from './sections/LanguageSection'
 import { NotchSection } from './sections/NotchSection'
 import { PhoneSection } from './sections/PhoneSection'
 import { SpeechSection } from './sections/SpeechSection'
@@ -53,6 +55,7 @@ export function SettingsPage({
    *  leave it alone: they must not throw away a query or a section the user chose in the dialog. */
   retargetNonce?: number
 }): React.JSX.Element {
+  const { t } = useI18n()
   const hydrate = useEntitlement((s) => s.hydrate)
 
   // ONE list feeds both the nav rows and the panes below, so a "Projects" row can never point at a
@@ -72,11 +75,12 @@ export function SettingsPage({
   )
 
   const extraGroups = useMemo(() => {
-    const group = projectsSettingsGroup(
+    const group = localizedProjectsSettingsGroup(
+      t,
       openProjects.map((p) => ({ id: p.id, name: p.name, color: p.color, icon: p.icon }))
     )
     return group ? [group] : []
-  }, [openProjects])
+  }, [openProjects, t])
 
   useEffect(() => {
     void hydrate()
@@ -111,6 +115,9 @@ export function SettingsPage({
             </SettingsSectionBoundary>
             <SettingsSectionBoundary title="Behavior" visible={active === 'behavior'}>
               <BehaviorSection isActive={active === 'behavior'} />
+            </SettingsSectionBoundary>
+            <SettingsSectionBoundary title={t('settings.sections.language')} visible={active === 'language'}>
+              <LanguageSection isActive={active === 'language'} />
             </SettingsSectionBoundary>
             <SettingsSectionBoundary title="Appearance" visible={active === 'appearance'}>
               <AppearanceSection isActive={active === 'appearance'} />

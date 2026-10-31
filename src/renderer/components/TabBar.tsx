@@ -32,6 +32,7 @@ import { CONFIRM_WAIVABLE_VERBS, WAIVABLE_VERB_ACTIONS, otherWaiverHint } from '
 import { projectWaiverRow, setControlConfirmWaivedForProject } from '../state/controlConfirmGate'
 import { useControlConfirm } from '../state/controlConfirm'
 import { isBrowserRuntime } from '../bridge/runtime'
+import { useI18n } from '@renderer/i18n/useI18n'
 
 interface TabBarProps {
   onSwitch: (id: string) => void
@@ -113,6 +114,7 @@ export function TabBar({
   onCancelPendingPauses,
   onResumeAllProject
 }: TabBarProps) {
+  const { t } = useI18n()
   // Select the raw array and filter in a memo, a `.filter()` inside the selector returns a
   // fresh array every store snapshot, which re-rendered the TabBar on EVERY projects change.
   const allProjects = useProjects((s) => s.projects)
@@ -308,17 +310,17 @@ export function TabBar({
             className="tabbar__update"
             title={
               pendingUpdate.kind === 'downloaded'
-                ? `nodeterm v${pendingUpdate.version} is ready, restart to update`
+                ? t('tabBar.updateDownloaded', { version: pendingUpdate.version })
                 : pendingUpdate.kind === 'available'
-                  ? `nodeterm v${pendingUpdate.version} is available, click to download it`
+                  ? t('tabBar.updateAvailable', { version: pendingUpdate.version })
                   : pendingUpdate.kind === 'manual'
-                    ? `nodeterm v${pendingUpdate.version} is available, download it to update`
-                    : 'This version is no longer supported, update to continue'
+                    ? t('tabBar.updateManual', { version: pendingUpdate.version })
+                    : t('tabBar.updateUnsupported')
             }
             onClick={() => runPendingUpdate(pendingUpdate)}
           >
             <IconUpdate />
-            Update
+            {t('tabBar.updateButton')}
           </button>
         )}
         <div className="brand">
@@ -500,10 +502,10 @@ export function TabBar({
                       <button
                         className="tab__board-toggle"
                         title={commandTooltip(
-                          kanbanActive ? 'Canvas view' : 'Kanban view',
+                          kanbanActive ? t('tabBar.canvasView') : t('tabBar.kanbanView'),
                           'view.kanbanToggle'
                         )}
-                        aria-label={kanbanActive ? 'Canvas view' : 'Kanban view'}
+                        aria-label={kanbanActive ? t('tabBar.canvasView') : t('tabBar.kanbanView')}
                         onClick={(e) => {
                           e.stopPropagation() // a tab click switches projects, this flips the view
                           // One decision with ⌘⇧B and the menu (state/viewMode.ts): from any board
@@ -516,8 +518,8 @@ export function TabBar({
                     )}
                     <button
                       className="tab__caret"
-                      title="Project options"
-                      aria-label="Project options"
+                      title={t('tabBar.projectOptions')}
+                      aria-label={t('tabBar.projectOptions')}
                       onClick={(e) => {
                         e.stopPropagation()
                         if (menuId === p.id) closeMenu()
@@ -541,8 +543,8 @@ export function TabBar({
           <button
             type="button"
             className="tab__add"
-            title="New project"
-            aria-label="New project"
+            title={t('tabBar.newProject')}
+            aria-label={t('tabBar.newProject')}
             onClick={onOpenWelcome}
           >
             <IconPlus />
@@ -582,7 +584,9 @@ export function TabBar({
                     closeMenu()
                   }}
                 >
-                  {menuProject.storeInAppData ? 'Store canvas in folder' : 'Store canvas in app data'}
+                  {menuProject.storeInAppData
+                    ? t('tabBar.storeInFolder')
+                    : t('tabBar.storeInAppData')}
                 </button>
               )}
             <button
@@ -816,7 +820,7 @@ export function TabBar({
                 pointer through to it (`.tab-menu__reason > button:disabled`). */}
             <span
               className="tab-menu__reason"
-              title={menuProject.id !== activeId ? 'Open the project to resume' : undefined}
+              title={menuProject.id !== activeId ? t('tabBar.openToResume') : undefined}
             >
               <button
                 // Resume needs each node's mounted terminal (it re-launches the CLI into the pane

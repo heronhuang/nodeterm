@@ -7,6 +7,7 @@ import type {
 } from '@shared/project-settings'
 import { oneLine } from '@shared/one-line'
 import { ConfirmDialog } from './ConfirmDialog'
+import { useI18n } from '@renderer/i18n/useI18n'
 
 /**
  * THE TRUST GATE for a git-shared setup/archive script — the last thing between a cloned repo's
@@ -74,8 +75,6 @@ function safeLabel(raw: string): string {
   return flat.length > SETUP_LABEL_MAX ? flat.slice(0, SETUP_LABEL_MAX - 1) + '…' : flat
 }
 
-const KIND_LABEL: Record<ProjectSetupKind, string> = { setup: 'Setup', archive: 'Archive' }
-
 /**
  * The pin that defeats Trojan-source reordering on APPROVED BYTES (a script body, a launch command,
  * an env value, a shell path): it forces the DISPLAY order to the byte order, so a U+202E inside
@@ -112,6 +111,7 @@ function familyOf(req: ProjectConsentRequest): ProjectConsentRequest['family'] |
 }
 
 export function SetupConsentDialog(): React.JSX.Element | null {
+  const { t } = useI18n()
   // A QUEUE, not a single request: two projects (or a run and a worktree archive) can ask at once,
   // and answering one must not lose the other. The head is the one on screen.
   const [queue, setQueue] = useState<ProjectConsentRequest[]>([])
@@ -139,6 +139,9 @@ export function SetupConsentDialog(): React.JSX.Element | null {
   }, [])
 
   const head = queue[0]
+  const kindLabel = (kind: ProjectSetupKind): string =>
+    kind === 'setup' ? t('onboarding.setupKindSetup') : t('onboarding.setupKindArchive')
+
   if (!head) return null
 
   const drop = (requestId: string): void =>
@@ -159,21 +162,15 @@ export function SetupConsentDialog(): React.JSX.Element | null {
   const view =
     head.family === 'agents'
       ? {
-          message: `Use the shared agent launch settings for "${name}"?`,
-          confirmLabel: 'Approve',
-          changed: 'These settings have changed since you approved them for this project.',
-          intro: (
-            <>
-              They come from the project&apos;s shared <code>.nodeterm/settings.json</code>, so anyone
-              who can commit to the repo can change them. One answer covers the launch command and
-              every variable below.
-            </>
-          ),
+          message: t('onboarding.agentsMessage', { name }),
+          confirmLabel: t('onboarding.approve'),
+          changed: t('onboarding.agentsChanged'),
+          intro: <p className="text-[13px] text-muted">{t('onboarding.agentsIntro')}</p>,
           detail: (
             <>
               {head.launchCmd !== undefined ? (
                 <div className="space-y-1">
-                  <p className="text-[12px] font-semibold text-text">Launch command</p>
+                  <p className="text-[12px] font-semibold text-text">{t('onboarding.launchCommand')}</p>
                   {/* Text child, never markup — and never truncated: this is what is approved. */}
                   <pre
                     style={BIDI_PIN}
@@ -186,7 +183,7 @@ export function SetupConsentDialog(): React.JSX.Element | null {
               ) : null}
               {head.env ? (
                 <div className="space-y-1">
-                  <p className="text-[12px] font-semibold text-text">Environment</p>
+                  <p className="text-[12px] font-semibold text-text">{t('onboarding.environment')}</p>
                   {/* Every pair, verbatim: an env var is code's blast radius (PATH/LD_PRELOAD), so
                       it is inside the hash and must be inside the question. The whole ROW is pinned
                       to byte order, key included — a `KEY=value` line that renders in some other
@@ -207,19 +204,13 @@ export function SetupConsentDialog(): React.JSX.Element | null {
         }
       : head.family === 'shell'
         ? {
-            message: `Use the shared terminal shell for "${name}"?`,
-            confirmLabel: 'Approve',
-            changed: 'This setting has changed since you approved it for this project.',
-            intro: (
-              <>
-                It comes from the project&apos;s shared <code>.nodeterm/settings.json</code>, so anyone
-                who can commit to the repo can change it. Every terminal you open for this project
-                starts this program.
-              </>
-            ),
+            message: t('onboarding.shellMessage', { name }),
+            confirmLabel: t('onboarding.approve'),
+            changed: t('onboarding.shellChanged'),
+            intro: <p className="text-[13px] text-muted">{t('onboarding.shellIntro')}</p>,
             detail: (
               <div className="space-y-1">
-                <p className="text-[12px] font-semibold text-text">Shell</p>
+                <p className="text-[12px] font-semibold text-text">{t('onboarding.shellLabel')}</p>
                 <pre
                   style={BIDI_PIN}
                   data-shell=""
@@ -231,21 +222,16 @@ export function SetupConsentDialog(): React.JSX.Element | null {
             )
           }
         : {
-            message: `Run the ${KIND_LABEL[head.kind].toLowerCase()} script for "${name}"?`,
-            confirmLabel: 'Run once',
-            changed: 'These scripts have changed since you approved them for this project.',
-            intro: (
-              <>
-                They come from the project&apos;s shared <code>.nodeterm/settings.json</code>, so
-                anyone who can commit to the repo can change them. One answer covers both.
-              </>
-            ),
+            message: t('onboarding.setupMessage', { kind: kindLabel(head.kind), name }),
+            confirmLabel: t('onboarding.runOnce'),
+            changed: t('onboarding.setupChanged'),
+            intro: <p className="text-[13px] text-muted">{t('onboarding.setupIntro')}</p>,
             detail: (
               <>
                 {orderedScripts(head).map((s) => (
                   <div key={s.kind} className="space-y-1">
                     <p className="text-[12px] font-semibold text-text">
-                      {KIND_LABEL[s.kind]} script{s.kind === head.kind ? ' (about to run)' : ''}
+                      {kindLabel(s.kind)} script{s.kind === head.kind ? t('onboarding.scriptAboutToRun') : ''}
                     </p>
                     {/* Text child, never markup — and never truncated: this is what is being
                         approved. `BIDI_PIN` pins the DISPLAY order to the byte order, so a U+202E in
@@ -284,7 +270,7 @@ export function SetupConsentDialog(): React.JSX.Element | null {
       }
       message={view.message}
       confirmLabel={view.confirmLabel}
-      cancelLabel="Skip"
+      cancelLabel={t('onboarding.skip')}
       // The confirm button is the grant, so it carries the danger styling; no button takes focus.
       danger
       enterConfirms={false}

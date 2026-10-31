@@ -22,7 +22,7 @@ describe('bulk pause wiring', () => {
     for (const s of ['Pause project', 'Cancel pending pauses', 'Resume all']) expect(tabbar).toContain(s)
   })
   it('resume all is limited to the active project', () => {
-    expect(tabbar).toContain('Open the project to resume')
+    expect(tabbar).toMatch(/openToResume|Open the project to resume/)
   })
   it('the sessions-sidebar project menu carries the same three rows', () => {
     // The sidebar's project-header menu is built in Canvas (`onProjectContextMenu`), so the rows

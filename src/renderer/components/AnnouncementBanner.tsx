@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { IconClose } from './icons'
 import { useEntitlement } from '../state/entitlement'
+import { useI18n } from '@renderer/i18n/useI18n'
 import type { Announcement } from '@shared/types'
 
 // Polls the remote announcements feed (via the main process) and shows the newest
@@ -27,6 +28,7 @@ function saveSeen(seen: Set<string>): void {
 }
 
 export function AnnouncementBanner(): JSX.Element | null {
+  const { t } = useI18n()
   const [current, setCurrent] = useState<Announcement | null>(null)
   // Messages can be aimed at paid or free users, and main asks the feed with the CURRENT plan — so
   // a purchase or a lapse re-asks now instead of leaving the other plan's message (a "try Pro"
@@ -75,7 +77,7 @@ export function AnnouncementBanner(): JSX.Element | null {
           className="announce-banner__btn"
           onClick={() => window.open(current.url, '_blank', 'noopener')}
         >
-          Learn more
+          {t('announcement.learnMore')}
         </button>
       )}
       <button className="announce-banner__close" title="Dismiss" aria-label="Dismiss" onClick={dismiss}>

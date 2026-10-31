@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useMemo, useCallback, useEffect, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import type { SpeechModelInfo } from '@shared/types'
 import {
   hasSpeechModel,
@@ -25,17 +26,17 @@ import type { SettingsSectionId } from '../nav'
 
 const isMac = /Mac/i.test(navigator.platform || navigator.userAgent)
 
-const ROWS = {
+const ROW_DEFS = {
   engine: {
-    title: 'Speech engine',
+    key: 'settings.speech.rows.engine.title',
     keywords: ['speech', 'dictation', 'whisper', 'cloud', 'engine', 'voice', 'microphone']
   },
   shortcut: {
-    title: 'Dictation shortcut',
+    key: 'settings.speech.rows.shortcut.title',
     keywords: ['shortcut', 'dictation', 'hotkey', 'keybinding', 'press-to-talk', 'microphone']
   },
   models: {
-    title: 'Whisper models',
+    key: 'settings.speech.rows.models.title',
     keywords: [
       'whisper',
       'model',
@@ -53,11 +54,7 @@ const ROWS = {
     ]
   },
   language: {
-    title: 'Language',
-    // Every language name and endonym is a keyword, DERIVED from the catalogue rather than
-    // retyped: someone who searches Settings for "polish" (or "polski") should be shown the row
-    // that can give it to them. The old nine-word list is exactly the kind that goes stale the
-    // day an entry is added.
+    key: 'settings.speech.rows.language.title',
     keywords: [
       'language',
       'locale',
@@ -67,8 +64,7 @@ const ROWS = {
       ...SPEECH_LANGUAGES.flatMap((l) => [l.label, l.endonym, l.code, ...(l.aliases ?? [])])
     ]
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 /** `1600` -> `"1.6 GB"`, `142` -> `"142 MB"`. Used for both the approximate (undownloaded) and
  *  real (downloaded) size, so the two read consistently in the same row. */
@@ -93,6 +89,19 @@ export function SpeechSection({
    *  select/download to the License section (the sales surface; there is no paywall dialog). */
   onNavigate: (id: SettingsSectionId) => void
 }): React.JSX.Element {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
+
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
   // The chord's single source is the registry override (`speech.shortcut` is only the legacy
@@ -213,12 +222,12 @@ export function SpeechSection({
   return (
     <SettingsSection
       id="speech"
-      title="Speech"
-      description="Dictate into any terminal or chat node. Local Whisper runs fully on-device — nothing leaves this machine."
+      title={t('settings.speech.title')}
+      description={t('settings.speech.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.engine}>
+      <SearchableRow {...rows.engine}>
         <FieldRow
           label="Engine"
           description="Local Whisper transcribes on-device. Cloud requires the nodeterm backend · not available yet."
@@ -236,7 +245,7 @@ export function SpeechSection({
         />
       </SearchableRow>
 
-      <SearchableRow {...ROWS.shortcut}>
+      <SearchableRow {...rows.shortcut}>
         <FieldRow
           label="Shortcut"
           description="Dictation's shortcut is managed with every other keyboard shortcut."
@@ -255,7 +264,7 @@ export function SpeechSection({
         />
       </SearchableRow>
 
-      <SearchableRow {...ROWS.models}>
+      <SearchableRow {...rows.models}>
         <div className="space-y-3">
           <h4 className="text-[13px] font-medium text-text">Whisper models</h4>
           {models.length === 0 ? (
@@ -350,7 +359,7 @@ export function SpeechSection({
         </div>
       </SearchableRow>
 
-      <SearchableRow {...ROWS.language}>
+      <SearchableRow {...rows.language}>
         <FieldRow
           label="Language"
           // The copy names what is SELECTED, not just what the field is for: with a searchable

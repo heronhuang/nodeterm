@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 import type { Project } from '@shared/types'
 import {
   ALL_PERMISSION_MODES,
@@ -49,27 +50,31 @@ function persistIdentityEdit(): void {
  * WITHOUT the project's name: a name query is handled by `forceVisible` below, which opens the
  * whole pane rather than filtering it down to whichever rows happened to mention the name.
  */
-const ROWS = {
-  name: { title: 'Project name', keywords: ['rename', 'project', 'title'] },
-  folder: { title: 'Folder', keywords: ['cwd', 'path', 'directory', 'ssh', 'server'] },
+const ROW_DEFS = {
+  name: {
+    key: 'settings.projectSettings.rows.name.title',
+    keywords: ['rename', 'project', 'title']
+  },
+  folder: {
+    key: 'settings.projectSettings.rows.folder.title',
+    keywords: ['cwd', 'path', 'directory', 'ssh', 'server']
+  },
   color: {
-    title: 'Icon & color',
+    key: 'settings.projectSettings.rows.color.title',
     keywords: [
       'accent', 'swatch', 'tab', 'monogram', 'color',
       'icon', 'emoji', 'glyph', 'lucide', 'avatar', 'image', 'logo', 'upload'
     ]
   },
   permission: {
-    title: 'Default permission mode',
+    key: 'settings.projectSettings.rows.permission.title',
     keywords: ['claude', 'plan', 'accept edits', 'bypass', 'approval']
   },
   account: {
-    title: 'Default Claude account',
+    key: 'settings.projectSettings.rows.account.title',
     keywords: ['account', 'login', 'claude', 'system']
   }
-} satisfies Record<string, SettingsSearchEntry>
-
-const IDENTITY_ENTRIES: SettingsSearchEntry[] = Object.values(ROWS)
+} as const
 
 /** Where this project's terminals run: a local folder, or `user@host:/remote/path` for SSH. */
 function projectTarget(project: Project): string {
@@ -92,14 +97,25 @@ export function ProjectSettingsSection({
   projectId: string
   isActive: boolean
 }): React.JSX.Element | null {
+  const { t } = useI18n()
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, SettingsSearchEntry>,
+    [t]
+  )
   const project = useProjects((s) => s.projects.find((p) => p.id === projectId))
   const query = useSettingsSearch()
   const name = project?.name ?? ''
   // The pane's own name is a search entry in its own right (so a name query reaches the gate at
   // all) AND the trigger for `forceVisible` (so the pane then renders whole).
   const entries = useMemo(
-    () => [...IDENTITY_ENTRIES, ...FAMILY_SEARCH_ENTRIES, { title: name, keywords: [name] }],
-    [name]
+    () => [...Object.values(rows), ...FAMILY_SEARCH_ENTRIES, { title: name, keywords: [name] }],
+    [rows, name]
   )
   const forceVisible = matchesQuery(query, { title: name })
   if (!project) return null
@@ -125,6 +141,7 @@ export function ProjectSettingsSection({
       isActive={isActive}
       entries={entries}
       forceVisible={forceVisible}
+      rows={rows}
     />
   )
 }
@@ -161,13 +178,16 @@ function EditableProjectSection({
   project,
   isActive,
   entries,
-  forceVisible
+  forceVisible,
+  rows
 }: {
   project: Project
   isActive: boolean
   entries: SettingsSearchEntry[]
   forceVisible: boolean
+  rows: Record<keyof typeof ROW_DEFS, SettingsSearchEntry>
 }): React.JSX.Element {
+  const { t } = useI18n()
   const settings = useProjectSettings(project.id)
   const appTheme = useAppTheme()
   const claudeAccounts = useSettings((s) => s.settings.claudeAccounts)
@@ -226,10 +246,10 @@ function EditableProjectSection({
               file it is about is being ignored, even before Task 4's editors exist. */}
         </div>
       ) : null}
-      <SearchableRow {...ROWS.name}>
+      <SearchableRow {...rows.name}>
         <FieldRow
           label="Project name"
-          description="Shown on the tab and in the project switcher."
+          description="The name shown on the project tab and in the sessions sidebar."
           htmlFor={`project-name-${project.id}`}
           control={
             <Input
@@ -248,7 +268,7 @@ function EditableProjectSection({
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.folder}>
+      <SearchableRow {...rows.folder}>
         <FieldRow
           label={project.ssh ? 'Server folder' : 'Folder'}
           description="Where this project's terminals start. Change it from the project tab's menu."
@@ -259,7 +279,7 @@ function EditableProjectSection({
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.color}>
+      <SearchableRow {...rows.color}>
         {/* Icon & colour is a full-width block, not a label-left/control-right FieldRow: the picker
             (glyph preview, swatches, tabbed sources) needs the whole column, mirroring Orca's
             RepositoryIconPicker layout. */}
@@ -294,7 +314,7 @@ function EditableProjectSection({
           />
         </div>
       </SearchableRow>
-      <SearchableRow {...ROWS.permission}>
+      <SearchableRow {...rows.permission}>
         <FieldRow
           label="Default permission mode"
           description="Start-up permission mode for new Claude terminal sessions in this project. Saved in the shared project file, so it travels to everyone who clones the repo."
@@ -325,7 +345,7 @@ function EditableProjectSection({
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.account}>
+      <SearchableRow {...rows.account}>
         <FieldRow
           label="Default Claude account"
           description="Account new Claude and chat nodes in this project use."

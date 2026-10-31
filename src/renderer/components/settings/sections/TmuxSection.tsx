@@ -23,69 +23,85 @@ import {
   PARK_MINUTES_DEFAULT,
   PARK_MINUTES_MAX
 } from '@renderer/terminal/park-budget'
+import { useMemo } from 'react'
+import { useI18n } from '@renderer/i18n/useI18n'
 
-const ROWS = {
+const ROW_DEFS = {
   enabled: {
-    title: 'Persistent sessions',
+    key: 'settings.tmux.rows.enabled.title',
     keywords: ['tmux', 'persistent', 'session', 'continuity', 'protection', 'host']
   },
   backend: {
-    title: 'Session backend',
+    key: 'settings.tmux.rows.backend.title',
     keywords: ['tmux', 'zellij', 'backend', 'multiplexer', 'session', 'persistent']
   },
-  scrollback: { title: 'Scrollback lines', keywords: ['tmux', 'scrollback', 'history', 'lines'] },
+  scrollback: {
+    key: 'settings.tmux.rows.scrollback.title',
+    keywords: ['tmux', 'scrollback', 'history', 'lines']
+  },
   leadPane: {
-    title: 'Keep lead pane wide (agent teams)',
+    key: 'settings.tmux.rows.leadPane.title',
     keywords: ['lead', 'pane', 'width', 'agent', 'team', 'teammates', 'split', 'claude', 'resize']
   },
   parkMinutes: {
-    title: 'Keep switched-away terminals attached',
+    key: 'settings.tmux.rows.parkMinutes.title',
     keywords: ['park', 'switch', 'project', 'ssh', 'fast', 'instant', 'reattach', 'minutes', 'memory']
   },
   parkMax: {
-    title: 'Max attached terminals in other projects',
+    key: 'settings.tmux.rows.parkMax.title',
     keywords: ['park', 'cap', 'limit', 'switch', 'project', 'ssh', 'reattach', 'memory', 'ram']
   },
   offscreen: {
-    title: 'Release offscreen terminals',
+    key: 'settings.tmux.rows.offscreen.title',
     keywords: ['offscreen', 'memory', 'ram', 'release', 'reattach', 'idle', 'minutes']
   }
-}
-const ENTRIES = Object.values(ROWS)
+} as const
 
 export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Element {
+  const { t } = useI18n()
   const status = usePersistenceStatus()
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
+  const rows = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(ROW_DEFS).map(([id, def]) => [
+          id,
+          { title: t(def.key), keywords: [...def.keywords] }
+        ])
+      ) as Record<keyof typeof ROW_DEFS, { title: string; keywords: string[] }>,
+    [t]
+  )
+  const entries = useMemo(() => Object.values(rows), [rows])
   return (
     <SettingsSection
       id="tmux"
-      title="Session protection"
-      description="Applies to new terminals / next launch."
+      title={t('settings.tmux.title')}
+      description={t('settings.tmux.description')}
       isActive={isActive}
-      searchEntries={ENTRIES}
+      searchEntries={entries}
     >
-      <SearchableRow {...ROWS.enabled}>
+      <SearchableRow {...rows.enabled}>
         <FieldRow
-          label="Persistent sessions"
+          label={t('settings.tmux.persistentSessions')}
           description={persistenceDescription(status)}
           control={
             <Switch
               checked={settings.tmuxEnabled}
               onChange={(v) => update({ tmuxEnabled: v })}
-              ariaLabel="Persistent sessions"
+              ariaLabel={t('settings.tmux.persistentSessions')}
             />
           }
         />
       </SearchableRow>
       {status?.zellij ? (
-        <SearchableRow {...ROWS.backend}>
+        <SearchableRow {...rows.backend}>
           <FieldRow
-            label="Session backend"
+            label={t('settings.tmux.sessionBackend')}
             description={sessionBackendNote(status.zellij)}
             note={
               normalizeSessionBackend(settings.sessionBackend) === 'zellij'
-                ? `Not available with Zellij: ${ZELLIJ_BACKEND_GAPS.join(' ')}`
+                ? t('settings.tmux.zellijUnavailable', { gaps: ZELLIJ_BACKEND_GAPS.join(' ') })
                 : undefined
             }
             control={
@@ -101,9 +117,9 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           />
         </SearchableRow>
       ) : null}
-      <SearchableRow {...ROWS.scrollback}>
+      <SearchableRow {...rows.scrollback}>
         <FieldRow
-          label="Scrollback lines"
+          label={t('settings.tmux.scrollbackLines')}
           description={
             'tmux’s history-limit for each terminal. ' +
             `Without tmux (Windows), history is capped at ${XTERM_SCROLLBACK_MAX.toLocaleString('en-US')} lines: the app holds it at full width in memory.`
@@ -119,9 +135,9 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.leadPane}>
+      <SearchableRow {...rows.leadPane}>
         <FieldRow
-          label="Keep lead pane wide (agent teams)"
+          label={t('settings.tmux.leadPane')}
           description={
             'Claude Code agent teams re-apply a hardcoded 70/30 tmux split on every teammate spawn, squeezing the pane you type into. ' +
             'When on, guarded tmux hooks keep the lead pane at the chosen % of the node width (40–90), locally and on SSH hosts (at next connect). ' +
@@ -152,9 +168,9 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.parkMinutes}>
+      <SearchableRow {...rows.parkMinutes}>
         <FieldRow
-          label="Keep switched-away terminals attached"
+          label={t('settings.tmux.parkMinutes')}
           description={
             'Minutes a project’s terminals stay attached after you switch to another project, so switching back is instant. ' +
             'After that they reattach on return — seconds per project over SSH. 0 = until the app quits. ' +
@@ -178,9 +194,9 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.parkMax}>
+      <SearchableRow {...rows.parkMax}>
         <FieldRow
-          label="Max attached terminals in other projects"
+          label={t('settings.tmux.parkMax')}
           description={
             'How many switched-away terminals stay attached in total. Beyond this the oldest are released early — local ones before SSH ones, which are slower to reattach. ' +
             'Each costs about 2 MB with tmux (more without tmux: its scrollback lives in the app) and, over SSH, one local ssh client on the project’s connection. ' +
@@ -200,10 +216,10 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
           }
         />
       </SearchableRow>
-      <SearchableRow {...ROWS.offscreen}>
+      <SearchableRow {...rows.offscreen}>
         <FieldRow
-          label="Release offscreen terminals"
-          description="Minutes a terminal may sit offscreen before its view is released (tmux keeps it running; it reattaches on view). 0 = never."
+          label={t('settings.tmux.offscreen')}
+          description={t('settings.tmux.offscreenDescription')}
           control={
             <NumberField
               value={settings.offscreenTerminalMinutes}
