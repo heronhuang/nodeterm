@@ -10,6 +10,7 @@ Desktop installers are built with [electron-builder](https://www.electron.build/
 | `npm run dist:win` | Windows (x64, unsigned) | Local Windows package: NSIS + zip, updates disabled |
 | `npm run release` | macOS (arm64 + x64, signed) | Production mac build: sign, notarize, DMG + zip + `latest-mac.yml` |
 | `npm run dist:win:release` | Windows (x64, unsigned beta) | CI/release Windows build: NSIS + zip + `latest.yml`, manual update notice only |
+| `npm run dist:mac:release` | macOS (arm64 + x64, unsigned) | CI/release mac build: DMG + zip + `latest-mac.yml`, manual update notice only |
 
 Every packaging script runs `npm run make-icon` and the full `npm run build` (electron-vite bundles, session host, Codex relay) before invoking electron-builder.
 
@@ -17,9 +18,9 @@ On macOS, `npm run release` expects a universal build and runs `npm run rebuild`
 
 ## Code signing and notarization
 
-### macOS (`npm run release`, CI `release-mac`)
+### macOS (`npm run release`, signed upstream)
 
-Set these environment variables (GitHub Actions secrets on the self-hosted Mac runner):
+Set these environment variables (GitHub Actions secrets on a signing Mac runner):
 
 - **`CSC_LINK`** — base64-encoded Developer ID Application `.p12`
 - **`CSC_KEY_PASSWORD`** — password for the `.p12`
@@ -37,8 +38,9 @@ Shipped Windows builds are currently **unsigned** (passive update notice only). 
 
 Tag pushes (`v*`) run `.github/workflows/release.yml`:
 
-- **`release-mac`** — self-hosted Apple Silicon Mac: `npm run release`, uploads DMG/zip/`latest-mac.yml`
+- **`release-mac`** — GitHub `macos-14`: `npm run dist:mac:release` (unsigned on this fork), uploads DMG/zip/`latest-mac.yml`
 - **`release-win`** — GitHub `windows-latest`: `npm run dist:win:release`, uploads NSIS/zip/`latest.yml` (best-effort, does not block publish)
 - **`publish`** — promotes the GitHub Release to latest after mac assets upload
+- **`verify-feed`** — checks `https://nodeterm.dev/updates` only on `eneskirca/nodeterm` (skipped on forks)
 
-Update feed files are mirrored at `https://nodeterm.dev/updates` (outside this repo).
+Update feed files are mirrored at `https://nodeterm.dev/updates` on upstream (outside this repo).
