@@ -15,7 +15,7 @@ const ROWS = fs
 
 describe('Collapse / Expand menu wiring', () => {
   it('gates the row on canToggleCollapse over the targets', () => {
-    const row = ROWS.indexOf("label: 'Collapse / Expand'")
+    const row = ROWS.indexOf("label: t('nodeActions.collapseExpand')")
     expect(row).toBeGreaterThan(-1)
     const gate = ROWS.slice(ROWS.lastIndexOf("isHidden('collapse', hidden)", row), row)
     expect(gate).toMatch(/!ids\.some\(\(nid\) => \{[\s\S]*canToggleCollapse\(n\)/)
