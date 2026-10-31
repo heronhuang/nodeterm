@@ -1,94 +1,93 @@
-# Walking agent mascots — shared sprite spec (v1)
+> English: [docs/en/mascot-sprites.md](./en/mascot-sprites.md)
 
-Adopted from **agent-notch** (MIT, © 2026 realfishsam — animation technique and the pixel
-Claude mascot rendition) with the owner's call: use these sprites now, swap in nodeterm's own
-mascot before any branding/App-Store push (the Codex pet spritesheet is © OpenAI from their
-public pets CDN; the pixel Claude critter renders Anthropic's banner mascot).
+# 行走代理吉祥物——共享图案谱(v1).
 
-Surfaces (owner-picked): iOS in-app (full walk animation), Live Activity / Lock Screen
-(STATIC frame only — WidgetKit renders static views), desktop canvas RUNNING badge (full walk).
+由** agent-notch**(MIT, 2026 realfishsam)——动画技术和像素通过
+Claude吉祥物引渡案),与主人的呼唤:现在使用这些宝石,在节点交换自己
+吉祥物在任何品牌/App-Store推前令人信服的(Codex宠物图案表是来自他们的OpenAI)
+被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的起着的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝 这将被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的被拒绝的 什么事的被拒绝的被拒绝的被拒绝的被拒绝的被的被拒绝的被的被的被的被的被硕的拒绝的被的被的被的被的拒绝的被的被的被的拒绝的被的拒绝的被的被的被的拒绝的被的被的拒绝的被的被的被的被的被的拒绝是联合国的被的被的拒绝的被的被的被的拒绝的被的被的被的被的被的被的被的被的被的拒绝的被的拒绝的被的被的被的被的被的被的被的被的被的拒绝的被的拒绝的被的被的拒绝的被的被的的被的被的被的被的被的被的
 
-## Claude mascot (drawn at runtime from a pixel map — no image asset)
+表面( 所有者选中): iOS in- app( 完整行走动画), Live Activity / Lock Screen
+(STATIC框架只——WidgetKit使静态视图),桌面画布运行徽章(完整行走).
 
-Two frames of terminal quadrant-block art, 9 cols × 3 rows of half-block characters
-→ an 18×6 sub-pixel grid. Feet alternate between frames:
+^ Claude吉祥物(运行时从像素地图中提取——没有图像资产)
+
+终端四角形艺术的两帧, 9 cols × 3行半块字符
+~ 一个18×6子像素网格. 在框架之间换脚 :
 
 ```
 frame 0:  " ▐▛███▜▌ " / "▝▜█████▛▘" / "  ▘▘ ▝▝  "
 frame 1:  " ▐▛███▜▌ " / "▝▜█████▛▘" / "  ▝▝ ▘▘  "
 ```
 
-Quadrant char → (UL, UR, LL, LR) sub-pixel bits:
-`█`=1111 `▐`=0101 `▌`=1010 `▛`=1110 `▜`=1101 `▙`=1011 `▟`=0111 `▘`=1000 `▝`=0100 `▖`=0010 `▗`=0001 space=0000
-(bit order: upper-left, upper-right, lower-left, lower-right)
+Quadrant char → (UL, UR, LL, LR) 子像素比特 :`█`=1111 个`▐`=0101 (单位:千美元)`▌`=1010 个`▛`=1110个`▜`=1101个`▙`=1011个`▟`=0111 (单位:千美元)`▘`=1 000个`▝`=0100 (单位:千美元)`▖`=0010 时`▗`=0001空间=000
+(位顺序:左上,右上,左下,右下).
 
-- Color: Anthropic coral `rgb(217, 120, 87)` (= 0.85, 0.47, 0.34).
-- **Aspect**: terminal cells are ~2× taller than wide — sub-pixel cell ratio 1:2
-  (reference: subW 1.6, subH 3.2). Don't square it or "he squishes".
-- **Walk**: frame index = `floor(t × 2.5) % 2` (≈ 2.5 steps/s).
-- **Bob**: vertical offset alternates with the frame (±0.5–1.5 px scaled to render size).
+- 颜色:炭珊瑚`rgb(217, 120, 87)`(=0.85,0.47,0.34) (中文(简体) ).
+- **Spect**:终极细胞比宽~2×高−子像素细胞比1:2
+(参考:子W 1.6,子H 3.2). 不要说"他"
+- **Walk**:帧指数=`floor(t × 2.5) % 2`(≈2.5步/秒).
+- **Bob**:与框架相垂直冲抵替代(±0.5-1.5 px缩放成大小)。
 
-## Grok, gemini and opencode — the brand mark, breathing (no critter)
+^ Grok, gemini和opencode——品牌标记,呼吸(无动物).
 
-These three have **no sprite**. Grok had an original quadrant critter first; standing next to two
-real mascots it read as neither, so the working indicator became the glyph the agent actually has —
-its official mark, pulsing with a bloom instead of walking. gemini and opencode then joined the same
-mechanism (2026-08-09): they had been falling through to the plain dot, which says "something is
-happening" but not *who*.
+这3个有**没有图案**. 格鲁克先有一个原象限动物;站在两个象限旁边
+真正的吉祥物 它读为两个, 所以工作指标 成为glyph 代理实际上 -
+它的官方标记, 脉动的开花而不是走路。 Gemini 和 opencode 然后加入同样的
+机制(2026-08-09):他们一直掉到平原点,上面写着:
+发生了",但不是"谁"。
 
-- The DECISION is the pure `brandPulsePlan` in `src/renderer/lib/brandPulse.ts` — deliberately
-  React-free, because it has two consumers with nothing in common: the React canvas badge
-  (`AgentMascot` → `BrandPulse` in `lib/agentIcons.tsx`) and the notch HUD, which builds DOM
-  imperatively (`workingMascot` in `hud/main.ts`). One decision, two thin renderers, so an agent is
-  never two things on two surfaces. `AgentMascot` no longer imports `GrokMark` at all.
-- **Two kinds of mark**, which is the whole reason the plan has a `kind`:
-  - `inline` — **grok only**: a single monochrome path from `src/renderer/lib/grokMark.ts`
-    (`createGrokMarkSvg` for the HUD), painted in `currentColor`.
-  - `asset` — claude, codex, gemini, opencode: multi-colour SVGs carrying their own fills, loaded as
-    an `<img src>` / `background-image`, so `currentColor` has nothing to inherit there. (claude and
-    codex have their own sprite art and reach the pulse only through menus, not the badge.)
-- The **bloom is a drop-shadow of the element's `color`**, which is exactly right for a monochrome
-  mark and approximate for the assets: gemini's gradient mark blooms in the label colour, not its own
-  ink. Accepted — the halo reads as a glow either way, and per-mark bloom colours would mean an ink
-  table. For grok it is what makes the mark theme-correct with no ink of its own: light-on-dark in the
-  dark theme and on the notch's black capsule, dark-on-light in the light theme. A fixed glow colour
-  would have vanished into one of the two backgrounds — the trap the retired sprite had to solve with
-  a measured mid-tone.
-- Two shadows, tight + wide (`0 0 1px` + `0 0 4px`): the tight one keeps thin strokes from washing out
-  at 13–16 px, the wide one is the glow.
-- `prefers-reduced-motion` freezes it at the LIT end of the cycle, so a working node reads as awake
-  rather than dimmed.
-- The HUD paints its mark as a CSS `background-image` and **must** quote the URL
-  (`brandPulseBackground`): Vite inlines these small SVGs as data URIs carrying literal `'` and, for
-  three of the four, literal `(`/`)`, so an unquoted `url(…)` terminates early and the declaration is
-  dropped — an empty box, silently.
+-决定是纯洁的`brandPulsePlan`输入`src/renderer/lib/brandPulse.ts`- 蓄意的
+反应免费,因为它有两个没有共同点的消费者:反应画布徽章
+(单位:千美元)`AgentMascot`→`BrandPulse`输入`lib/agentIcons.tsx`和建立DOM的圆顶HUD
+绝对(`workingMascot`输入`hud/main.ts`) (中文(简体) ). 一个决定,两个薄的渲染器, 所以一个代理是
+从来没有两件事在两个表面。`AgentMascot`不再进口`GrokMark`完全没有。
+-** 两种标记**, 这就是计划有一个原因`kind`编号 :
+- 怎么样?`inline`- 来源于从从从从从从从从从从从إ从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从的从从从从从从从从从从从从从从从的从从从从从从从从从从从从从从从的从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从从`src/renderer/lib/grokMark.ts`(单位:千美元)`createGrokMarkSvg`用于HUD),涂在`currentColor`。 。 。
+- 怎么样?`asset`– Claude, codex, gemini, opencode: 多色 SVG 携带自己的填充, 加载为
+a 一个`<img src>`页:1`background-image`这样`currentColor`在那里没有什么可继承的。 (声优:
+codex拥有自己的图案艺术,只能通过菜单,而不是徽章到达脉冲. )
+-**bloom是元素的滴影`color`**,这 138. 完全适合单色
+资产标记和近似: 基因组的梯度标记在标签颜色中开花, 而不是它自己的
+墨迹. 接受——光环读作一种发光方式,每个标记开花的携手颜色将意味着墨水
+表单。 对于grok来说,正是它使标记主题正确,没有自己的墨水: 就这些浅色的暗色
+暗色主题和notch的黑色胶囊上,光线主题中的暗光. 固定的发光颜色
+将消失在两个背景之一—— 退休的宝石必须用
+一个量度中吨。
+- 两个阴影,紧+宽(`0 0 1px`+ 键`0 0 4px`:紧身的保持细微的中风 冲洗出来
+在13 -16px,宽的是一个光。
+- 怎么样?`prefers-reduced-motion`将它冻结在循环的LIT末端,所以一个工作节点读作清醒
+而不是阴暗。
+- HUD将其标记描绘为CSS`background-image`并 ** 必须** 引用 URL
+(单位:千美元)`brandPulseBackground`: Vite 将这些小 SVG 作为数据 URI 包含字面`'`和,用于
+4个中的3个,字面`(`页:1`)`,所以没有引用`url(…)`提前终止,声明为
+空箱,无声地。
 
-## Codex pet (spritesheet asset)
+□ Codex 宠物( 文件表资产)
 
-`pet-codex.webp` (checked into `resources/mascot/` here, `NodeTerm/Resources/Mascot/` on iOS):
-8 columns × 9 rows of 192×208 frames. The first-row cycle has **six populated frames followed by two empty cells**; play only
-those six frames at ~8 fps
-(agent-notch uses a 0.12 s timer). Render small (~16–20 px tall), pixelated scaling
-(`image-rendering: pixelated` / `.interpolation(.none)`).
+`pet-codex.webp`(已核对)`resources/mascot/`在这里,`NodeTerm/Resources/Mascot/`(原始内容存档于2018-09-31). Official website
+8列×9行192×208帧. 第一次轮值周期为 ** 6 个内装帧,然后是两个空电池**;
+在 ~8 fps 时的六帧
+(agent-notch使用0.12 s定时器). 小型( ~16 - 20 px 高), 像素缩放
+(单位:千美元)`image-rendering: pixelated`页:1`.interpolation(.none)`) (中文(简体) ).
 
-## Done state — green blob
+□ 完成状态——绿色blob
 
-When a session finishes and hasn't been looked at, the mascot's slot turns into a shimmering
-green blob: 7×7 grid, cell filled when `hash-noise(i,j,step) > 0.1 + dist-from-center/3.5 × 0.8`,
-green with alpha `0.5 + 0.5×noise`, `step = floor(t × 2)`. Static surfaces (Live Activity)
-render one blob frame. In-app/desktop may simplify to a green pixel checkmark where the
-shimmer is noisy at small sizes — match agent-notch's panel behavior.
+当一个会场结束,还没有被看, 吉祥物的插槽变成闪烁
+绿色块: 7×7格, 单元格填充时间`hash-noise(i,j,step) > 0.1 + dist-from-center/3.5 × 0.8`, (中文).
+绿色,带α`0.5 + 0.5×noise`, (中文).`step = floor(t × 2)`静态表面(活活动)
+做一个blob框。 应用中/桌面上可以简化为绿色像素检查标记,如果
+shimmer在小尺寸上很吵——匹配代理-noch的面板行为.
 
-## Per-surface rules
+□ 表面规则
 
-- **iOS in-app** (Inbox Working-now cards, session header): SwiftUI `Canvas` renders the
-  pixel map; `TimelineView(.periodic(…, 0.2s))` drives walk+bob. Codex → spritesheet crop.
-  Other agents (gemini/opencode/custom): keep the existing glyphs (no sprite exists).
-- **Live Activity / Island**: STATIC — working = mascot frame 0, done = one green-blob frame.
-  No timers, no TimelineView animation loops (WidgetKit won't run them).
-- **Desktop canvas** (TerminalNode header, working state): prefer CSS `steps()` animation over
-  JS timers (a canvas can hold dozens of terminals — zero per-node intervals). Render the two
-  pixel-map frames once into a data-URI spritesheet at module load; the badge is a `<span>`
-  with `background-position` stepping. Codex: `steps(6)` over the first row's six populated cells (0.72 s cycle, 0.12 s per frame).
-  Keep the sheet eight columns wide; including its two empty cells makes the mascot disappear
-  for 0.24 s on every loop. This applies to the notch HUD too.
+- **iOS in-app**(Inbox Working-n梢卡,会话标题):SwiftUI`Canvas`使
+像素映射;`TimelineView(.periodic(…, 0.2s))`驱动步态+bob. (原始内容存档于2017-03-03). Codex ~ Spritesheet 裁剪.
+其他代理(gemini/opencode/custom):保留现有的glyphs(不存在sprite).
+- **Live Activity / Island**:STATIC——工作=吉祥物帧0,完成=一个绿色blob帧.
+没有计时器,也没有时光网上View动画循环(WidgetKit不会运行).
+- ** Desktop画布**(结束) 节点头, 工作状态 : 偏好 CSS`steps()`动画结束
+JS定时器(帆布可以持有数十个终端——每节点间隔为0). 我有个问题. 把两个都弄出来
+在模块加载时,像素-映射框架曾经被输入到一个数据-URI图示表;徽章是一个`<span>`设置`background-position`脚步。 代码 :`steps(6)`超过第一排的6个人口密集的牢房(0.72s周期,0.12s每帧)。
+保持表八列宽; 包括其两个空单元格使吉祥物消失
+每环0.24秒 这一点也适用于 " 团结 " 项目。
