@@ -17,6 +17,7 @@ import { createControlOpenBatch } from '../lib/controlOpenBatch'
 import { commitOwnedLaunchAttempt, registerLaunchCommit } from '../terminal/launch-attempt'
 import { hasLaunchWriter, launchCommand } from '../terminal/launch-command'
 import { useCoreIsWindows } from '../terminal/use-core-platform'
+import { t } from '@renderer/i18n/runtime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useContextLinkSync } from './useContextLinkSync'
 import { useMirrorIdentitySeed } from './useMirrorIdentitySeed'
@@ -8905,7 +8906,7 @@ export function Canvas() {
           label: 'Resume all',
           icon: <IconPower />,
           disabled: !active,
-          ...(active ? {} : { hint: 'Open the project to resume' }),
+          ...(active ? {} : { hint: t('tabBar.openToResume') }),
           onClick: () => resumeAllProject(projectId)
         }
       ]

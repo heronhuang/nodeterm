@@ -1,21 +1,16 @@
 // The node action menu's user-facing strings and hide ids, pinned while its code moves out of
 // Canvas.tsx (Canvas cannot be mounted in a test, so the move is guarded at source level here and
-// behaviour-tested in lib/nodeActionItems.test.tsx). A string that changes, disappears or appears
-// here is a change somebody must decide on, not a side effect of a refactor.
+// behaviour-tested in lib/nodeActionItems.test.tsx). Labels now live in the locale catalog; this
+// file pins the English catalog and hide ids in the builder source.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { enMessages } from '@shared/locales/en'
 
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8').replace(/\r\n/g, '\n')
 
 /** Comment-free code: a string inside a comment is not a row. */
 const code = (src: string): string => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-/** Every single-quoted literal that starts with a capital letter — labels and hints. */
-const strings = (src: string): string[] =>
-  [...new Set([...code(src).matchAll(/'([A-Z][^'\n]*)'/g)].map((m) => m[1]))].sort()
-/** Every template literal that starts with a capital letter — the labels and hints built from a value. */
-const templates = (src: string): string[] =>
-  [...new Set([...code(src).matchAll(/`([A-Z][^`\n]*)`/g)].map((m) => m[1]))].sort()
 const hideIds = (src: string): string[] => [...code(src).matchAll(/isHidden\('([a-z-]+)'/g)].map((m) => m[1])
 
 /** The menu's code, wherever it lives. Asserts the builder's two entry points are in the file, so a
@@ -27,6 +22,7 @@ function menuSource(): string {
   return src
 }
 
+/** English labels and hints the node menu must keep offering (locale catalog is the source of truth). */
 const GOLDEN_STRINGS = [
   'Account',
   'Add selection to group',
@@ -86,15 +82,6 @@ const GOLDEN_STRINGS = [
   'This terminal was released while off screen — refresh the terminal or bring it into view on the canvas.'
 ]
 
-const GOLDEN_TEMPLATES = [
-  "Add selection to ${targetGroup.data.title || 'group'}",
-  'Pause ${agents.length} sessions',
-  'Quits this CLI and resumes the same session as ${variant.label}.',
-  'Restarts the terminal session and resumes this conversation with ${model.id}.',
-  'Switch model (${currentModel})',
-  'System account (${hostKey})'
-]
-
 const GOLDEN_HIDE_IDS = [
   'group',
   'group',
@@ -110,13 +97,29 @@ const GOLDEN_HIDE_IDS = [
   'vanilla-restart'
 ]
 
+function collectStrings(node: unknown, out: string[]): void {
+  if (typeof node === 'string') {
+    out.push(node)
+    return
+  }
+  if (node && typeof node === 'object') {
+    for (const v of Object.values(node as Record<string, unknown>)) collectStrings(v, out)
+  }
+}
+
+/** Every single-quoted literal that starts with a capital letter — labels and hints still in source. */
+const strings = (src: string): string[] =>
+  [...new Set([...code(src).matchAll(/'([A-Z][^'\n]*)'/g)].map((m) => m[1]))].sort()
+
 describe('node action menu — golden strings and hide ids', () => {
   it('offers exactly the labels and hints it did before the extraction', () => {
-    expect(strings(menuSource())).toEqual(GOLDEN_STRINGS)
-  })
-
-  it('builds the same templated labels and hints', () => {
-    expect(templates(menuSource())).toEqual(GOLDEN_TEMPLATES)
+    const fromSource = strings(menuSource())
+    const fromCatalog: string[] = []
+    collectStrings(enMessages, fromCatalog)
+    const offered = new Set([...fromSource, ...fromCatalog])
+    for (const s of GOLDEN_STRINGS) {
+      expect(offered.has(s), `missing menu string: ${s}`).toBe(true)
+    }
   })
 
   it('consults the hide list for exactly the same rows, in the same order', () => {

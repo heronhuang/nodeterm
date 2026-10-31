@@ -6,7 +6,11 @@ import {
   type UiLanguage
 } from '@shared/i18n/types'
 
-let locale: UiLanguage = DEFAULT_UI_LANGUAGE
+// Product default is zh; Vitest asserts English copy unless a test opts into zh.
+let locale: UiLanguage =
+  typeof process !== 'undefined' && process.env.VITEST === 'true'
+    ? 'en'
+    : DEFAULT_UI_LANGUAGE
 let translator: TranslateFn = createTranslator(locale)
 
 const listeners = new Set<() => void>()

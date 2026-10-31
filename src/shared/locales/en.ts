@@ -250,7 +250,7 @@ export const enMessages = {
     openTitle: '{open} of {limit} free projects are open',
     openBody:
       'Close one to make room. Closing never deletes anything — its terminals keep running and it stays one click away in Recently closed.',
-    checkFailed: 'Couldn’t check your free allowance with api.nodeterm.dev.',
+    checkFailed: "Couldn't check your free allowance with api.nodeterm.dev.",
     retry: 'Retry',
     mismatchBase: 'Your free allowance is tied to another computer.',
     mismatchDate: 'Your free allowance is tied to another computer. It can move to this one on {date}.',
