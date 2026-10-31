@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { IconClose } from './icons'
 import { persistenceDescription, usePersistenceStatus } from './usePersistenceStatus'
 import { localSession } from '../session/localSession'
+import { useI18n } from '../i18n/useI18n'
 
 // Backend discovery is shared with Settings. Availability does not assert runtime health.
 export const INSTALL_POLL_MS = 3000
@@ -17,6 +18,7 @@ export function pollOutcome(available: boolean, elapsedMs: number): InstallPhase
 }
 
 export function TmuxBanner({ onInstall }: { onInstall?: (command: string) => void }): JSX.Element | null {
+  const { t } = useI18n()
   const status = usePersistenceStatus()
   const [dismissed, setDismissed] = useState(false)
   const [phase, setPhase] = useState<InstallPhase>('missing')
@@ -72,7 +74,7 @@ export function TmuxBanner({ onInstall }: { onInstall?: (command: string) => voi
         ? 'tmux is now available for new local terminals. Existing plain-shell terminals are not upgraded.'
         : phase === 'failed'
           ? 'The install hasn’t completed. Check the terminal node for errors, or install tmux with your package manager and restart nodeterm.'
-          : persistenceDescription(status)
+          : persistenceDescription(status, t)
 
   const showInstall =
     (phase === 'missing' || phase === 'failed') && !!onInstall &&

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { TmuxStatus } from '@shared/types'
+import type { TranslateFn } from '@shared/i18n/types'
 import { localSession } from '../session/localSession'
 import { useSettings } from '../state/settings'
+import { t as defaultT } from '../i18n/runtime'
 
 /** Always the local core (the server in a browser), never the selected relay host. */
 export function usePersistenceStatus(): TmuxStatus | null | undefined {
@@ -32,14 +34,23 @@ export function usePersistenceStatus(): TmuxStatus | null | undefined {
   return status
 }
 
-export function persistenceDescription(status: TmuxStatus | null | undefined): string {
-  if (status === undefined) return 'Checking session protection…'
+export function persistenceDescription(
+  status: TmuxStatus | null | undefined,
+  translate: TranslateFn = defaultT
+): string {
+  const t = translate
+  if (status === undefined) return t('settings.tmux.persistenceChecking')
   const p = status?.persistence
-  if (!p) return 'Session protection could not be checked. Continuity is not confirmed.'
-  if (!p.enabled) return 'Session protection is off for new local terminals. They will not survive an app or server restart.'
-  if (!p.backend) return 'No session protection backend was found. New local terminals will not survive an app or server restart.'
-  const name = p.backend === 'tmux' ? 'tmux' : p.backend === 'zellij' ? 'Zellij' : 'Session host'
-  return `${name} is available for new local terminals. Existing plain-shell terminals are not upgraded; runtime startup can still fail.`
+  if (!p) return t('settings.tmux.persistenceNotConfirmed')
+  if (!p.enabled) return t('settings.tmux.persistenceOff')
+  if (!p.backend) return t('settings.tmux.persistenceNoBackend')
+  const name =
+    p.backend === 'tmux'
+      ? 'tmux'
+      : p.backend === 'zellij'
+        ? 'Zellij'
+        : t('settings.tmux.backendSessionHost')
+  return t('settings.tmux.persistenceAvailable', { name })
 }
 
 /**
@@ -47,18 +58,20 @@ export function persistenceDescription(status: TmuxStatus | null | undefined): s
  * created, so each branch says what actually happens next — including the fallback when Zellij is
  * selected but no binary was found, which must not read as applied.
  */
-export function sessionBackendNote(z: {
-  available: boolean
-  selected: boolean
-  socketTooLong?: boolean
-}): string {
+export function sessionBackendNote(
+  z: {
+    available: boolean
+    selected: boolean
+    socketTooLong?: boolean
+  },
+  translate: TranslateFn = defaultT
+): string {
+  const t = translate
   if (z.selected && z.available && z.socketTooLong)
-    return 'Zellij is selected, but its socket path on this machine is longer than the system allows (Zellij refuses to start there) — new local terminals use tmux. Setting a short XDG_RUNTIME_DIR or ZELLIJ_SOCKET_DIR for the app fixes it.'
-  if (z.selected && !z.available)
-    return 'Zellij is selected but was not found on this machine — new local terminals use tmux until it is installed.'
-  if (z.selected)
-    return 'New local terminals open in a Zellij session (attach from any terminal with `zellij attach nt-<node id>`). Terminals already running keep their current backend.'
+    return t('settings.tmux.sessionBackendZellijSocketTooLong')
+  if (z.selected && !z.available) return t('settings.tmux.sessionBackendZellijNotFound')
+  if (z.selected) return t('settings.tmux.sessionBackendZellijSelected')
   return z.available
-    ? 'New local terminals open in tmux. Zellij is also available here. Terminals already running keep their current backend.'
-    : 'New local terminals open in tmux. Install Zellij to choose it instead.'
+    ? t('settings.tmux.sessionBackendTmuxWithZellij')
+    : t('settings.tmux.sessionBackendTmuxOnly')
 }

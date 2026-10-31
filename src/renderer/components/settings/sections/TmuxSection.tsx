@@ -84,7 +84,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
       <SearchableRow {...rows.enabled}>
         <FieldRow
           label={t('settings.tmux.persistentSessions')}
-          description={persistenceDescription(status)}
+          description={persistenceDescription(status, t)}
           control={
             <Switch
               checked={settings.tmuxEnabled}
@@ -98,7 +98,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
         <SearchableRow {...rows.backend}>
           <FieldRow
             label={t('settings.tmux.sessionBackend')}
-            description={sessionBackendNote(status.zellij)}
+            description={sessionBackendNote(status.zellij, t)}
             note={
               normalizeSessionBackend(settings.sessionBackend) === 'zellij'
                 ? t('settings.tmux.zellijUnavailable', { gaps: ZELLIJ_BACKEND_GAPS.join(' ') })
@@ -106,7 +106,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
             }
             control={
               <Select
-                aria-label="Session backend"
+                aria-label={t('settings.tmux.aria.sessionBackend')}
                 value={normalizeSessionBackend(settings.sessionBackend)}
                 onChange={(e) => update({ sessionBackend: normalizeSessionBackend(e.target.value) })}
               >
@@ -120,10 +120,9 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
       <SearchableRow {...rows.scrollback}>
         <FieldRow
           label={t('settings.tmux.scrollbackLines')}
-          description={
-            'tmux’s history-limit for each terminal. ' +
-            `Without tmux (Windows), history is capped at ${XTERM_SCROLLBACK_MAX.toLocaleString('en-US')} lines: the app holds it at full width in memory.`
-          }
+          description={t('settings.tmux.scrollbackDescription', {
+            scrollbackMax: XTERM_SCROLLBACK_MAX.toLocaleString()
+          })}
           control={
             <NumberField
               value={settings.tmuxScrollback}
@@ -138,12 +137,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
       <SearchableRow {...rows.leadPane}>
         <FieldRow
           label={t('settings.tmux.leadPane')}
-          description={
-            'Claude Code agent teams re-apply a hardcoded 70/30 tmux split on every teammate spawn, squeezing the pane you type into. ' +
-            'When on, guarded tmux hooks keep the lead pane at the chosen % of the node width (40–90), locally and on SSH hosts (at next connect). ' +
-            'Side effect: a manual 50/50 split in a plain terminal is nudged to the same width. ' +
-            'Turning it off leaves a running tmux server’s hooks in place until that server exits (close all terminals, or tmux -L node-terminal kill-server).'
-          }
+          description={t('settings.tmux.leadPaneDescription')}
           control={
             <div className="flex items-center gap-2">
               {settings.tmuxLeadPaneWidth > 0 ? (
@@ -152,7 +146,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
                   min={LEAD_PANE_WIDTH_MIN}
                   max={LEAD_PANE_WIDTH_MAX}
                   step={1}
-                  ariaLabel="Lead pane width (%)"
+                  ariaLabel={t('settings.tmux.aria.leadPaneWidth')}
                   // Raw value stored; out-of-range hand edits are re-validated where the conf is
                   // generated (sanitizeLeadPaneWidth), so mid-typing values never snap under the
                   // user's cursor.
@@ -162,7 +156,7 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
               <Switch
                 checked={settings.tmuxLeadPaneWidth > 0}
                 onChange={(v) => update({ tmuxLeadPaneWidth: v ? LEAD_PANE_WIDTH_DEFAULT : 0 })}
-                ariaLabel="Keep lead pane wide"
+                ariaLabel={t('settings.tmux.aria.leadPaneWide')}
               />
             </div>
           }
@@ -171,18 +165,16 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
       <SearchableRow {...rows.parkMinutes}>
         <FieldRow
           label={t('settings.tmux.parkMinutes')}
-          description={
-            'Minutes a project’s terminals stay attached after you switch to another project, so switching back is instant. ' +
-            'After that they reattach on return — seconds per project over SSH. 0 = until the app quits. ' +
-            `Default ${PARK_MINUTES_DEFAULT}. Applies from the next switch.`
-          }
+          description={t('settings.tmux.parkMinutesDescription', {
+            defaultMinutes: PARK_MINUTES_DEFAULT
+          })}
           control={
             <NumberField
               value={settings.terminalParkMinutes}
               min={0}
               max={PARK_MINUTES_MAX}
               step={1}
-              ariaLabel="Park window (minutes)"
+              ariaLabel={t('settings.tmux.aria.parkMinutes')}
               // A cleared field reads back as the DEFAULT, not 0: 0 means "keep forever", the
               // memory-expensive end, and must only ever be typed on purpose.
               onChange={(v) =>
@@ -197,18 +189,14 @@ export function TmuxSection({ isActive }: { isActive: boolean }): React.JSX.Elem
       <SearchableRow {...rows.parkMax}>
         <FieldRow
           label={t('settings.tmux.parkMax')}
-          description={
-            'How many switched-away terminals stay attached in total. Beyond this the oldest are released early — local ones before SSH ones, which are slower to reattach. ' +
-            'Each costs about 2 MB with tmux (more without tmux: its scrollback lives in the app) and, over SSH, one local ssh client on the project’s connection. ' +
-            `Default ${PARK_MAX}.`
-          }
+          description={t('settings.tmux.parkMaxDescription', { defaultMax: PARK_MAX })}
           control={
             <NumberField
               value={settings.terminalParkMax}
               min={1}
               max={PARK_MAX_LIMIT}
               step={1}
-              ariaLabel="Max parked terminals"
+              ariaLabel={t('settings.tmux.aria.parkMax')}
               onChange={(v) =>
                 update({ terminalParkMax: Number.isFinite(v) && v >= 1 ? Math.floor(v) : PARK_MAX })
               }

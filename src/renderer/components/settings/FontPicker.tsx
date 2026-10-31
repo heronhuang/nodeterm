@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Input } from '@renderer/ui/Input'
 import { Select } from '@renderer/ui/Select'
 import { Button } from '@renderer/ui/Button'
+import { useI18n } from '@renderer/i18n/useI18n'
 import {
   MONO_FONT_CATALOG,
   buildFontStack,
@@ -46,7 +47,7 @@ export function FontPicker({
   catalog = MONO_FONT_CATALOG,
   buildStack = buildFontStack,
   systemOption,
-  label = 'Font'
+  label
 }: {
   value: string
   onChange: (stack: string) => void
@@ -61,6 +62,8 @@ export function FontPicker({
   /** Prefixes the two controls' accessible names ("Font family", "Font stack"). */
   label?: string
 }): React.JSX.Element {
+  const { t } = useI18n()
+  const controlLabel = label ?? t('settings.fontPicker.labelDefault')
   // One measurer for the lifetime of the picker: it holds a single reused canvas, and building one
   // per probe is what turns a 31-font scan into a visible hitch.
   const measure = useMemo(() => createCanvasMeasurer(), [])
@@ -104,7 +107,7 @@ export function FontPicker({
     } catch {
       // Permission denied, or no transient activation. Not an error worth a dialog — the catalogue
       // scan and the text field both still work.
-      setBrowseError('Font list unavailable — type the font name instead.')
+      setBrowseError(t('settings.fontPicker.browseUnavailable'))
     }
   }
 
@@ -113,7 +116,7 @@ export function FontPicker({
       <Select
         className="w-64"
         value={selectValue}
-        aria-label={`${label} family`}
+        aria-label={`${controlLabel} family`}
         onChange={(e) => {
           const picked = e.target.value
           if (picked === SYSTEM && systemOption !== undefined) onChange(systemOption.stack)
@@ -122,7 +125,7 @@ export function FontPicker({
       >
         {systemOption !== undefined && <option value={SYSTEM}>{systemOption.label}</option>}
         {installed.length > 0 && (
-          <optgroup label="Installed">
+          <optgroup label={t('settings.fontPicker.installedGroup')}>
             {installed.map((f) => (
               <option key={f} value={f}>
                 {f}
@@ -130,25 +133,23 @@ export function FontPicker({
             ))}
           </optgroup>
         )}
-        <optgroup label="Other">
-          <option value={CUSTOM}>Custom…</option>
+        <optgroup label={t('settings.fontPicker.otherGroup')}>
+          <option value={CUSTOM}>{t('settings.fontPicker.customOption')}</option>
         </optgroup>
       </Select>
       <Input
         className="w-64"
         value={value}
-        aria-label={`${label} stack`}
+        aria-label={`${controlLabel} stack`}
         onChange={(e) => onChange(e.target.value)}
       />
       {missing ? (
         <p className="text-[12px] leading-relaxed text-[color:var(--warn)]">
-          “{primary}” isn’t installed — the next font in the stack is being used.
+          {t('settings.fontPicker.missing', { primary: primary ?? '' })}
         </p>
       ) : null}
       {hasLocalFontAccess() && !extraFamilies.length ? (
-        <Button onClick={() => void browseAll()}>
-          Browse all installed fonts
-        </Button>
+        <Button onClick={() => void browseAll()}>{t('settings.fontPicker.browseAll')}</Button>
       ) : null}
       {browseError ? (
         <p className="text-[12px] leading-relaxed text-muted">{browseError}</p>

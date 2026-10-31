@@ -120,42 +120,6 @@ const ROW_DEFS = {
   }
 } as const
 
-const CURSOR_STYLES: { value: TerminalCursorStyle; label: string }[] = [
-  { value: 'block', label: 'Block' },
-  { value: 'bar', label: 'Bar' },
-  { value: 'underline', label: 'Underline' }
-]
-
-const CURSOR_INACTIVE_STYLES: { value: TerminalCursorInactiveStyle; label: string }[] = [
-  { value: 'outline', label: 'Outline' },
-  { value: 'block', label: 'Block' },
-  { value: 'bar', label: 'Bar' },
-  { value: 'underline', label: 'Underline' },
-  { value: 'none', label: 'Hidden' }
-]
-
-const FONT_WEIGHTS: { value: number; label: string }[] = [
-  { value: 100, label: 'Thin' },
-  { value: 200, label: 'Extra light' },
-  { value: 300, label: 'Light' },
-  { value: 400, label: 'Regular' },
-  { value: 500, label: 'Medium' },
-  { value: 600, label: 'Semibold' },
-  { value: 700, label: 'Bold' },
-  { value: 800, label: 'Extra bold' },
-  { value: 900, label: 'Black' }
-]
-
-// xterm reads 1 as "no adjustment"; the named steps are the WCAG ratios, and 21 is the maximum
-// possible (black on white), i.e. force every foreground to one or the other.
-const MIN_CONTRAST_OPTIONS: { value: number; label: string }[] = [
-  { value: 1, label: 'Off' },
-  { value: 3, label: 'Low (3:1)' },
-  { value: 4.5, label: 'WCAG AA (4.5:1)' },
-  { value: 7, label: 'WCAG AAA (7:1)' },
-  { value: 21, label: 'Maximum' }
-]
-
 /** A sub-heading inside the section, riding on the first row of its group so a search that hides
  *  every row in the group takes the heading with it. */
 function GroupHeading({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -174,6 +138,50 @@ function Sub({ children }: { children: React.ReactNode }): React.JSX.Element {
 
 export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.Element {
   const { t } = useI18n()
+  const cursorStyles = useMemo(
+    (): { value: TerminalCursorStyle; label: string }[] => [
+      { value: 'block', label: t('settings.terminal.cursorStyle.block') },
+      { value: 'bar', label: t('settings.terminal.cursorStyle.bar') },
+      { value: 'underline', label: t('settings.terminal.cursorStyle.underline') }
+    ],
+    [t]
+  )
+  const cursorInactiveStyles = useMemo(
+    (): { value: TerminalCursorInactiveStyle; label: string }[] => [
+      { value: 'outline', label: t('settings.terminal.cursorInactiveStyle.outline') },
+      { value: 'block', label: t('settings.terminal.cursorInactiveStyle.block') },
+      { value: 'bar', label: t('settings.terminal.cursorInactiveStyle.bar') },
+      { value: 'underline', label: t('settings.terminal.cursorInactiveStyle.underline') },
+      { value: 'none', label: t('settings.terminal.cursorInactiveStyle.none') }
+    ],
+    [t]
+  )
+  const fontWeights = useMemo(
+    (): { value: number; label: string }[] => [
+      { value: 100, label: t('settings.terminal.fontWeight.w100') },
+      { value: 200, label: t('settings.terminal.fontWeight.w200') },
+      { value: 300, label: t('settings.terminal.fontWeight.w300') },
+      { value: 400, label: t('settings.terminal.fontWeight.w400') },
+      { value: 500, label: t('settings.terminal.fontWeight.w500') },
+      { value: 600, label: t('settings.terminal.fontWeight.w600') },
+      { value: 700, label: t('settings.terminal.fontWeight.w700') },
+      { value: 800, label: t('settings.terminal.fontWeight.w800') },
+      { value: 900, label: t('settings.terminal.fontWeight.w900') }
+    ],
+    [t]
+  )
+  // xterm reads 1 as "no adjustment"; the named steps are the WCAG ratios, and 21 is the maximum
+  // possible (black on white), i.e. force every foreground to one or the other.
+  const minContrastOptions = useMemo(
+    (): { value: number; label: string }[] => [
+      { value: 1, label: t('settings.terminal.minContrast.off') },
+      { value: 3, label: t('settings.terminal.minContrast.low') },
+      { value: 4.5, label: t('settings.terminal.minContrast.wcagAa') },
+      { value: 7, label: t('settings.terminal.minContrast.wcagAaa') },
+      { value: 21, label: t('settings.terminal.minContrast.maximum') }
+    ],
+    [t]
+  )
   const rows = useMemo(
     () =>
       Object.fromEntries(
@@ -214,9 +222,10 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           <GroupHeading>{rows.fontFamily.title}</GroupHeading>
           <FieldRow
             label={rows.fontFamily.title}
-            description="Only fonts installed on this machine are listed. The field below is the full CSS stack — keep a generic monospace last, so the setting still works on a machine without your font."
+            description={t('settings.terminal.fontFamilyDescription')}
             control={
               <FontPicker
+                label={rows.fontFamily.title}
                 value={settings.fontFamily}
                 onChange={(stack) => update({ fontFamily: stack })}
               />
@@ -240,22 +249,22 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
                 className="w-28"
                 value={String(settings.fontWeight)}
                 onChange={(e) => update({ fontWeight: Number(e.target.value) })}
-                aria-label="Font weight"
+                aria-label={t('settings.terminal.aria.fontWeight')}
               >
-                {FONT_WEIGHTS.map((w) => (
+                {fontWeights.map((w) => (
                   <option key={w.value} value={w.value}>
                     {w.label}
                   </option>
                 ))}
               </Select>
-              <Sub>bold</Sub>
+              <Sub>{t('settings.terminal.subBold')}</Sub>
               <Select
                 className="w-28"
                 value={String(settings.fontWeightBold)}
                 onChange={(e) => update({ fontWeightBold: Number(e.target.value) })}
-                aria-label="Bold font weight"
+                aria-label={t('settings.terminal.aria.fontWeightBold')}
               >
-                {FONT_WEIGHTS.map((w) => (
+                {fontWeights.map((w) => (
                   <option key={w.value} value={w.value}>
                     {w.label}
                   </option>
@@ -270,12 +279,12 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.fontZoomKeys}>
         <FieldRow
           label={rows.fontZoomKeys.title}
-          description={t('settings.terminal.description')}
+          description={t('settings.terminal.fontZoomKeysDescription', { modKey })}
           control={
             <Switch
               checked={settings.terminalFontZoomKeys}
               onChange={(v) => update({ terminalFontZoomKeys: v })}
-              ariaLabel="Font size keys"
+              ariaLabel={t('settings.terminal.aria.fontSizeKeys')}
             />
           }
         />
@@ -283,10 +292,10 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.spacing}>
         <FieldRow
           label={rows.spacing.title}
-          description="Line height multiplies the font size; letter spacing adds pixels between characters. Push either far and the box-drawing characters agent CLIs frame their output with stop meeting."
+          description={t('settings.terminal.spacingDescription')}
           control={
             <span className="flex items-center gap-2">
-              <Sub>line</Sub>
+              <Sub>{t('settings.terminal.subLine')}</Sub>
               <NumberField
                 className="w-20"
                 value={settings.terminalLineHeight}
@@ -295,7 +304,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
                 step={0.05}
                 onChange={(v) => update({ terminalLineHeight: v || 1 })}
               />
-              <Sub>letter</Sub>
+              <Sub>{t('settings.terminal.subLetter')}</Sub>
               <NumberField
                 className="w-20"
                 value={settings.terminalLetterSpacing}
@@ -318,15 +327,15 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
               <span className="flex items-center gap-3">
                 <SegmentedPill
                   value={settings.cursorStyle}
-                  options={CURSOR_STYLES}
+                  options={cursorStyles}
                   onChange={(v) => update({ cursorStyle: v })}
-                  ariaLabel="Cursor style"
+                  ariaLabel={t('settings.terminal.aria.cursorStyle')}
                 />
-                <Sub>blink</Sub>
+                <Sub>{t('settings.terminal.subBlink')}</Sub>
                 <Switch
                   checked={settings.cursorBlink}
                   onChange={(v) => update({ cursorBlink: v })}
-                  ariaLabel="Cursor blink"
+                  ariaLabel={t('settings.terminal.aria.cursorBlink')}
                 />
               </span>
             }
@@ -336,7 +345,7 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.cursorInactive}>
         <FieldRow
           label={rows.cursorInactive.title}
-          description="What the cursor looks like in a terminal that isn't taking your keystrokes — the quickest way to tell which of a canvas full of terminals is focused."
+          description={t('settings.terminal.cursorInactiveDescription')}
           control={
             <Select
               className="w-36"
@@ -344,9 +353,9 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
               onChange={(e) =>
                 update({ cursorInactiveStyle: e.target.value as TerminalCursorInactiveStyle })
               }
-              aria-label="Cursor when unfocused"
+              aria-label={t('settings.terminal.aria.cursorUnfocused')}
             >
-              {CURSOR_INACTIVE_STYLES.map((o) => (
+              {cursorInactiveStyles.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -361,12 +370,12 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
           <GroupHeading>{t('settings.terminal.groupAdvanced')}</GroupHeading>
           <FieldRow
             label={rows.middleClickPaste.title}
-            description="Linux only. Off by default — and off makes the middle button do nothing at all inside a terminal, tmux's own middle-click paste included: the paste happens beyond the app (tmux, or the running program reading the selection), so the only way to stop it is to swallow the click before the terminal forwards it. On, a stray middle click can drop whatever was last selected into a running agent's prompt."
+            description={t('settings.terminal.middleClickPasteDescription')}
             control={
               <Switch
                 checked={settings.terminalMiddleClickPaste}
                 onChange={(v) => update({ terminalMiddleClickPaste: v })}
-                ariaLabel="Middle click pastes the selection"
+                ariaLabel={t('settings.terminal.aria.middleClickPaste')}
               />
             }
           />
@@ -376,12 +385,12 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.copyOnSelect}>
         <FieldRow
           label={rows.copyOnSelect.title}
-          description="Off by default. On, finishing a mouse selection in the terminal itself — a drag, a double or triple click, or inside an app that grabs the mouse an Option-drag (macOS) or Shift-drag (Windows, Linux) — copies it to the clipboard. It cannot copy a selection an app draws itself. Copies a program sends on its own (tmux copy mode, vim) reach the clipboard whether this is on or off."
+          description={t('settings.terminal.copyOnSelectDescription')}
           control={
             <Switch
               checked={settings.copyOnSelect}
               onChange={(v) => update({ copyOnSelect: v })}
-              ariaLabel="Copy on select"
+              ariaLabel={t('settings.terminal.aria.copyOnSelect')}
             />
           }
         />
@@ -390,13 +399,13 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.wordSeparator}>
         <FieldRow
           label={rows.wordSeparator.title}
-          description="Characters that end a word when you double-click terminal text. Remove a character to keep it inside selections; for example, leave hyphen out to select a full issue ID."
+          description={t('settings.terminal.wordSeparatorDescription')}
           control={
             <Input
               className="w-48 font-mono"
               value={settings.terminalWordSeparator}
               onChange={(e) => update({ terminalWordSeparator: e.target.value })}
-              aria-label="Terminal word separators"
+              aria-label={t('settings.terminal.aria.wordSeparators')}
             />
           }
         />
@@ -406,12 +415,12 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
         <div className="space-y-3">
           <FieldRow
             label={rows.boldBright.title}
-            description="The historical terminal convention, and xterm's default. Turn it off to keep bold purely a weight, so a program's colour choice survives."
+            description={t('settings.terminal.boldBrightDescription')}
             control={
               <Switch
                 checked={settings.drawBoldTextInBrightColors}
                 onChange={(v) => update({ drawBoldTextInBrightColors: v })}
-                ariaLabel="Bold text uses bright colours"
+                ariaLabel={t('settings.terminal.aria.boldBright')}
               />
             }
           />
@@ -420,15 +429,15 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.minContrast}>
         <FieldRow
           label={rows.minContrast.title}
-          description="Lightens or darkens foreground colours that fall below the ratio against their background — the fix for a theme whose dark blue is unreadable. Costs per-cell work in the renderer, so it is off by default."
+          description={t('settings.terminal.minContrastDescription')}
           control={
             <Select
               className="w-44"
               value={String(settings.terminalMinContrast)}
               onChange={(e) => update({ terminalMinContrast: Number(e.target.value) })}
-              aria-label="Minimum contrast"
+              aria-label={t('settings.terminal.aria.minContrast')}
             >
-              {MIN_CONTRAST_OPTIONS.map((o) => (
+              {minContrastOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -440,15 +449,10 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
       <SearchableRow {...rows.gpu}>
         <FieldRow
           label={rows.gpu.title}
-          description={
-            'Auto uses one GPU context per terminal; switch to Off if the window flickers. ' +
-            'Shared GPU draws every terminal into a single canvas-wide context, which lifts the ' +
-            'per-terminal context limit; GPU per terminal gives each one its own context; Off uses ' +
-            'no GPU at all. Shared GPU falls back to DOM on failure.'
-          }
+          description={t('settings.terminal.gpuDescription')}
           control={
             <Select
-              aria-label="Terminal rendering"
+              aria-label={t('settings.terminal.aria.rendering')}
               value={settings.terminalGpuRendering}
               onChange={(e) =>
                 update({
@@ -456,10 +460,10 @@ export function TerminalSection({ isActive }: { isActive: boolean }): React.JSX.
                 })
               }
             >
-              <option value="auto">Auto (default)</option>
-              <option value="on">GPU per terminal</option>
-              <option value="shared">Shared GPU</option>
-              <option value="off">Off (DOM renderer)</option>
+              <option value="auto">{t('settings.terminal.gpuMode.auto')}</option>
+              <option value="on">{t('settings.terminal.gpuMode.on')}</option>
+              <option value="shared">{t('settings.terminal.gpuMode.shared')}</option>
+              <option value="off">{t('settings.terminal.gpuMode.off')}</option>
             </Select>
           }
         />

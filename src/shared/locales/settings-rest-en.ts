@@ -132,11 +132,94 @@ export const settingsRestEn = {
     wallpaperChooseImage: "Choose image…",
     resetAppearanceWhat: "the appearance settings",
   },
+  fontPicker: {
+    labelDefault: "Font",
+    installedGroup: "Installed",
+    otherGroup: "Other",
+    customOption: "Custom…",
+    missing: "“{primary}” isn’t installed — the next font in the stack is being used.",
+    browseAll: "Browse all installed fonts",
+    browseUnavailable: "Font list unavailable — type the font name instead.",
+  },
   terminal: {
     title: "Terminal",
     description: "Applies to every terminal — on the canvas and in kanban cards. A light theme also turns the app light (Settings → Appearance).",
     groupAdvanced: "Advanced",
     resetAppearanceWhat: "the terminal appearance settings",
+    fontFamilyDescription:
+      "Only fonts installed on this machine are listed. The field below is the full CSS stack — keep a generic monospace last, so the setting still works on a machine without your font.",
+    fontZoomKeysDescription:
+      "{modKey}+ / {modKey}− / {modKey}0 change the focused terminal’s font size instead of zooming the canvas; {modKey}0 clears back to the global size. Off by default — with it off, those keys behave as before (on Windows/Linux a focused terminal may pass Ctrl+− to the shell).",
+    spacingDescription:
+      "Line height multiplies the font size; letter spacing adds pixels between characters. Push either far and the box-drawing characters agent CLIs frame their output with stop meeting.",
+    subLine: "line",
+    subLetter: "letter",
+    subBold: "bold",
+    subBlink: "blink",
+    cursorInactiveDescription:
+      "What the cursor looks like in a terminal that isn’t taking your keystrokes — the quickest way to tell which of a canvas full of terminals is focused.",
+    middleClickPasteDescription:
+      "Linux only. Off by default — and off makes the middle button do nothing at all inside a terminal, tmux’s own middle-click paste included: the paste happens beyond the app (tmux, or the running program reading the selection), so the only way to stop it is to swallow the click before the terminal forwards it. On, a stray middle click can drop whatever was last selected into a running agent’s prompt.",
+    copyOnSelectDescription:
+      "Off by default. On, finishing a mouse selection in the terminal itself — a drag, a double or triple click, or inside an app that grabs the mouse an Option-drag (macOS) or Shift-drag (Windows, Linux) — copies it to the clipboard. It cannot copy a selection an app draws itself. Copies a program sends on its own (tmux copy mode, vim) reach the clipboard whether this is on or off.",
+    wordSeparatorDescription:
+      "Characters that end a word when you double-click terminal text. Remove a character to keep it inside selections; for example, leave hyphen out to select a full issue ID.",
+    boldBrightDescription:
+      "The historical terminal convention, and xterm’s default. Turn it off to keep bold purely a weight, so a program’s colour choice survives.",
+    minContrastDescription:
+      "Lightens or darkens foreground colours that fall below the ratio against their background — the fix for a theme whose dark blue is unreadable. Costs per-cell work in the renderer, so it is off by default.",
+    gpuDescription:
+      "Auto uses one GPU context per terminal; switch to Off if the window flickers. Shared GPU draws every terminal into a single canvas-wide context, which lifts the per-terminal context limit; GPU per terminal gives each one its own context; Off uses no GPU at all. Shared GPU falls back to DOM on failure.",
+    cursorStyle: {
+      block: "Block",
+      bar: "Bar",
+      underline: "Underline",
+    },
+    cursorInactiveStyle: {
+      outline: "Outline",
+      block: "Block",
+      bar: "Bar",
+      underline: "Underline",
+      none: "Hidden",
+    },
+    fontWeight: {
+      w100: "Thin",
+      w200: "Extra light",
+      w300: "Light",
+      w400: "Regular",
+      w500: "Medium",
+      w600: "Semibold",
+      w700: "Bold",
+      w800: "Extra bold",
+      w900: "Black",
+    },
+    minContrast: {
+      off: "Off",
+      low: "Low (3:1)",
+      wcagAa: "WCAG AA (4.5:1)",
+      wcagAaa: "WCAG AAA (7:1)",
+      maximum: "Maximum",
+    },
+    gpuMode: {
+      auto: "Auto (default)",
+      on: "GPU per terminal",
+      shared: "Shared GPU",
+      off: "Off (DOM renderer)",
+    },
+    aria: {
+      fontWeight: "Font weight",
+      fontWeightBold: "Bold font weight",
+      cursorStyle: "Cursor style",
+      cursorBlink: "Cursor blink",
+      cursorUnfocused: "Cursor when unfocused",
+      fontSizeKeys: "Font size keys",
+      middleClickPaste: "Middle click pastes the selection",
+      copyOnSelect: "Copy on select",
+      wordSeparators: "Terminal word separators",
+      boldBright: "Bold text uses bright colours",
+      minContrast: "Minimum contrast",
+      rendering: "Terminal rendering",
+    },
     rows: {
       theme: {
         title: "Colour theme",

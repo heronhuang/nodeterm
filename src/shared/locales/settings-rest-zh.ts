@@ -132,11 +132,94 @@ export const settingsRestZh = {
     wallpaperYourImage: '你的图片',
     wallpaperChooseImage: '选择图片…',
   },
+  fontPicker: {
+    labelDefault: '字体',
+    installedGroup: '已安装',
+    otherGroup: '其他',
+    customOption: '自定义…',
+    missing: '「{primary}」未安装 — 将使用字体栈中的下一项。',
+    browseAll: '浏览本机全部字体',
+    browseUnavailable: '无法列出字体 — 请直接输入字体名称。',
+  },
   terminal: {
     title: '终端',
     description: '适用于画布与看板卡片中的所有终端。浅色终端主题也会将应用设为浅色（设置 → 外观）。',
     groupAdvanced: '高级',
     resetAppearanceWhat: '终端外观设置',
+    fontFamilyDescription:
+      '列表仅包含本机已安装的字体。下方输入框为完整 CSS 字体栈 — 末尾请保留通用等宽字体，以便在未安装指定字体的机器上仍能正常显示。',
+    fontZoomKeysDescription:
+      '开启后，{modKey}+ / {modKey}− / {modKey}0 调整当前聚焦终端的字号（而非缩放画布）；{modKey}0 恢复为全局字号。默认关闭 — 关闭时快捷键行为与原先一致（Windows/Linux 下聚焦终端时 Ctrl+− 可能仍会传给 Shell）。',
+    spacingDescription:
+      '行高为字号的倍数；字距为字符间额外像素。两者调得过大时，Agent CLI 用于框线的制表符/框线字符可能对不齐。',
+    subLine: '行高',
+    subLetter: '字距',
+    subBold: '粗体',
+    subBlink: '闪烁',
+    cursorInactiveDescription:
+      '终端未接收键盘输入时的光标样式 — 画布上终端很多时，这是区分哪块正在聚焦的最快方式。',
+    middleClickPasteDescription:
+      '仅 Linux。默认关闭 — 关闭时中键在终端内完全无效（包括 tmux 自带的中键粘贴）：粘贴发生在应用之外（tmux 或读取选区的程序），要阻止只能先拦截点击再交给终端。开启后，误触中键可能把上次选中的内容粘贴到正在运行的 Agent 提示符中。',
+    copyOnSelectDescription:
+      '默认关闭。开启后，在终端内完成鼠标选区 — 拖拽、双击/三击，或在占用鼠标的程序内 Option 拖拽（macOS）或 Shift 拖拽（Windows、Linux）— 会复制到剪贴板。无法复制由程序自行绘制的选区。程序主动发送的复制（tmux 复制模式、vim 等）无论此项开关如何都会进入剪贴板。',
+    wordSeparatorDescription:
+      '双击终端文本时，哪些字符视为「词」边界。去掉某字符可让选区包含它；例如去掉连字符以便一次选中完整 issue ID。',
+    boldBrightDescription:
+      '传统终端惯例，也是 xterm 默认行为。关闭后粗体仅改变字重，程序指定的颜色会保留。',
+    minContrastDescription:
+      '将前景色相对背景过低的对比度提亮或压暗 — 适合修复主题里深蓝看不清等问题。会在渲染器中对每个单元格计算，因此默认关闭。',
+    gpuDescription:
+      '「自动」为每个终端使用独立 GPU 上下文；若窗口闪烁可改为关闭。共享 GPU 将所有终端绘制到画布级单一上下文，可突破每终端上下文数量限制；「每终端 GPU」为各终端单独上下文；「关闭」完全不使用 GPU。共享 GPU 失败时会回退到 DOM 渲染。',
+    cursorStyle: {
+      block: '块状',
+      bar: '竖线',
+      underline: '下划线',
+    },
+    cursorInactiveStyle: {
+      outline: '空心',
+      block: '块状',
+      bar: '竖线',
+      underline: '下划线',
+      none: '隐藏',
+    },
+    fontWeight: {
+      w100: '极细',
+      w200: '特细',
+      w300: '细',
+      w400: '常规',
+      w500: '中等',
+      w600: '半粗',
+      w700: '粗体',
+      w800: '特粗',
+      w900: '黑体',
+    },
+    minContrast: {
+      off: '关闭',
+      low: '低 (3:1)',
+      wcagAa: 'WCAG AA (4.5:1)',
+      wcagAaa: 'WCAG AAA (7:1)',
+      maximum: '最高',
+    },
+    gpuMode: {
+      auto: '自动（默认）',
+      on: '每终端 GPU',
+      shared: '共享 GPU',
+      off: '关闭（DOM 渲染）',
+    },
+    aria: {
+      fontWeight: '字重',
+      fontWeightBold: '粗体字重',
+      cursorStyle: '光标样式',
+      cursorBlink: '光标闪烁',
+      cursorUnfocused: '未聚焦时的光标',
+      fontSizeKeys: '字号快捷键',
+      middleClickPaste: '中键粘贴选区',
+      copyOnSelect: '选中即复制',
+      wordSeparators: '终端选词分隔符',
+      boldBright: '粗体使用亮色',
+      minContrast: '最低对比度',
+      rendering: '终端渲染',
+    },
     rows: {
       theme: {
         title: '配色主题',

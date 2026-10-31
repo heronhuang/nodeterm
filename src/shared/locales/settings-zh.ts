@@ -119,7 +119,38 @@ export const settingsSectionZh = {
     offscreen: '释放屏幕外终端',
     offscreenDescription:
       '终端在屏幕外停留多少分钟后释放其视图（tmux 仍运行；回到视图时会重新附着）。0 = 从不。',
-    zellijUnavailable: 'Zellij 不可用：{gaps}'
+    zellijUnavailable: 'Zellij 不可用：{gaps}',
+    persistenceChecking: '正在检查会话保护…',
+    persistenceNotConfirmed: '无法检查会话保护状态，连续性未确认。',
+    persistenceOff: '新建本地终端已关闭会话保护，应用或服务器重启后不会保留。',
+    persistenceNoBackend: '未找到会话保护后端，新建本地终端在应用或服务器重启后不会保留。',
+    backendSessionHost: '会话宿主',
+    persistenceAvailable:
+      '{name} 可用于新建本地终端。已有纯 Shell 终端不会自动升级；运行时启动仍可能失败。',
+    sessionBackendZellijSocketTooLong:
+      '已选择 Zellij，但本机 socket 路径超过系统限制（Zellij 无法在该路径启动）— 新建本地终端将使用 tmux。为应用设置较短的 XDG_RUNTIME_DIR 或 ZELLIJ_SOCKET_DIR 可解决。',
+    sessionBackendZellijNotFound:
+      '已选择 Zellij，但本机未找到 — 安装前新建本地终端将使用 tmux。',
+    sessionBackendZellijSelected:
+      '新建本地终端在 Zellij 会话中打开（可在任意终端用 `zellij attach nt-<node id>` 附着）。已在运行的终端保持当前后端。',
+    sessionBackendTmuxWithZellij:
+      '新建本地终端在 tmux 中打开；本机也可使用 Zellij。已在运行的终端保持当前后端。',
+    sessionBackendTmuxOnly: '新建本地终端在 tmux 中打开。安装 Zellij 后可改选它。',
+    scrollbackDescription:
+      '每个终端的 tmux history-limit。无 tmux 时（Windows）历史上限为 {scrollbackMax} 行：应用会在内存中按全宽保存。',
+    leadPaneDescription:
+      'Claude Code Agent 团队在每次生成队友时会重新应用固定的 70/30 tmux 分屏，挤压你输入的主 pane。开启后，受保护的 tmux 钩子会将主 pane 保持在节点宽度的所选比例（40–90），本机与 SSH 主机（下次连接生效）均如此。副作用：纯终端里手动的 50/50 分屏也会被推到相同宽度。关闭后，正在运行的 tmux 服务器的钩子会保留，直到该服务器退出（关闭所有终端，或 tmux -L node-terminal kill-server）。',
+    parkMinutesDescription:
+      '切换到其他项目后，该项目终端仍保持附着多少分钟，以便切回时即时恢复。超时后在返回时重新附着 — SSH 上每个项目需数秒。0 = 直到退出应用。默认 {defaultMinutes}。从下次切换起生效。',
+    parkMaxDescription:
+      '其他项目中仍保持附着的终端总数上限。超出后最早释放 — 本地优先于 SSH（SSH 重新附着更慢）。有 tmux 时每个约 2 MB（无 tmux 时更多：回滚在应用内）；经 SSH 时每个占用项目连接上的一个本地 ssh 客户端。默认 {defaultMax}。',
+    aria: {
+      sessionBackend: '会话后端',
+      leadPaneWidth: '主 pane 宽度 (%)',
+      leadPaneWide: '保持主 pane 较宽',
+      parkMinutes: '附着窗口（分钟）',
+      parkMax: '附着终端上限'
+    }
   },
   signIn: {
     title: '登录',

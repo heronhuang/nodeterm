@@ -121,7 +121,42 @@ export const settingsSectionEn = {
     offscreen: 'Release offscreen terminals',
     offscreenDescription:
       'Minutes a terminal may sit offscreen before its view is released (tmux keeps it running; it reattaches on view). 0 = never.',
-    zellijUnavailable: 'Not available with Zellij: {gaps}'
+    zellijUnavailable: 'Not available with Zellij: {gaps}',
+    persistenceChecking: 'Checking session protection…',
+    persistenceNotConfirmed:
+      'Session protection could not be checked. Continuity is not confirmed.',
+    persistenceOff:
+      'Session protection is off for new local terminals. They will not survive an app or server restart.',
+    persistenceNoBackend:
+      'No session protection backend was found. New local terminals will not survive an app or server restart.',
+    backendSessionHost: 'Session host',
+    persistenceAvailable:
+      '{name} is available for new local terminals. Existing plain-shell terminals are not upgraded; runtime startup can still fail.',
+    sessionBackendZellijSocketTooLong:
+      'Zellij is selected, but its socket path on this machine is longer than the system allows (Zellij refuses to start there) — new local terminals use tmux. Setting a short XDG_RUNTIME_DIR or ZELLIJ_SOCKET_DIR for the app fixes it.',
+    sessionBackendZellijNotFound:
+      'Zellij is selected but was not found on this machine — new local terminals use tmux until it is installed.',
+    sessionBackendZellijSelected:
+      'New local terminals open in a Zellij session (attach from any terminal with `zellij attach nt-<node id>`). Terminals already running keep their current backend.',
+    sessionBackendTmuxWithZellij:
+      'New local terminals open in tmux. Zellij is also available here. Terminals already running keep their current backend.',
+    sessionBackendTmuxOnly:
+      'New local terminals open in tmux. Install Zellij to choose it instead.',
+    scrollbackDescription:
+      'tmux’s history-limit for each terminal. Without tmux (Windows), history is capped at {scrollbackMax} lines: the app holds it at full width in memory.',
+    leadPaneDescription:
+      'Claude Code agent teams re-apply a hardcoded 70/30 tmux split on every teammate spawn, squeezing the pane you type into. When on, guarded tmux hooks keep the lead pane at the chosen % of the node width (40–90), locally and on SSH hosts (at next connect). Side effect: a manual 50/50 split in a plain terminal is nudged to the same width. Turning it off leaves a running tmux server’s hooks in place until that server exits (close all terminals, or tmux -L node-terminal kill-server).',
+    parkMinutesDescription:
+      'Minutes a project’s terminals stay attached after you switch to another project, so switching back is instant. After that they reattach on return — seconds per project over SSH. 0 = until the app quits. Default {defaultMinutes}. Applies from the next switch.',
+    parkMaxDescription:
+      'How many switched-away terminals stay attached in total. Beyond this the oldest are released early — local ones before SSH ones, which are slower to reattach. Each costs about 2 MB with tmux (more without tmux: its scrollback lives in the app) and, over SSH, one local ssh client on the project’s connection. Default {defaultMax}.',
+    aria: {
+      sessionBackend: 'Session backend',
+      leadPaneWidth: 'Lead pane width (%)',
+      leadPaneWide: 'Keep lead pane wide',
+      parkMinutes: 'Park window (minutes)',
+      parkMax: 'Max parked terminals'
+    }
   },
   signIn: {
     title: 'Sign-in',
