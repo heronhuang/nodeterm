@@ -30,8 +30,8 @@
 import type { ReactNode } from 'react'
 import type { MenuItem } from '../components/ContextMenu'
 import { ACCOUNT_CAPABLE_AGENT_IDS } from '@shared/agents/account-binding'
-import { SIMULATOR_SSH_HINT } from '@shared/simulator'
 import { isBrowserRuntime } from '../bridge/runtime'
+import { t } from '@renderer/i18n/runtime'
 import {
   IconAgent,
   IconBranch,
@@ -145,11 +145,21 @@ export interface AddHandlers {
 }
 
 /** The SSH worktree hint shown on the disabled row — kept here so every surface shows the same one. */
-export const WORKTREE_SSH_HINT = 'Not supported in SSH projects yet'
+export function worktreeSshHint(): string {
+  return t('addMenu.hints.worktreeSsh')
+}
+/** English snapshot for tests; live UI should call {@link worktreeSshHint}. */
+export const WORKTREE_SSH_HINT = worktreeSshHint()
 /** A run node's launcher, processes and (Flutter) simulators all live on THIS machine. */
-export const RUN_SSH_HINT = 'Run configurations run on this machine — not in SSH projects yet'
+export function runSshHint(): string {
+  return t('addMenu.hints.runSsh')
+}
+export const RUN_SSH_HINT = runSshHint()
 /** iOS simulators live on the Mac the desktop app runs on; a browser tab (Server Edition) is not it. */
-export const SIMULATOR_UNAVAILABLE_HINT = 'Simulators need the desktop app'
+export function simulatorUnavailableHint(): string {
+  return t('addMenu.hints.simulatorUnavailable')
+}
+export const SIMULATOR_UNAVAILABLE_HINT = simulatorUnavailableHint()
 /** Whether this renderer can show a Simulator node: the desktop app on any OS — Android emulators
  *  run everywhere; iOS simulators are simply absent from the list off macOS. Not a Server Edition
  *  tab, whose emulators would be the server's. */
@@ -157,24 +167,34 @@ export function simulatorAvailable(relayTab = false): boolean {
   return !isBrowserRuntime() && !relayTab
 }
 /** A relay tab's project lives on another machine; this machine's simulators do not belong in it. */
-export const SIMULATOR_RELAY_HINT = 'Simulators run on this machine — not in a relay tab'
-export { SIMULATOR_SSH_HINT }
+export function simulatorRelayHint(): string {
+  return t('addMenu.hints.simulatorRelay')
+}
+export const SIMULATOR_RELAY_HINT = simulatorRelayHint()
+export function simulatorSshHint(): string {
+  return t('addMenu.hints.simulatorSsh')
+}
+/** Same text as `@shared/simulator` — re-exported for tests and canvas refusals. */
+export const SIMULATOR_SSH_HINT = simulatorSshHint()
 /** The simulator row's gate, one rule for the menu, the Dock, ⌘K and the canvas refusal. */
 export function simulatorRefusal(relayTab = false, sshProject = false): string | undefined {
-  if (isBrowserRuntime()) return SIMULATOR_UNAVAILABLE_HINT
-  if (relayTab) return SIMULATOR_RELAY_HINT
-  if (sshProject) return SIMULATOR_SSH_HINT
+  if (isBrowserRuntime()) return simulatorUnavailableHint()
+  if (relayTab) return simulatorRelayHint()
+  if (sshProject) return simulatorSshHint()
   return undefined
 }
 
 /** The core's launcher is a POSIX `sh` script stopped by POSIX signals (see `RUN_WINDOWS_REASON`). */
-export const RUN_WINDOWS_HINT = 'Run configurations that launch a process are not supported on Windows yet'
+export function runWindowsHint(): string {
+  return t('addMenu.hints.runWindows')
+}
+export const RUN_WINDOWS_HINT = runWindowsHint()
 
 /** The run row's gate, one rule for the menu and the Dock: SSH first (its reason is the more
  *  specific one), then a Windows core. */
 function runGate(ctx: AddCtx): { disabled: boolean; hint?: string } {
-  if (ctx.isSshProject) return { disabled: true, hint: RUN_SSH_HINT }
-  if (ctx.isWindowsCore) return { disabled: true, hint: RUN_WINDOWS_HINT }
+  if (ctx.isSshProject) return { disabled: true, hint: runSshHint() }
+  if (ctx.isWindowsCore) return { disabled: true, hint: runWindowsHint() }
   return { disabled: false }
 }
 
@@ -188,7 +208,10 @@ function runGate(ctx: AddCtx): { disabled: boolean; hint?: string } {
  * vanished before, which teaches nothing: the row was gone and so was the reason, and the folder
  * that would fix it is one menu away.
  */
-export const NEW_FILE_NO_CWD_HINT = 'This project has no folder — set one first (tab ⌄ → “Set folder…”)'
+export function newFileNoCwdHint(): string {
+  return t('addMenu.hints.noCwd')
+}
+export const NEW_FILE_NO_CWD_HINT = newFileNoCwdHint()
 export const WORKTREE_NO_CWD_HINT = NEW_FILE_NO_CWD_HINT
 /** Same reason, same fix — a file manager has nothing to list without a project folder. */
 export const FILES_NO_CWD_HINT = NEW_FILE_NO_CWD_HINT
@@ -216,15 +239,15 @@ export function contentAddItemsToMenuItems(
   for (const item of items) {
     switch (item.kind) {
       case 'terminal':
-        out.push({ label: 'New terminal', icon: <IconTerminal />, onClick: () => handlers.terminal(at) })
+        out.push({ label: t('addMenu.labels.newTerminal'), icon: <IconTerminal />, onClick: () => handlers.terminal(at) })
         break
       case 'remote':
-        out.push({ label: 'New remote…', icon: <IconTerminal />, onClick: () => handlers.remote(remotePos) })
+        out.push({ label: t('addMenu.labels.newRemote'), icon: <IconTerminal />, onClick: () => handlers.remote(remotePos) })
         break
       case 'simulator': {
         const refusal = simulatorRefusal(ctx.isRelayTab, ctx.isSshProject)
         out.push({
-          label: 'New simulator',
+          label: t('addMenu.labels.newSimulator'),
           icon: <IconPhone />,
           disabled: !!refusal,
           hint: refusal,
@@ -234,20 +257,20 @@ export function contentAddItemsToMenuItems(
       }
       case 'run':
         out.push({
-          label: 'New run configuration',
+          label: t('addMenu.labels.newRunConfiguration'),
           icon: <IconPlay />,
           ...runGate(ctx),
           onClick: () => handlers.run(at)
         })
         break
       case 'browser':
-        out.push({ label: 'New browser', icon: <IconRemote />, onClick: () => handlers.browser(at) })
+        out.push({ label: t('addMenu.labels.newBrowser'), icon: <IconRemote />, onClick: () => handlers.browser(at) })
         break
       case 'web':
-        out.push({ label: 'New web view…', icon: <IconWeb />, onClick: () => handlers.web(at) })
+        out.push({ label: t('addMenu.labels.newWebView'), icon: <IconWeb />, onClick: () => handlers.web(at) })
         break
       case 'sticky':
-        out.push({ label: 'New sticky note', icon: <IconNote />, onClick: () => handlers.sticky(at) })
+        out.push({ label: t('addMenu.labels.newStickyNote'), icon: <IconNote />, onClick: () => handlers.sticky(at) })
         break
       case 'files':
         // A file manager needs a directory to root itself in. This row used to be HIDDEN on a
@@ -256,49 +279,49 @@ export function contentAddItemsToMenuItems(
         // persisted canvas, so a folder-shaped row degrades EXPLICITLY rather than vanishing,
         // because a row that is gone takes its reason with it and the fix is one menu away.
         out.push({
-          label: 'New file manager',
+          label: t('addMenu.labels.newFileManager'),
           icon: <IconExplorer />,
           disabled: !ctx.hasCwd,
-          hint: ctx.hasCwd ? undefined : FILES_NO_CWD_HINT,
+          hint: ctx.hasCwd ? undefined : newFileNoCwdHint(),
           onClick: () => handlers.files(at)
         })
         break
       case 'whiteboard':
-        out.push({ label: 'New whiteboard', icon: <IconWhiteboard />, onClick: () => handlers.whiteboard(at) })
+        out.push({ label: t('addMenu.labels.newWhiteboard'), icon: <IconWhiteboard />, onClick: () => handlers.whiteboard(at) })
         break
       case 'dino':
-        out.push({ label: 'New dino game', icon: <IconDino />, onClick: () => handlers.dino(at) })
+        out.push({ label: t('addMenu.labels.newDinoGame'), icon: <IconDino />, onClick: () => handlers.dino(at) })
         break
       case 'trigger':
-        out.push({ label: 'New trigger…', icon: <IconBellFilled />, onClick: () => handlers.trigger(at) })
+        out.push({ label: t('addMenu.labels.newTrigger'), icon: <IconBellFilled />, onClick: () => handlers.trigger(at) })
         break
       case 'open-file':
-        out.push({ label: 'Open file…', icon: <IconEditor />, onClick: () => void handlers.openFile(at) })
+        out.push({ label: t('addMenu.labels.openFile'), icon: <IconEditor />, onClick: () => void handlers.openFile(at) })
         break
       case 'new-file':
         // "New file…" creates UNDER the project folder, so a cwd-less project cannot run it — the
         // row stays, disabled, and names the reason (NEW_FILE_NO_CWD_HINT).
         out.push({
-          label: 'New file…',
+          label: t('addMenu.labels.newFile'),
           icon: <IconEditor />,
           disabled: !ctx.hasCwd,
-          hint: ctx.hasCwd ? undefined : NEW_FILE_NO_CWD_HINT,
+          hint: ctx.hasCwd ? undefined : newFileNoCwdHint(),
           onClick: () => void handlers.newFile(at)
         })
         break
       case 'spawn-team':
-        out.push({ label: 'Spawn a team…', icon: <IconGroup />, onClick: () => handlers.spawnTeam(at) })
+        out.push({ label: t('addMenu.labels.spawnTeam'), icon: <IconGroup />, onClick: () => handlers.spawnTeam(at) })
         break
       case 'worktree':
         out.push({
-          label: 'New worktree…',
+          label: t('addMenu.labels.newWorktree'),
           icon: <IconBranch />,
           disabled: ctx.isSshProject || !ctx.hasCwd,
           hint: ctx.isSshProject
-            ? WORKTREE_SSH_HINT
+            ? worktreeSshHint()
             : ctx.hasCwd
               ? undefined
-              : WORKTREE_NO_CWD_HINT,
+              : newFileNoCwdHint(),
           onClick: () => handlers.worktree(at)
         })
         break
@@ -348,7 +371,7 @@ export function contentAddItemsToDockRows(
         const refusal = simulatorRefusal(ctx.isRelayTab, ctx.isSshProject)
         out.push({
           kind: 'simulator',
-          label: 'Simulator',
+          label: t('addMenu.labels.simulator'),
           icon: <IconPhone />,
           disabled: !!refusal,
           hint: refusal,
@@ -359,67 +382,67 @@ export function contentAddItemsToDockRows(
       case 'run':
         out.push({
           kind: 'run',
-          label: 'Run Configuration',
+          label: t('addMenu.labels.runConfiguration'),
           icon: <IconPlay />,
           ...runGate(ctx),
           onClick: () => handlers.run()
         })
         break
       case 'browser':
-        out.push({ kind: 'browser', label: 'Browser', icon: <IconRemote />, onClick: () => handlers.browser() })
+        out.push({ kind: 'browser', label: t('addMenu.labels.browser'), icon: <IconRemote />, onClick: () => handlers.browser() })
         break
       case 'web':
-        out.push({ kind: 'web', label: 'Web View', icon: <IconWeb />, onClick: () => handlers.web() })
+        out.push({ kind: 'web', label: t('addMenu.labels.webView'), icon: <IconWeb />, onClick: () => handlers.web() })
         break
       case 'sticky':
-        out.push({ kind: 'sticky', label: 'Sticky Note', icon: <IconNote />, onClick: () => handlers.sticky() })
+        out.push({ kind: 'sticky', label: t('addMenu.labels.stickyNote'), icon: <IconNote />, onClick: () => handlers.sticky() })
         break
       case 'files':
         out.push({
           kind: 'files',
-          label: 'File Manager',
+          label: t('addMenu.labels.fileManager'),
           icon: <IconExplorer />,
           disabled: !ctx.hasCwd,
-          hint: ctx.hasCwd ? undefined : FILES_NO_CWD_HINT,
+          hint: ctx.hasCwd ? undefined : newFileNoCwdHint(),
           onClick: () => handlers.files()
         })
         break
       case 'whiteboard':
-        out.push({ kind: 'whiteboard', label: 'Whiteboard', icon: <IconWhiteboard />, onClick: () => handlers.whiteboard() })
+        out.push({ kind: 'whiteboard', label: t('addMenu.labels.whiteboard'), icon: <IconWhiteboard />, onClick: () => handlers.whiteboard() })
         break
       case 'dino':
-        out.push({ kind: 'dino', label: 'Dino Game', icon: <IconDino />, onClick: () => handlers.dino() })
+        out.push({ kind: 'dino', label: t('addMenu.labels.dinoGame'), icon: <IconDino />, onClick: () => handlers.dino() })
         break
       case 'trigger':
-        out.push({ kind: 'trigger', label: 'Trigger', icon: <IconBellFilled />, onClick: () => handlers.trigger() })
+        out.push({ kind: 'trigger', label: t('addMenu.labels.trigger'), icon: <IconBellFilled />, onClick: () => handlers.trigger() })
         break
       case 'open-file':
-        out.push({ kind: 'open-file', label: 'Open file…', icon: <IconEditor />, onClick: () => void handlers.openFile() })
+        out.push({ kind: 'open-file', label: t('addMenu.labels.openFile'), icon: <IconEditor />, onClick: () => void handlers.openFile() })
         break
       case 'new-file':
         out.push({
           kind: 'new-file',
-          label: 'New file…',
+          label: t('addMenu.labels.newFile'),
           icon: <IconEditor />,
           disabled: !ctx.hasCwd,
-          hint: ctx.hasCwd ? undefined : NEW_FILE_NO_CWD_HINT,
+          hint: ctx.hasCwd ? undefined : newFileNoCwdHint(),
           onClick: () => void handlers.newFile()
         })
         break
       case 'spawn-team':
-        out.push({ kind: 'spawn-team', label: 'Spawn a team…', icon: <IconGroup />, onClick: () => handlers.spawnTeam() })
+        out.push({ kind: 'spawn-team', label: t('addMenu.labels.spawnTeam'), icon: <IconGroup />, onClick: () => handlers.spawnTeam() })
         break
       case 'worktree':
         out.push({
           kind: 'worktree',
-          label: 'Worktree…',
+          label: t('addMenu.labels.worktree'),
           icon: <IconBranch />,
           disabled: ctx.isSshProject || !ctx.hasCwd,
           hint: ctx.isSshProject
-            ? WORKTREE_SSH_HINT
+            ? worktreeSshHint()
             : ctx.hasCwd
               ? undefined
-              : WORKTREE_NO_CWD_HINT,
+              : newFileNoCwdHint(),
           onClick: () => handlers.worktree()
         })
         break
@@ -475,11 +498,23 @@ export const ADD_ITEM_GROUP: Record<AddItem['kind'], AddGroupId> = {
 }
 
 /** Submenu labels, kept here so every surface names the same group the same way. */
-export const AGENT_GROUP_LABEL = 'New agent'
+export function agentGroupLabel(): string {
+  return t('addMenu.labels.newAgent')
+}
+export const AGENT_GROUP_LABEL = agentGroupLabel()
+const ADD_GROUP_MESSAGE_KEY: Record<Exclude<AddGroupId, 'top'>, string> = {
+  view: 'addMenu.labels.groupView',
+  files: 'addMenu.labels.groupFiles',
+  orchestrate: 'addMenu.labels.groupOrchestrate'
+}
+export function addGroupLabel(id: Exclude<AddGroupId, 'top'>): string {
+  return t(ADD_GROUP_MESSAGE_KEY[id])
+}
+/** English snapshot for tests. */
 export const ADD_GROUP_LABEL: Record<Exclude<AddGroupId, 'top'>, string> = {
-  view: 'New view',
-  files: 'Files',
-  orchestrate: 'Orchestrate'
+  view: addGroupLabel('view'),
+  files: addGroupLabel('files'),
+  orchestrate: addGroupLabel('orchestrate')
 }
 
 /**
@@ -524,7 +559,7 @@ export function agentEntriesToMenuItems(agents: readonly AgentAddEntry[]): MenuI
       ? [
           {
             type: 'submenu',
-            label: AGENT_GROUP_LABEL,
+            label: agentGroupLabel(),
             icon: <IconAgent />,
             children: rest
           } as MenuItem
@@ -579,7 +614,7 @@ export function buildGroupedAddMenu(
       ? [
           {
             type: 'submenu',
-            label: ADD_GROUP_LABEL[id],
+            label: addGroupLabel(id),
             icon: GROUP_ICON[id],
             children: buckets[id]
           } as MenuItem

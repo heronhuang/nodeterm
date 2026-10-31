@@ -40,6 +40,7 @@ import {
 import { useGlassA11y } from './lib/useGlassA11y'
 import { GlassRefraction } from './components/GlassRefraction'
 import { isLiquidGlass } from './lib/appTheme'
+import { I18nProvider } from './i18n/I18nProvider'
 
 export default function App() {
   // Apply the terminal-rendering setting to the two GPU coordinators, live. 'auto' is
@@ -218,7 +219,10 @@ export default function App() {
     useViewMode.getState().setDefaultView(defaultView === 'kanban' ? 'kanban' : 'canvas')
   }, [defaultView])
 
+  const uiLanguage = useSettings((s) => s.settings.uiLanguage)
+
   return (
+    <I18nProvider uiLanguage={settingsHydrated ? uiLanguage : undefined}>
     <SessionProvider session={localSession}>
       <ReactFlowProvider>
         <Canvas />
@@ -230,5 +234,6 @@ export default function App() {
         {liquidGlass && !glassA11y.reduceTransparency && <GlassRefraction slider={glassT} />}
       </ReactFlowProvider>
     </SessionProvider>
+    </I18nProvider>
   )
 }

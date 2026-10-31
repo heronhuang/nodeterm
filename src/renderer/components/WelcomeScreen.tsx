@@ -5,6 +5,7 @@ import { filterClosedProjects } from '../lib/closedHistory'
 import { ProjectGlyph } from './ProjectGlyph'
 import type { RecentConversation } from '@shared/recent-conversations'
 import { RecentConversations } from './RecentConversations'
+import { useI18n } from '@renderer/i18n/useI18n'
 
 /**
  * Rows before the "Recently closed" filter box appears (issue #506). `.welcome__recent-list` is
@@ -65,6 +66,7 @@ export function WelcomeScreen({
   recentActionFor,
   onResumeRecent
 }: WelcomeScreenProps) {
+  const { t } = useI18n()
   const [query, setQuery] = useState('')
   const visibleClosed = useMemo(
     () => filterClosedProjects(closedProjects, query),
@@ -88,8 +90,8 @@ export function WelcomeScreen({
       {onClose && (
         <button
           onClick={onClose}
-          title="Close"
-          aria-label="Close"
+          title={t('welcome.close')}
+          aria-label={t('welcome.close')}
           style={{
             position: 'absolute',
             top: 16,
@@ -133,7 +135,7 @@ export function WelcomeScreen({
         </svg>
         <span className="welcome__name">nodeterm</span>
       </div>
-      <p className="welcome__tagline">A canvas of terminals. Start a project to begin.</p>
+      <p className="welcome__tagline">{t('welcome.tagline')}</p>
 
       <div className="welcome__cards">
         <button className="welcome__card" onClick={onNewProject}>
@@ -141,14 +143,14 @@ export function WelcomeScreen({
             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             <path d="M12 11v5M9.5 13.5h5" />
           </svg>
-          <span>New project</span>
+          <span>{t('welcome.newProject')}</span>
         </button>
 
         <button className="welcome__card" onClick={onOpenFolder}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           </svg>
-          <span>Open folder…</span>
+          <span>{t('welcome.openFolder')}</span>
         </button>
 
         <button className="welcome__card" onClick={onCloneRepo}>
@@ -156,7 +158,7 @@ export function WelcomeScreen({
             <path d="M12 3v10M8 9l4 4 4-4" />
             <path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
           </svg>
-          <span>Clone repo…</span>
+          <span>{t('welcome.cloneRepo')}</span>
         </button>
 
         <button className="welcome__card" onClick={onConnectSsh}>
@@ -164,7 +166,7 @@ export function WelcomeScreen({
             <rect x="3" y="5" width="18" height="14" rx="2" />
             <path d="M7 10l3 2-3 2M13 14h4" />
           </svg>
-          <span>Connect over SSH…</span>
+          <span>{t('welcome.connectSsh')}</span>
         </button>
       </div>
 
@@ -183,13 +185,13 @@ export function WelcomeScreen({
 
         {closedProjects.length > 0 && (
           <div className="welcome__recent welcome__recent--closed">
-            <div className="welcome__recent-title">Recently closed</div>
+            <div className="welcome__recent-title">{t('welcome.recentlyClosed')}</div>
             {/* Shown only past the visible-row cap: with three closed projects a filter box is
                 in the way, and past six the list is already scrolling. */}
             {closedProjects.length > RECENT_FILTER_THRESHOLD && (
               <input
                 className="welcome__recent-filter"
-                placeholder="Filter by name or folder…"
+                placeholder={t('welcome.filterPlaceholder')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -204,7 +206,9 @@ export function WelcomeScreen({
             )}
             <div className="welcome__recent-list">
               {visibleClosed.length === 0 && (
-                <div className="welcome__recent-empty">No closed projects match “{query.trim()}”.</div>
+                <div className="welcome__recent-empty">
+                  {t('welcome.noMatch', { query: query.trim() })}
+                </div>
               )}
               {visibleClosed.map((p) => (
                 <div
@@ -231,18 +235,21 @@ export function WelcomeScreen({
                   {(sessionCounts?.[p.id] ?? 0) > 0 && (
                     <span
                       className="welcome__recent-sessions"
-                      title={`${sessionCounts![p.id]} tmux session${
-                        sessionCounts![p.id] === 1 ? ' from this project is' : 's from this project are'
-                      } still running on this machine. Reopen the project to pick them up, or × to delete it and end them.`}
+                      title={t(
+                        sessionCounts![p.id] === 1
+                          ? 'welcome.sessionsTooltipOne'
+                          : 'welcome.sessionsTooltipOther',
+                        { count: sessionCounts![p.id] }
+                      )}
                     >
-                      {sessionCounts![p.id]} running
+                      {t('welcome.running', { count: sessionCounts![p.id] })}
                     </span>
                   )}
                   {onDeleteClosed && (
                     <button
                       className="welcome__recent-del"
-                      title="Delete permanently (ends its sessions)"
-                      aria-label="Delete permanently"
+                      title={t('welcome.deletePermanently')}
+                      aria-label={t('welcome.deletePermanentlyAria')}
                       onClick={(e) => {
                         e.stopPropagation()
                         onDeleteClosed(p.id)

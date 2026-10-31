@@ -1,10 +1,12 @@
 import { projectSectionId } from './project-settings-targets'
 import type { ProjectIcon } from '@shared/project-icon'
+import type { TranslateFn } from '@shared/i18n/types'
 
 export type SettingsSectionId =
   | 'terminal'
   | 'shell'
   | 'behavior'
+  | 'language'
   | 'appearance'
   | 'notch'
   | 'phone'
@@ -88,6 +90,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     id: 'interface',
     title: 'Interface',
     sections: [
+      { id: 'language', title: 'Language' },
       { id: 'appearance', title: 'Appearance' },
       { id: 'notch', title: 'Notch', macOnly: true },
       { id: 'notifications', title: 'Notifications' },
@@ -136,6 +139,40 @@ export function visibleSettingsGroups(isMac: boolean, isBrowser = false): Settin
     ...g,
     sections: g.sections.filter((s) => (isMac || !s.macOnly) && (isBrowser || !s.browserOnly))
   })).filter((g) => g.sections.length > 0)
+}
+
+/** Static nav with localized group and section titles (sidebar render path). */
+export function localizedSettingsGroups(t: TranslateFn): SettingsGroup[] {
+  return SETTINGS_GROUPS.map((g) => ({
+    ...g,
+    title: t(`settings.groups.${g.id}`),
+    sections: g.sections.map((s) => ({
+      ...s,
+      title: t(`settings.sections.${s.id}`)
+    }))
+  }))
+}
+
+export function localizedVisibleSettingsGroups(
+  t: TranslateFn,
+  isMac: boolean,
+  isBrowser = false
+): SettingsGroup[] {
+  return localizedSettingsGroups(t)
+    .map((g) => ({
+      ...g,
+      sections: g.sections.filter((s) => (isMac || !s.macOnly) && (isBrowser || !s.browserOnly))
+    }))
+    .filter((g) => g.sections.length > 0)
+}
+
+export function localizedProjectsSettingsGroup(
+  t: TranslateFn,
+  projects: ProjectNavItem[]
+): SettingsGroup | null {
+  const group = projectsSettingsGroup(projects)
+  if (!group) return null
+  return { ...group, title: t('settings.groups.projects') }
 }
 
 /**

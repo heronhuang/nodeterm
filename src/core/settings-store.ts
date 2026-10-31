@@ -4,6 +4,7 @@ import { writeFileAtomic } from "./fs-atomic";
 import { IPC } from "../shared/ipc";
 import { isNewProjectStorage } from "../shared/project-storage";
 import { platform } from "./platform";
+import { normalizeUiLanguage } from "../shared/i18n/types";
 import { DEFAULT_SETTINGS, type Settings } from "../shared/types";
 
 /**
@@ -104,6 +105,7 @@ function mergeSettings(saved: Partial<Settings> | null | undefined): Settings {
   const legacyGlass = (saved as { glassTerminals?: unknown } | null | undefined)?.glassTerminals;
   if (legacyGlass === true && merged.appTheme === "auto") merged.appTheme = "liquid-glass";
   delete (merged as { glassTerminals?: unknown }).glassTerminals;
+  merged.uiLanguage = normalizeUiLanguage(merged.uiLanguage);
   return merged;
 }
 
