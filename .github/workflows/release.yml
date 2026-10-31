@@ -235,13 +235,21 @@ jobs:
           # asked, and this step runs BEFORE the promote below, so it still names the PREVIOUS
           # release. Falls back to the last tag when there is no published release yet, and when
           # a rerun on an already-promoted tag would otherwise diff that tag against itself.
-          prev=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name 2>/dev/null || true)
+          # Do NOT append `|| true` to the gh call: a 404 still prints JSON to stdout and would
+          # become previous_tag_name, which breaks generate-notes and git log ranges on a fork's
+          # first published release.
+          prev=""
+          if latest=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name 2>/dev/null); then
+            case "$latest" in v*) prev="$latest" ;; esac
+          fi
           if [ -z "$prev" ] || [ "$prev" = "$tag" ]; then
             prev=$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)
+            case "$prev" in v*) ;; *) prev="" ;; esac
           fi
           if [ -n "$prev" ]; then range="${prev}..${tag}"; else range="${tag}"; fi
-          if ! node scripts/release-notes.mjs --tag "$tag" --prev "$prev" \
-                 --repo "$GITHUB_REPOSITORY" --out notes.md; then
+          notes_args=(node scripts/release-notes.mjs --tag "$tag" --repo "$GITHUB_REPOSITORY" --out notes.md)
+          if [ -n "$prev" ]; then notes_args+=(--prev "$prev"); fi
+          if ! "${notes_args[@]}"; then
             echo "::warning::structured release notes failed; falling back to the plain commit list"
             # The plain list is commit subjects, and git knows nothing about the `no-release-notes`
             # label — the fallback would publish exactly what the label keeps out. So the list is

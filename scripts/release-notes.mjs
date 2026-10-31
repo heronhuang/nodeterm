@@ -85,6 +85,17 @@ export const UNMAPPED_SECTION = 'improved'
 /** PRs carrying this label never reach the notes (see the header). */
 export const EXCLUDE_LABEL = 'no-release-notes'
 
+/** Version tags accepted as `previous_tag_name` / git ranges — rejects API error JSON and `null`. */
+const RELEASE_TAG_RE = /^v[0-9A-Za-z._-]+$/
+
+/** Return a normalised previous tag, or '' when the input is missing or not a release tag. */
+export function normalizePreviousTag(prev) {
+  if (prev == null || prev === '' || prev === 'true') return ''
+  const s = String(prev).trim()
+  if (s === 'null' || s === 'undefined') return ''
+  return RELEASE_TAG_RE.test(s) ? s : ''
+}
+
 /** The version-bump commit for the PREVIOUS tag lands in every range. It is pure noise. */
 const RELEASE_BUMP_RE = /^chore\(release\)/i
 
@@ -303,7 +314,8 @@ function parseArgs(argv) {
 
 function generatedBody({ repo, tag, prev }) {
   const args = ['api', `repos/${repo}/releases/generate-notes`, '-f', `tag_name=${tag}`]
-  if (prev) args.push('-f', `previous_tag_name=${prev}`)
+  const previous = normalizePreviousTag(prev)
+  if (previous) args.push('-f', `previous_tag_name=${previous}`)
   args.push('--jq', '.body')
   return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
 }
@@ -350,7 +362,7 @@ function main() {
     )
     process.exit(2)
   }
-  const prev = args.prev && args.prev !== 'true' ? args.prev : ''
+  const prev = normalizePreviousTag(args.prev)
   const body = args['body-file'] ? readFileSync(args['body-file'], 'utf8') : generatedBody({ repo, tag, prev })
   // `--exclude` stands in for the label lookup (tests, a hand run against a saved body).
   const exclude = args.exclude !== undefined ? parseExcludeList(args.exclude === 'true' ? '' : args.exclude) : excludedPrs({ repo })

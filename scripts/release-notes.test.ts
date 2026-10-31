@@ -21,12 +21,22 @@ import {
   groupEntries,
   highlightsBlock,
   highlightsPathFor,
-  renderNotes
+  renderNotes,
+  normalizePreviousTag
   // @ts-expect-error — plain .mjs repo tooling, deliberately outside the typechecked projects.
 } from './release-notes.mjs'
 
 const REPO = 'eneskirca/nodeterm'
 const pr = (n: number) => `https://github.com/${REPO}/pull/${n}`
+
+describe('normalizePreviousTag', () => {
+  it('accepts version tags and rejects API noise', () => {
+    expect(normalizePreviousTag('v0.4.5')).toBe('v0.4.5')
+    expect(normalizePreviousTag('')).toBe('')
+    expect(normalizePreviousTag('null')).toBe('')
+    expect(normalizePreviousTag('{"message":"Not Found"}')).toBe('')
+  })
+})
 
 // A trimmed copy of a real `POST /releases/generate-notes` body for v0.3.7..v0.3.8. Every case
 // the generator has to get right is in here: a feat, a fix, an internal test PR, a dependabot
