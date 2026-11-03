@@ -15,6 +15,7 @@ export const enMessages = {
     back: 'Back',
     search: 'Search',
     dismiss: 'Dismiss',
+    upgradeToPro: 'Upgrade to Pro',
     testOnlyFallback: 'English fallback string'
   },
   confirm: {

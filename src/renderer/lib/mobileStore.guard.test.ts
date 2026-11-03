@@ -94,7 +94,7 @@ describe('mobile store guard', () => {
       join(REPO_ROOT, 'src/renderer/components/settings/sections/NotificationsSection.tsx'),
       'utf8'
     )
-    expect(src).toContain('label="Live updates on phone"')
+    expect(src).toContain("label={t('settings.notifications.liveUpdatesOnPhone')}")
     expect(src).toContain('update({ mobileLiveActivities: on })')
   })
 })
